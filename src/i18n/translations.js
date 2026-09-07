@@ -348,8 +348,9 @@ export const translations = {
 
     // Settings Page & Schedules
     settingsPageTitle: 'Clinic & System Settings',
-    settingsPageSubtitle: 'Working hours, clinic holidays, doctor leaves, and FHIR server connection',
+    settingsPageSubtitle: 'Working hours, clinical & diagnostic services, clinic holidays, doctor leaves, and FHIR server connection',
     tabClinicSchedule: 'Working Hours',
+    tabClinicalServices: 'Clinical & Diagnostic Services',
     tabHolidays: 'Clinic Holidays',
     tabDoctorLeaves: 'Doctor Leaves & Absences',
     tabFacilities: 'Facilities & Locations',
@@ -857,8 +858,9 @@ export const translations = {
 
     // Settings Page & Schedules
     settingsPageTitle: 'Configuración de la Clínica y Sistema',
-    settingsPageSubtitle: 'Horarios de trabajo, días festivos, ausencias médicas y conexión con el servidor FHIR',
+    settingsPageSubtitle: 'Horarios de trabajo, servicios clínicos y diagnósticos, días festivos, ausencias médicas y conexión con el servidor FHIR',
     tabClinicSchedule: 'Horarios de Atención',
+    tabClinicalServices: 'Servicios Clínicos & Diagnósticos',
     tabHolidays: 'Días Festivos',
     tabDoctorLeaves: 'Ausencias por Médico',
     tabFacilities: 'Planteles & Sedes',

@@ -55,6 +55,7 @@ import { useAuth } from '../context/AuthContext';
 import { getPractitioners, updateProxyConfig, checkProxyHealth } from '../services/fhirApi';
 import HolidaysCalendarPicker from '../components/settings/HolidaysCalendarPicker';
 import FacilitiesPage from './FacilitiesPage';
+import ClinicalServicesAdmin from '../components/services/ClinicalServicesAdmin';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, defaultTab }) {
@@ -66,7 +67,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     try {
       const params = new URLSearchParams(location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['schedule', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
         return tabParam;
       }
     } catch (e) {}
@@ -79,7 +80,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     try {
       const params = new URLSearchParams(location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['schedule', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     } catch (e) {}
@@ -406,6 +407,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
 
   const tabs = [
     { id: 'schedule', label: t('tabClinicSchedule'), icon: Clock },
+    { id: 'services', label: t('tabClinicalServices') || 'Servicios Clínicos & Diagnósticos', icon: Stethoscope },
     { id: 'holidays', label: `${t('tabHolidays')} (${holidays.length})`, icon: PartyPopper },
     { id: 'leaves', label: `${t('tabDoctorLeaves')} (${doctorLeaves.length})`, icon: UserCheck },
     { id: 'facilities', label: t('tabFacilities') || 'Planteles & Sedes', icon: Building2 },
@@ -1773,6 +1775,13 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
             </button>
           </div>
         </form>
+      )}
+
+      {/* =========================================================================
+          TAB 2: SERVICIOS CLÍNICOS & DIAGNÓSTICOS DISPONIBLES
+          ========================================================================= */}
+      {activeTab === 'services' && (
+        <ClinicalServicesAdmin addToast={addToast} />
       )}
 
       {/* =========================================================================

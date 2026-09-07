@@ -9,12 +9,12 @@ export default function AppLayout({
   onOpenSettings
 }) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
       {/* Left Menu Sidebar */}
       <Sidebar onOpenSettings={onOpenSettings} />
 
       {/* Main App Right Container */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
         {/* Top Header Bar */}
         <TopHeader
           serverInfo={serverInfo}
@@ -22,8 +22,8 @@ export default function AppLayout({
           onOpenSettings={onOpenSettings}
         />
 
-        {/* Dynamic Page Body */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Dynamic Page Body with visible vertical scrollbar */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
           {children}
         </div>
       </div>

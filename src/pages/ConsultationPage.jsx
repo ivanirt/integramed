@@ -69,6 +69,7 @@ export default function ConsultationPage({ addToast }) {
   // Voice recording simulation states
   const [isRecordingSubjective, setIsRecordingSubjective] = useState(false);
   const [isRecordingPhysical, setIsRecordingPhysical] = useState(false);
+  const [isRecordingAssessment, setIsRecordingAssessment] = useState(false);
   const [isRecordingPlan, setIsRecordingPlan] = useState(false);
 
   // SOAP Note State
@@ -79,6 +80,7 @@ export default function ConsultationPage({ addToast }) {
     { code: '8A80', label: 'Asma' }
   ]);
   const [diagnosisInput, setDiagnosisInput] = useState('');
+  const [assessmentText, setAssessmentText] = useState('Cefalea tensional primaria probablemente desencadenada por estrés laboral. Hipertensión arterial sistémica estadio I en adecuado control farmacológico.');
   const [plan, setPlan] = useState('Continuar con losartán. Solicitar perfil lipídico de control. Cita de seguimiento en 3 meses.');
 
   // AI Assistant Chat & Suggestions State
@@ -699,17 +701,39 @@ export default function ConsultationPage({ addToast }) {
             />
           </div>
 
-          {/* A - DIAGNÓSTICO (CIE-11) (Assessment & Diagnostic chips) */}
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.4rem' }}>
-              {t('soapAssessmentLabel')}
-            </label>
+          {/* A - DIAGNÓSTICO (CIE-11) (Assessment & Diagnostic chips + Free text) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t('soapAssessmentLabel')}
+              </label>
 
+              <button
+                onClick={() => setIsRecordingAssessment(!isRecordingAssessment)}
+                style={{
+                  border: 'none',
+                  background: isRecordingAssessment ? '#fee2e2' : '#f1f5f9',
+                  color: isRecordingAssessment ? '#ef4444' : '#64748b',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Dictar diagnóstico o evaluación clínica"
+              >
+                {isRecordingAssessment ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
+            </div>
+
+            {/* CIE-11 Tag Container */}
             <div
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
-                minHeight: '52px',
+                minHeight: '48px',
                 backgroundColor: '#f8fafc',
                 borderRadius: '0.625rem',
                 border: '1px solid #cbd5e1',
@@ -771,6 +795,32 @@ export default function ConsultationPage({ addToast }) {
                   flex: '1 1 240px',
                   minWidth: '220px',
                   padding: '0.2rem 0'
+                }}
+              />
+            </div>
+
+            {/* Diagnóstico Clínico / Impresión Diagnóstica en Texto Libre */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem' }}>
+                {t('soapAssessmentNarrativeLabel')}
+              </label>
+              <textarea
+                className="form-textarea"
+                rows={3}
+                value={assessmentText}
+                onChange={(e) => setAssessmentText(e.target.value)}
+                placeholder={t('soapAssessmentNarrativePlaceholder')}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '80px',
+                  fontSize: '0.875rem',
+                  lineHeight: 1.55,
+                  padding: '0.65rem 0.875rem',
+                  borderRadius: '0.625rem',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  resize: 'vertical'
                 }}
               />
             </div>

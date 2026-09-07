@@ -396,6 +396,34 @@ export const translations = {
     daySaturdayFull: 'Saturday',
     daySundayFull: 'Sunday',
 
+    // Prescription Builder
+    prescriptionBuilderTitle: 'Prescription Builder',
+    assistantAlertTitle: 'Clinical Assistant Alert',
+    assistantAlertText: 'has registered penicillin allergy and risk of blood pressure elevation with NSAIDs.',
+    viewClinicalDetailLink: 'View clinical details',
+    addMedicationSectionTitle: 'Add Medication',
+    searchMedicationPlaceholder: 'Search medication or active compound...',
+    fieldDose: 'Dose',
+    fieldRoute: 'Route of Administration',
+    fieldFrequency: 'Frequency',
+    fieldDuration: 'Duration',
+    fieldSpecialIndications: 'Special Instructions',
+    addMedicationBtn: 'Add to Prescription',
+    followUpAndControlSectionTitle: 'Follow-up & Control',
+    nextControlAppointment: 'Next Follow-up Appointment',
+    takingFrequencyLabel: 'Dosing Regimen',
+    enableDigitalRemindersLabel: 'Enable Digital Reminders',
+    enableDigitalRemindersDesc: 'Send WhatsApp/SMS reminders to the patient to ensure treatment adherence.',
+    attendingPractitionerHeader: 'Attending Doctor',
+    patientDataHeader: 'Patient Information',
+    noMedicationsAddedYet: 'No medications added to this prescription yet.',
+    printPrescriptionBtn: 'Print',
+    signAndSendPrescriptionBtn: 'Sign & Send to Patient',
+    signingPrescription: 'Signing & saving to FHIR...',
+    medicationAddedToPrescriptionToast: 'Medication added to prescription',
+    emptyPrescriptionError: 'Please add at least one medication to the prescription',
+    prescriptionSignedAndSentToast: 'Prescription signed and sent to patient (FHIR records created)',
+
     // Toasts
     toastCreatedTitle: 'Resource Created',
     toastCreatedMsg: 'Patient "{name}" created on FHIR server.',
@@ -803,6 +831,34 @@ export const translations = {
     daySaturdayFull: 'Sábado',
     daySundayFull: 'Domingo',
 
+    // Prescription Builder
+    prescriptionBuilderTitle: 'Constructor de Receta',
+    assistantAlertTitle: 'Alerta del asistente',
+    assistantAlertText: 'presenta alergia registrada a Penicilinas y riesgo de elevación tensional con AINEs.',
+    viewClinicalDetailLink: 'Ver detalle clínico',
+    addMedicationSectionTitle: 'Agregar Medicamento',
+    searchMedicationPlaceholder: 'Buscar medicamento o principio activo...',
+    fieldDose: 'Dosis',
+    fieldRoute: 'Vía de Administración',
+    fieldFrequency: 'Frecuencia',
+    fieldDuration: 'Duración',
+    fieldSpecialIndications: 'Indicaciones Especiales',
+    addMedicationBtn: 'Agregar a la receta',
+    followUpAndControlSectionTitle: 'Seguimiento y Control',
+    nextControlAppointment: 'Próxima cita de control',
+    takingFrequencyLabel: 'Frecuencia de tomas',
+    enableDigitalRemindersLabel: 'Activar Recordatorios Digitales',
+    enableDigitalRemindersDesc: 'Enviar notificaciones vía WhatsApp/SMS al paciente para asegurar la adherencia al tratamiento.',
+    attendingPractitionerHeader: 'Médico Tratante',
+    patientDataHeader: 'Datos del Paciente',
+    noMedicationsAddedYet: 'Aún no se han agregado medicamentos a esta receta.',
+    printPrescriptionBtn: 'Imprimir',
+    signAndSendPrescriptionBtn: 'Firmar y enviar al paciente',
+    signingPrescription: 'Firmando y guardando en FHIR...',
+    medicationAddedToPrescriptionToast: 'Medicamento agregado a la receta',
+    emptyPrescriptionError: 'Agregue al menos un medicamento a la receta',
+    prescriptionSignedAndSentToast: 'Receta firmada y enviada al paciente (recursos FHIR creados)',
+
     // Toasts
     toastCreatedTitle: 'Recurso Creado',
     toastCreatedMsg: 'Paciente "{name}" creado en el servidor FHIR.',
@@ -814,3 +870,4 @@ export const translations = {
     toastErrorTitle: 'Error de API FHIR'
   }
 };
+

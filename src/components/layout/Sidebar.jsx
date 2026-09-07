@@ -26,7 +26,7 @@ export default function Sidebar({ onOpenSettings }) {
     { to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
     { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck },
     { to: '/labs', label: t('navLabs'), icon: Microscope },
-    { to: '/prescriptions', label: t('navPrescriptions'), icon: FileText },
+    { to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] },
     { to: '/follow-up', label: t('navFollowUp'), icon: Activity }
   ];
 

@@ -329,11 +329,11 @@ export default function PatientProfilePage({ addToast }) {
           {/* Quick Actions (Matching buttons in image: Nueva receta / Iniciar consulta) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
-              onClick={() => setIsDetailOpen(true)}
+              onClick={() => navigate(`/recetas?patientId=${id}`)}
               className="btn btn-secondary"
               style={{ borderRadius: '9999px', padding: '0.55rem 1.1rem', fontSize: '0.8125rem' }}
             >
-              <Eye size={15} />
+              <FileText size={15} />
               <span>{t('btnNewPrescription')}</span>
             </button>
 

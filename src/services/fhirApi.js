@@ -206,6 +206,73 @@ export async function getPatientMedications(patientId) {
 }
 
 /**
+ * Create a new FHIR MedicationRequest resource.
+ */
+export async function createMedicationRequest({
+  patientId,
+  patientName,
+  practitionerId,
+  practitionerName,
+  medicationName,
+  dosage,
+  frequency,
+  duration,
+  route = 'Oral',
+  instructions = ''
+}) {
+  if (!patientId) throw new Error('Patient ID is required');
+
+  const medicationResource = {
+    resourceType: 'MedicationRequest',
+    status: 'active',
+    intent: 'order',
+    medicationCodeableConcept: {
+      coding: [
+        {
+          system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+          display: medicationName
+        }
+      ],
+      text: medicationName
+    },
+    subject: {
+      reference: `Patient/${patientId}`,
+      display: patientName
+    },
+    ...(practitionerId ? {
+      requester: {
+        reference: `Practitioner/${practitionerId}`,
+        display: practitionerName || 'Practitioner'
+      }
+    } : {}),
+    authoredOn: new Date().toISOString(),
+    dosageInstruction: [
+      {
+        text: `Tomar ${dosage || ''} vía ${route || 'Oral'}, ${frequency || ''} durante ${duration || ''}. ${instructions || ''}`.trim(),
+        route: {
+          text: route || 'Oral'
+        }
+      }
+    ]
+  };
+
+  const response = await fetch(`${API_BASE}/fhir/MedicationRequest`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/fhir+json',
+      'Accept': 'application/fhir+json, application/json'
+    },
+    body: JSON.stringify(medicationResource)
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  return await response.json();
+}
+
+/**
  * Create a new FHIR Patient resource via POST.
  */
 export async function createPatient({ givenName, familyName, gender, birthDate }) {

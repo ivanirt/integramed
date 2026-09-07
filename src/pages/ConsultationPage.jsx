@@ -817,9 +817,7 @@ export default function ConsultationPage({ addToast }) {
             </button>
 
             <button
-              onClick={() => {
-                if (addToast) addToast('info', t('prescriptionGeneratedToast'), t('toastCreatedTitle'));
-              }}
+              onClick={() => navigate(`/recetas?patientId=${selectedPatientId}`)}
               className="btn btn-secondary"
               style={{ fontSize: '0.8125rem', padding: '0.55rem 1rem', color: '#0f766e', borderColor: '#a7f3d0' }}
             >

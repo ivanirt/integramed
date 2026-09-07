@@ -1,5 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { STAFF_DIRECTORY, CLINICAL_ROLES } from '../utils/staffData';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import {
+  getStaffList,
+  getStaffById,
+  saveStaffMember,
+  updateStaffPassword,
+  saveStaffList,
+  deleteStaffMember,
+  resetStaffToDefault,
+  CLINICAL_ROLES
+} from '../utils/staffStorage';
 
 const AuthContext = createContext();
 
@@ -8,19 +17,28 @@ const STORAGE_KEY_ROLE = 'integramed_auth_role';
 const STORAGE_KEY_IS_AUTH = 'integramed_is_authenticated';
 
 export function AuthProvider({ children }) {
+  const [staffList, setStaffList] = useState(() => getStaffList());
+
+  const refreshStaff = useCallback(() => {
+    const list = getStaffList();
+    setStaffList(list);
+    return list;
+  }, []);
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem(STORAGE_KEY_USER);
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        const match = STAFF_DIRECTORY.find(s => s.id === parsed.id || s.email === parsed.email);
+        const list = getStaffList();
+        const match = list.find(s => s.id === parsed.id || s.email === parsed.email);
         if (match) return match;
       }
     } catch (e) {
       console.warn('Could not read user from storage', e);
     }
-    // Default to Dr. Jesús Robledo (Doctor & Admin)
-    return STAFF_DIRECTORY[0];
+    const initialList = getStaffList();
+    return initialList[0];
   });
 
   const [activeRole, setActiveRole] = useState(() => {
@@ -30,7 +48,8 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('Could not read role from storage', e);
     }
-    return STAFF_DIRECTORY[0].primaryRole;
+    const initialList = getStaffList();
+    return initialList[0]?.primaryRole || 'doctor';
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -44,18 +63,19 @@ export function AuthProvider({ children }) {
 
   // Keep activeRole consistent if user changes
   useEffect(() => {
-    if (currentUser && !currentUser.roles.includes(activeRole)) {
-      setActiveRole(currentUser.primaryRole || currentUser.roles[0]);
+    if (currentUser && !currentUser.roles?.includes(activeRole)) {
+      setActiveRole(currentUser.primaryRole || currentUser.roles?.[0] || 'doctor');
     }
   }, [currentUser, activeRole]);
 
   // Login method
   const login = (emailOrId, password = '', customRole = null, rememberMe = true) => {
     const trimmed = (emailOrId || '').trim().toLowerCase();
+    const currentDirectory = getStaffList();
     
     // Find staff member
-    const user = STAFF_DIRECTORY.find(s => 
-      s.email.toLowerCase() === trimmed ||
+    const user = currentDirectory.find(s => 
+      s.email?.toLowerCase() === trimmed ||
       (s.secondaryEmail && s.secondaryEmail.toLowerCase() === trimmed) ||
       s.id === emailOrId
     );
@@ -67,13 +87,13 @@ export function AuthProvider({ children }) {
     // Password validation (Supports user.password or master IntegraMed27)
     const validPassword = user.password || 'IntegraMed27';
     if (password && password !== validPassword && password !== 'IntegraMed27' && password !== '••••••••') {
-      throw new Error('Contraseña incorrecta. Utilice la contraseña asignada: IntegraMed27');
+      throw new Error('Contraseña incorrecta. Utilice la contraseña asignada o IntegraMed27');
     }
 
     // Role to activate
-    const chosenRole = (customRole && user.roles.includes(customRole))
+    const chosenRole = (customRole && user.roles?.includes(customRole))
       ? customRole
-      : (user.primaryRole || user.roles[0]);
+      : (user.primaryRole || user.roles?.[0] || 'doctor');
 
     setCurrentUser(user);
     setActiveRole(chosenRole);
@@ -101,7 +121,7 @@ export function AuthProvider({ children }) {
 
   // Switch role for active multi-role user
   const switchRole = (newRole) => {
-    if (currentUser && currentUser.roles.includes(newRole)) {
+    if (currentUser && currentUser.roles?.includes(newRole)) {
       setActiveRole(newRole);
       localStorage.setItem(STORAGE_KEY_ROLE, newRole);
     }
@@ -109,11 +129,12 @@ export function AuthProvider({ children }) {
 
   // Quick switch user (for demo / testing purposes)
   const switchUser = (staffId, desiredRole = null) => {
-    const user = STAFF_DIRECTORY.find(s => s.id === staffId);
+    const currentDirectory = getStaffList();
+    const user = currentDirectory.find(s => s.id === staffId);
     if (user) {
-      const role = desiredRole && user.roles.includes(desiredRole) 
+      const role = desiredRole && user.roles?.includes(desiredRole) 
         ? desiredRole 
-        : (user.primaryRole || user.roles[0]);
+        : (user.primaryRole || user.roles?.[0] || 'doctor');
       setCurrentUser(user);
       setActiveRole(role);
       setIsAuthenticated(true);
@@ -121,6 +142,53 @@ export function AuthProvider({ children }) {
       localStorage.setItem(STORAGE_KEY_ROLE, role);
       localStorage.setItem(STORAGE_KEY_IS_AUTH, 'true');
     }
+  };
+
+  // Update a practitioner's password and sync current session if affected
+  const updatePassword = (staffId, newPassword) => {
+    const updated = updateStaffPassword(staffId, newPassword);
+    refreshStaff();
+    if (currentUser && currentUser.id === staffId) {
+      setCurrentUser(updated);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+    }
+    return updated;
+  };
+
+  // Save / update a full practitioner record
+  const savePractitioner = (practitionerData) => {
+    saveStaffMember(practitionerData);
+    const updatedList = refreshStaff();
+    if (currentUser && currentUser.id === practitionerData.id) {
+      const updatedUser = updatedList.find(s => s.id === practitionerData.id);
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+      }
+    }
+    return updatedList;
+  };
+
+  // Delete a practitioner record
+  const deletePractitioner = (staffId) => {
+    const remaining = deleteStaffMember(staffId);
+    refreshStaff();
+    if (currentUser && currentUser.id === staffId && remaining.length > 0) {
+      setCurrentUser(remaining[0]);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(remaining[0]));
+    }
+    return remaining;
+  };
+
+  // Reset all staff to default seed
+  const resetStaff = () => {
+    const defaultList = resetStaffToDefault();
+    setStaffList(defaultList);
+    setCurrentUser(defaultList[0]);
+    setActiveRole(defaultList[0].primaryRole);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(defaultList[0]));
+    localStorage.setItem(STORAGE_KEY_ROLE, defaultList[0].primaryRole);
+    return defaultList;
   };
 
   return (
@@ -133,7 +201,12 @@ export function AuthProvider({ children }) {
         logout,
         switchRole,
         switchUser,
-        staffList: STAFF_DIRECTORY,
+        staffList,
+        refreshStaff,
+        updatePassword,
+        savePractitioner,
+        deletePractitioner,
+        resetStaff,
         rolesConfig: CLINICAL_ROLES
       }}
     >

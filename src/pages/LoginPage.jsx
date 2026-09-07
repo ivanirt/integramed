@@ -21,19 +21,22 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
-import { STAFF_DIRECTORY, CLINICAL_ROLES, getStaffFullName } from '../utils/staffData';
+import { CLINICAL_ROLES, getStaffFullName } from '../utils/staffStorage';
 
 export default function LoginPage({ addToast }) {
   const navigate = useNavigate();
-  const { login, switchUser, currentUser } = useAuth();
+  const { login, switchUser, currentUser, staffList } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
-  const [email, setEmail] = useState('jesus.robledo@integramed.com');
-  const [password, setPassword] = useState('IntegraMed27');
+  const currentDirectory = staffList && staffList.length > 0 ? staffList : [];
+  const initialStaff = currentDirectory[0] || null;
+
+  const [email, setEmail] = useState(initialStaff?.email || 'jesus.robledo@integramed.com');
+  const [password, setPassword] = useState(initialStaff?.password || 'IntegraMed27');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [selectedStaff, setSelectedStaff] = useState(STAFF_DIRECTORY[0]);
-  const [selectedRole, setSelectedRole] = useState(STAFF_DIRECTORY[0].primaryRole);
+  const [selectedStaff, setSelectedStaff] = useState(initialStaff);
+  const [selectedRole, setSelectedRole] = useState(initialStaff?.primaryRole || 'doctor');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [activeRoleFilter, setActiveRoleFilter] = useState('all');
@@ -63,7 +66,7 @@ export default function LoginPage({ addToast }) {
   const handleSelectStaff = (staff) => {
     setSelectedStaff(staff);
     setEmail(staff.email);
-    setPassword('IntegraMed27');
+    setPassword(staff.password || 'IntegraMed27');
     setSelectedRole(staff.primaryRole || staff.roles[0]);
     setErrorMessage('');
   };
@@ -93,9 +96,9 @@ export default function LoginPage({ addToast }) {
   };
 
   // Filter staff by category for quick demo access
-  const filteredStaff = STAFF_DIRECTORY.filter(s => {
+  const filteredStaff = currentDirectory.filter(s => {
     if (activeRoleFilter === 'all') return true;
-    return s.roles.includes(activeRoleFilter);
+    return s.roles?.includes(activeRoleFilter);
   });
 
   return (
@@ -517,8 +520,8 @@ export default function LoginPage({ addToast }) {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    const match = STAFF_DIRECTORY.find(s => 
-                      s.email.toLowerCase() === e.target.value.toLowerCase() ||
+                    const match = currentDirectory.find(s => 
+                      s.email?.toLowerCase() === e.target.value.toLowerCase() ||
                       s.secondaryEmail?.toLowerCase() === e.target.value.toLowerCase()
                     );
                     if (match) {
@@ -776,7 +779,7 @@ export default function LoginPage({ addToast }) {
                 {language === 'en' ? 'Quick Access by Practitioner' : 'Acceso Rápido por Personal'}
               </span>
               <span style={{ fontSize: '0.6875rem', color: '#64748b' }}>
-                {STAFF_DIRECTORY.length} {language === 'en' ? 'staff members' : 'usuarios clínicos'}
+                {currentDirectory.length} {language === 'en' ? 'staff members' : 'usuarios clínicos'}
               </span>
             </div>
 

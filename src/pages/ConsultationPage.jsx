@@ -589,16 +589,21 @@ export default function ConsultationPage({ addToast }) {
 
             <textarea
               className="form-textarea"
-              rows={3}
+              rows={4}
               value={subjective}
               onChange={(e) => setSubjective(e.target.value)}
-              placeholder="Refiere cefalea de 3 días de evolución..."
+              placeholder="Refiere cefalea de 3 días de evolución, de tipo opresivo..."
               style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '100px',
                 fontSize: '0.875rem',
-                lineHeight: 1.5,
+                lineHeight: 1.6,
+                padding: '0.75rem 1rem',
                 borderRadius: '0.625rem',
                 backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #cbd5e1',
+                resize: 'vertical'
               }}
             />
           </div>
@@ -675,16 +680,21 @@ export default function ConsultationPage({ addToast }) {
 
             <textarea
               className="form-textarea"
-              rows={3}
+              rows={4}
               value={physicalExam}
               onChange={(e) => setPhysicalExam(e.target.value)}
               placeholder="Paciente consciente, orientado, ruidos cardíacos rítmicos..."
               style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '100px',
                 fontSize: '0.875rem',
-                lineHeight: 1.5,
+                lineHeight: 1.6,
+                padding: '0.75rem 1rem',
                 borderRadius: '0.625rem',
                 backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #cbd5e1',
+                resize: 'vertical'
               }}
             />
           </div>
@@ -697,10 +707,13 @@ export default function ConsultationPage({ addToast }) {
 
             <div
               style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '52px',
                 backgroundColor: '#f8fafc',
                 borderRadius: '0.625rem',
-                border: '1px solid #e2e8f0',
-                padding: '0.6rem 0.75rem',
+                border: '1px solid #cbd5e1',
+                padding: '0.65rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
                 flexWrap: 'wrap',
@@ -717,7 +730,7 @@ export default function ConsultationPage({ addToast }) {
                     backgroundColor: '#e0f2fe',
                     color: '#0369a1',
                     border: '1px solid #bae6fd',
-                    padding: '0.2rem 0.6rem',
+                    padding: '0.25rem 0.65rem',
                     borderRadius: '6px',
                     fontSize: '0.8125rem',
                     fontWeight: 600
@@ -753,10 +766,11 @@ export default function ConsultationPage({ addToast }) {
                   border: 'none',
                   background: 'transparent',
                   outline: 'none',
-                  fontSize: '0.8125rem',
+                  fontSize: '0.875rem',
                   color: '#0f172a',
-                  flex: 1,
-                  minWidth: '180px'
+                  flex: '1 1 240px',
+                  minWidth: '220px',
+                  padding: '0.2rem 0'
                 }}
               />
             </div>
@@ -791,16 +805,21 @@ export default function ConsultationPage({ addToast }) {
 
             <textarea
               className="form-textarea"
-              rows={3}
+              rows={5}
               value={plan}
               onChange={(e) => setPlan(e.target.value)}
               placeholder="Continuar con losartán. Solicitar perfil lipídico. Cita en 3 meses..."
               style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '120px',
                 fontSize: '0.875rem',
-                lineHeight: 1.5,
+                lineHeight: 1.6,
+                padding: '0.75rem 1rem',
                 borderRadius: '0.625rem',
                 backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #cbd5e1',
+                resize: 'vertical'
               }}
             />
           </div>

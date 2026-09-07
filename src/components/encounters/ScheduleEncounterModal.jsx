@@ -7,8 +7,10 @@ import { useLanguage } from '../../i18n/LanguageContext';
 export default function ScheduleEncounterModal({
   isOpen,
   preselectedPatient = null,
+  initialDate = null,
   onClose,
-  onSuccess
+  onSuccess,
+  onEncounterScheduled
 }) {
   const { t } = useLanguage();
 
@@ -29,9 +31,18 @@ export default function ScheduleEncounterModal({
   // Initialize date time
   useEffect(() => {
     if (isOpen) {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      setDatetime(now.toISOString().slice(0, 16));
+      let targetDate = new Date();
+      if (initialDate) {
+        if (typeof initialDate === 'string' && initialDate.length === 10) {
+          // YYYY-MM-DD
+          const [y, m, d] = initialDate.split('-').map(Number);
+          targetDate = new Date(y, m - 1, d, 10, 0, 0);
+        } else {
+          targetDate = new Date(initialDate);
+        }
+      }
+      targetDate.setMinutes(targetDate.getMinutes() - targetDate.getTimezoneOffset());
+      setDatetime(targetDate.toISOString().slice(0, 16));
       setSubmitError(null);
 
       if (preselectedPatient?.id) {
@@ -97,6 +108,9 @@ export default function ScheduleEncounterModal({
 
       if (onSuccess) {
         onSuccess(created, patientName);
+      }
+      if (onEncounterScheduled) {
+        onEncounterScheduled(created, patientName);
       }
       onClose();
     } catch (err) {

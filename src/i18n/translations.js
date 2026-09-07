@@ -424,6 +424,23 @@ export const translations = {
     emptyPrescriptionError: 'Please add at least one medication to the prescription',
     prescriptionSignedAndSentToast: 'Prescription signed and sent to patient (FHIR records created)',
 
+    // Login & Access
+    loginWelcomeTitle: 'Welcome',
+    loginWelcomeSubtitle: 'Enter your credentials to access your clinical portal',
+    loginEmailLabel: 'Email Address',
+    loginPasswordLabel: 'Password',
+    loginRememberMe: 'Remember me',
+    loginForgotPassword: 'Forgot password?',
+    loginSignInBtn: 'Sign In',
+    loginQuickAccessTitle: 'Quick Access by Practitioner',
+    loginStaffMembersCount: '{count} staff members',
+    loginHeroHeadline: 'Comprehensive, smart and compassionate healthcare.',
+    loginHeroDescription: 'Clinical platform for physicians, therapists, nursing and front desk with evidence-based intelligence.',
+    loginLegalNote: 'By signing in, you agree to our Privacy Policy and Regulatory Compliance under NOM-024 / HIPAA.',
+    switchPractitionerProfile: 'Switch Practitioner Profile',
+    switchActiveRole: 'Switch Active Role',
+    logOut: 'Log Out',
+
     // Toasts
     toastCreatedTitle: 'Resource Created',
     toastCreatedMsg: 'Patient "{name}" created on FHIR server.',
@@ -858,6 +875,23 @@ export const translations = {
     medicationAddedToPrescriptionToast: 'Medicamento agregado a la receta',
     emptyPrescriptionError: 'Agregue al menos un medicamento a la receta',
     prescriptionSignedAndSentToast: 'Receta firmada y enviada al paciente (recursos FHIR creados)',
+
+    // Login & Access
+    loginWelcomeTitle: 'Bienvenido',
+    loginWelcomeSubtitle: 'Ingresa tus credenciales para acceder a tu consultorio',
+    loginEmailLabel: 'Correo electrónico',
+    loginPasswordLabel: 'Contraseña',
+    loginRememberMe: 'Mantener sesión iniciada',
+    loginForgotPassword: '¿Olvidaste tu contraseña?',
+    loginSignInBtn: 'Entrar',
+    loginQuickAccessTitle: 'Acceso Rápido por Personal',
+    loginStaffMembersCount: '{count} usuarios clínicos',
+    loginHeroHeadline: 'Atención médica integral, inteligente y humana.',
+    loginHeroDescription: 'Plataforma clínica para médicos, terapeutas, enfermería y recepción con asistencia basada en evidencia.',
+    loginLegalNote: 'Al iniciar sesión aceptas las Políticas de Privacidad y Cumplimiento Normativo NOM-024 / HIPAA.',
+    switchPractitionerProfile: 'Cambiar Perfil de Usuario',
+    switchActiveRole: 'Cambiar Rol Activo',
+    logOut: 'Cerrar Sesión',
 
     // Toasts
     toastCreatedTitle: 'Recurso Creado',

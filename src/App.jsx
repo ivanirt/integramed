@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
+import LoginPage from './pages/LoginPage';
 import PatientListPage from './pages/PatientListPage';
 import PatientProfilePage from './pages/PatientProfilePage';
 import AgendaPage from './pages/AgendaPage';
@@ -17,6 +18,7 @@ import PrescriptionBuilderPage from './pages/PrescriptionBuilderPage';
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
   const [serverInfo, setServerInfo] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -51,6 +53,16 @@ export default function App() {
       });
   }, []);
 
+  // Standalone Login Page
+  if (location.pathname === '/login') {
+    return (
+      <div style={{ minHeight: '100vh' }}>
+        <Toast toasts={toasts} onDismiss={dismissToast} />
+        <LoginPage addToast={addToast} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh' }}>
       {/* Toast Notifications */}
@@ -70,6 +82,14 @@ export default function App() {
                 addToast={addToast}
                 formModal={formModal}
                 setFormModal={setFormModal}
+              />
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <LoginPage
+                addToast={addToast}
               />
             }
           />

@@ -59,37 +59,91 @@ export default function PractitionersPage({ addToast, onOpenScheduleModal }) {
   const handleSeedPractitioners = async () => {
     setIsSeeding(true);
     try {
-      const sampleDoctors = [
+      const sampleStaff = [
         {
           prefix: 'Dr.',
-          givenName: 'Carlos Alberto',
-          familyName: 'Mendoza Ruiz',
+          givenName: 'Jesús',
+          familyName: 'Robledo',
           gender: 'male',
-          email: 'carlos.mendoza@integramed.com',
-          phone: '+52 55 5234 8901',
-          qualification: 'Cardiología Clínica & Medicina Interna'
+          email: 'jesus.robledo@integramed.com',
+          phone: '+52 55 5234 8101',
+          qualification: 'Medicina Interna & Dirección Médica'
         },
         {
-          prefix: 'Dra.',
-          givenName: 'Elena',
-          familyName: 'Torres Morales',
+          prefix: 'Dr.',
+          givenName: 'Edgar',
+          familyName: 'Robledo',
+          gender: 'male',
+          email: 'edgar.robledo@integramed.com',
+          phone: '+52 55 5234 8102',
+          qualification: 'Medicina General & Fisioterapia Integral'
+        },
+        {
+          prefix: 'Lic.',
+          givenName: 'Sofía',
+          familyName: 'Mendiola',
           gender: 'female',
-          email: 'elena.torres@integramed.com',
-          phone: '+52 55 5234 8902',
-          qualification: 'Medicina General & Salud Familiar'
+          email: 'sofia.mendiola@integramed.com',
+          phone: '+52 55 5234 8103',
+          qualification: 'Fisioterapia y Rehabilitación Neurológica'
         },
         {
-          prefix: 'Dr.',
-          givenName: 'Roberto',
-          familyName: 'Sánchez Navarro',
+          prefix: 'Enf.',
+          givenName: 'Lluvia',
+          familyName: 'Robledo',
+          gender: 'female',
+          email: 'lluvia.robledo@integramed.com',
+          phone: '+52 55 5234 8104',
+          qualification: 'Enfermería General y Terapia Intensiva'
+        },
+        {
+          prefix: 'Enf.',
+          givenName: 'Carmen',
+          familyName: 'Saldaña',
+          gender: 'female',
+          email: 'carmen.saldana@integramed.com',
+          phone: '+52 55 5234 8105',
+          qualification: 'Enfermería Clínica y Triage de Urgencias'
+        },
+        {
+          prefix: 'Enf.',
+          givenName: 'Mariana',
+          familyName: 'Domínguez',
+          gender: 'female',
+          email: 'mariana.dominguez@integramed.com',
+          phone: '+52 55 5234 8106',
+          qualification: 'Enfermería Pediátrica y Control de Dosis'
+        },
+        {
+          prefix: 'Lic.',
+          givenName: 'Edith',
+          familyName: 'Alvarez',
+          gender: 'female',
+          email: 'edith.alvarez@integramed.com',
+          phone: '+52 55 5234 8107',
+          qualification: 'Atención a Pacientes, Análisis Clínicos y Administración'
+        },
+        {
+          prefix: 'QFB.',
+          givenName: 'Luis Fernando',
+          familyName: 'Garza',
           gender: 'male',
-          email: 'roberto.sanchez@integramed.com',
-          phone: '+52 55 5234 8903',
-          qualification: 'Neumología & Terapia Respiratoria'
+          email: 'luis.garza@integramed.com',
+          phone: '+52 55 5234 8108',
+          qualification: 'Química Clínica, Hematología y Microbiología'
+        },
+        {
+          prefix: 'Ing.',
+          givenName: 'Roberto',
+          familyName: 'Méndez',
+          gender: 'male',
+          email: 'roberto.mendez@integramed.com',
+          phone: '+52 55 5234 8109',
+          qualification: 'Administración Hospitalaria y Operaciones Clínicas'
         }
       ];
 
-      for (const doc of sampleDoctors) {
+      for (const doc of sampleStaff) {
         await createPractitioner(doc);
       }
 

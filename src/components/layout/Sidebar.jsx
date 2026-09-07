@@ -14,9 +14,12 @@ import {
   PlusSquare
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { CLINICAL_ROLES, getStaffFullName } from '../../utils/staffData';
 
 export default function Sidebar({ onOpenSettings }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const { currentUser, activeRole } = useAuth();
   const location = useLocation();
 
   const navItems = [
@@ -147,13 +150,18 @@ export default function Sidebar({ onOpenSettings }) {
       </div>
 
       {/* Footer / Profile Card */}
-      <div
+      <NavLink
+        to="/login"
+        title={language === 'en' ? 'Click to change user' : 'Clic para cambiar de usuario'}
         style={{
           padding: '1rem 1.25rem',
           borderTop: '1px solid #f1f5f9',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem'
+          gap: '0.75rem',
+          textDecoration: 'none',
+          backgroundColor: 'transparent',
+          transition: 'background-color 0.15s ease'
         }}
       >
         <div
@@ -161,29 +169,29 @@ export default function Sidebar({ onOpenSettings }) {
             width: '36px',
             height: '36px',
             borderRadius: '50%',
-            backgroundColor: 'var(--color-primary-100)',
-            color: 'var(--color-primary-800)',
+            backgroundColor: currentUser?.avatarBg || '#0f766e',
+            color: currentUser?.avatarText || '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontWeight: 700,
+            fontWeight: 800,
             fontSize: '0.8125rem',
             flexShrink: 0
           }}
         >
-          <User size={18} />
+          {currentUser ? `${currentUser.givenName[0]}${currentUser.familyName[0]}` : 'JR'}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {t('doctorProfileTitle')}
+            {currentUser ? getStaffFullName(currentUser) : t('doctorProfileTitle')}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-            <span>{t('onlineStatus')}</span>
+          <div style={{ fontSize: '0.7rem', color: CLINICAL_ROLES[activeRole]?.color || '#10b981', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: CLINICAL_ROLES[activeRole]?.color || '#10b981' }} />
+            <span>{CLINICAL_ROLES[activeRole]?.[language === 'en' ? 'labelEn' : 'labelEs'] || t('onlineStatus')}</span>
           </div>
         </div>
-      </div>
+      </NavLink>
     </aside>
   );
 }

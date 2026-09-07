@@ -1003,7 +1003,7 @@ export default function HomePage({ addToast, onOpenScheduleModal }) {
             <Pill size={20} />
           </div>
           <h4 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem' }}>
-            {language === 'en' ? 'Pharmacy & Stock' : 'Farmacia & Inventario'}
+            {language === 'en' ? 'Pharmacy' : 'Farmacia'}
           </h4>
           <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
             {language === 'en' ? 'Medication catalog, batch numbers and stock in/out' : 'Control de lotes, caducidades y entradas/salidas'}

@@ -1918,7 +1918,7 @@ export default function UserProfileAdminPage({ addToast }) {
                     <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Clinical Records & SOAP' : 'Expediente & SOAP'}</th>
                     <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Prescriptions & Rx' : 'Recetas & Rx'}</th>
                     <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Labs & Diagnostics' : 'Labs & Diagnósticos'}</th>
-                    <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Pharmacy & Stock' : 'Farmacia & Stock'}</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Pharmacy' : 'Farmacia'}</th>
                     <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'Shifts & Guards' : 'Turnos & Guardias'}</th>
                     <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>{language === 'en' ? 'System Settings' : 'Configuración'}</th>
                   </tr>

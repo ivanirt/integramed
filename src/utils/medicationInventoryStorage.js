@@ -1,6 +1,6 @@
 /**
- * Medication Catalog & Pharmacy Inventory Storage for IntegraMed
- * Aligned with HL7 FHIR R4 Medication, MedicationKnowledge and InventoryReport
+ * Medication Catalog, Pharmacy Inventory & Patient Dispensation Storage for IntegraMed
+ * Aligned with HL7 FHIR R4 Medication, MedicationKnowledge, MedicationDispense and InventoryReport
  */
 
 export const INITIAL_MEDICATIONS = [
@@ -212,7 +212,118 @@ export const INITIAL_MEDICATIONS = [
   }
 ];
 
+export const INITIAL_STOCK_INGRESSES = [
+  {
+    id: 'ing-2026-001',
+    medicationId: 'med-paracetamol-500',
+    medicationName: 'Paracetamol (Tempra Forte)',
+    batchNumber: 'LOTE-PAR-2408',
+    quantity: 200,
+    unitCost: 45.00,
+    totalCost: 9000.00,
+    supplier: 'Sanofi Aventis México',
+    invoiceNumber: 'FAC-SANOFI-8821',
+    receiptDate: '2026-08-01',
+    expiryDate: '2026-10-31',
+    storageLocation: 'Estante A-01 / Nivel 2',
+    receivedBy: 'Lic. Edith Alvarez',
+    notes: 'Recepción conforme con sello de calidad e inspección visual'
+  },
+  {
+    id: 'ing-2026-002',
+    medicationId: 'med-amoxicilina-clavulanico',
+    medicationName: 'Amoxicilina / Ácido Clavulánico (Augmentin)',
+    batchNumber: 'LOTE-AUG-2401',
+    quantity: 50,
+    unitCost: 220.00,
+    totalCost: 11000.00,
+    supplier: 'GlaxoSmithKline México',
+    invoiceNumber: 'FAC-GSK-4412',
+    receiptDate: '2026-07-10',
+    expiryDate: '2026-03-31',
+    storageLocation: 'Estante B-03 / Gaveta Antibióticos',
+    receivedBy: 'Lic. Edith Alvarez',
+    notes: 'Lote prioritario para urgencias y consulta general'
+  },
+  {
+    id: 'ing-2026-003',
+    medicationId: 'med-insulina-glargina',
+    medicationName: 'Insulina Glargina (Lantus SoloStar)',
+    batchNumber: 'LOTE-INS-9812',
+    quantity: 25,
+    unitCost: 780.00,
+    totalCost: 19500.00,
+    supplier: 'Sanofi Aventis México',
+    invoiceNumber: 'FAC-SANOFI-9104',
+    receiptDate: '2026-08-18',
+    expiryDate: '2026-12-15',
+    storageLocation: 'Refrigerador Farmacia 1 / Bandeja A',
+    receivedBy: 'Enf. Carmen Saldaña',
+    notes: 'Verificación de cadena de frío a 4.2°C al momento de descarga'
+  }
+];
+
+export const INITIAL_DISPENSATIONS = [
+  {
+    id: 'disp-2026-001',
+    patientId: 'patient-mariana-silva',
+    patientName: 'Mariana Silva Ruiz',
+    patientIdentifier: 'CLI-2026-0419',
+    medicationId: 'med-losartan-50',
+    medicationName: 'Losartán Potásico (Cozaar)',
+    quantity: 30,
+    dosageInstructions: '1 tableta vía oral cada 12 horas por 30 días',
+    prescriberDoctor: 'Dra. María Elena Rostro',
+    prescriptionFolio: 'REC-2026-0842',
+    dispenseDate: '2026-09-02',
+    dispenseTime: '10:45',
+    status: 'completed', // 'completed' | 'partial' | 'cancelled'
+    dispensedBy: 'Enf. Lluvia Robledo',
+    notes: 'Paciente acude con receta vigente de consulta externa'
+  },
+  {
+    id: 'disp-2026-002',
+    patientId: 'patient-carlos-mendoza',
+    patientName: 'Carlos Mendoza Cruz',
+    patientIdentifier: 'CLI-2026-0891',
+    medicationId: 'med-amoxicilina-clavulanico',
+    medicationName: 'Amoxicilina / Ácido Clavulánico (Augmentin)',
+    quantity: 14,
+    dosageInstructions: '1 comprimido cada 12 horas con alimentos por 7 días',
+    prescriberDoctor: 'Dr. Roberto Mendoza',
+    prescriptionFolio: 'REC-2026-0914',
+    dispenseDate: '2026-09-05',
+    dispenseTime: '16:20',
+    status: 'completed',
+    dispensedBy: 'Lic. Edith Alvarez',
+    notes: 'Receta de antibiótico sellada y retenida conforme a Fracción IV'
+  },
+  {
+    id: 'disp-2026-003',
+    patientId: 'patient-sofia-garcia',
+    patientName: 'Sofía García Morales',
+    patientIdentifier: 'CLI-2026-0155',
+    medicationId: 'med-salbutamol-aerosol',
+    medicationName: 'Sulfato de Salbutamol (Ventolin Aerosol)',
+    quantity: 1,
+    dosageInstructions: '2 disparos cada 6 horas en caso de crisis asmática',
+    prescriberDoctor: 'Dr. Alejandro Peña',
+    prescriptionFolio: 'REC-2026-0955',
+    dispenseDate: '2026-09-06',
+    dispenseTime: '11:15',
+    status: 'completed',
+    dispensedBy: 'Enf. Carmen Saldaña',
+    notes: 'Se brinda orientación sobre uso correcto de aerocámara'
+  }
+];
+
 const MEDS_STORAGE_KEY = 'integramed_medications_inventory';
+const INGRESS_STORAGE_KEY = 'integramed_stock_ingresses';
+const DISPENSE_STORAGE_KEY = 'integramed_patient_dispensations';
+
+// ==========================================
+// 1. MEDICATIONS CATALOG & STOCK
+// ==========================================
 
 export function getMedications() {
   try {
@@ -236,17 +347,31 @@ export function saveMedications(medsList) {
   } catch (e) {
     console.error('Failed to save medications', e);
   }
+  return medsList;
 }
 
 export function saveMedication(medData) {
   const list = getMedications();
-  const index = list.findIndex(m => m.id === medData.id);
+  const id = medData.id || `med-${Date.now()}`;
+  const cleanMed = {
+    ...medData,
+    id,
+    stock: Number(medData.stock) || 0,
+    minStock: Number(medData.minStock) || 10,
+    maxStock: Number(medData.maxStock) || 100,
+    reorderPoint: Number(medData.reorderPoint) || 20,
+    costPrice: Number(medData.costPrice) || 0,
+    unitPrice: Number(medData.unitPrice) || 0,
+    movements: medData.movements || []
+  };
+
+  const index = list.findIndex(m => m.id === id);
   let updated;
   if (index >= 0) {
     updated = [...list];
-    updated[index] = { ...updated[index], ...medData };
+    updated[index] = { ...updated[index], ...cleanMed };
   } else {
-    updated = [medData, ...list];
+    updated = [cleanMed, ...list];
   }
   saveMedications(updated);
   return updated;
@@ -292,7 +417,230 @@ export function adjustMedicationStock(medId, { type, quantity, reason, user }) {
   return null;
 }
 
+// ==========================================
+// 2. STOCK INGRESSES (ENTRADAS DE ALMACÉN)
+// ==========================================
+
+export function getStockIngresses() {
+  try {
+    const raw = localStorage.getItem(INGRESS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error reading stock ingresses', e);
+  }
+  try {
+    localStorage.setItem(INGRESS_STORAGE_KEY, JSON.stringify(INITIAL_STOCK_INGRESSES));
+  } catch {}
+  return INITIAL_STOCK_INGRESSES;
+}
+
+export function saveStockIngresses(ingList) {
+  try {
+    localStorage.setItem(INGRESS_STORAGE_KEY, JSON.stringify(ingList));
+  } catch (e) {
+    console.error('Failed to save stock ingresses', e);
+  }
+  return ingList;
+}
+
+export function saveStockIngress(ingressData) {
+  const ingresses = getStockIngresses();
+  const id = ingressData.id || `ing-${Date.now()}`;
+  const now = new Date();
+  const dateStr = ingressData.receiptDate || now.toISOString().split('T')[0];
+  const qty = Number(ingressData.quantity) || 0;
+  const unitCost = Number(ingressData.unitCost) || 0;
+  const totalCost = ingressData.totalCost ? Number(ingressData.totalCost) : (qty * unitCost);
+
+  const cleanRecord = {
+    ...ingressData,
+    id,
+    receiptDate: dateStr,
+    quantity: qty,
+    unitCost,
+    totalCost
+  };
+
+  const index = ingresses.findIndex(i => i.id === id);
+  let updatedIngresses;
+  const isNew = index < 0;
+
+  if (index >= 0) {
+    updatedIngresses = [...ingresses];
+    updatedIngresses[index] = cleanRecord;
+  } else {
+    updatedIngresses = [cleanRecord, ...ingresses];
+  }
+  saveStockIngresses(updatedIngresses);
+
+  // If newly registered, automatically add stock to the medication and log movement
+  if (isNew && cleanRecord.medicationId && qty > 0) {
+    const meds = getMedications();
+    const medIdx = meds.findIndex(m => m.id === cleanRecord.medicationId);
+    if (medIdx >= 0) {
+      const med = { ...meds[medIdx] };
+      med.stock = (med.stock || 0) + qty;
+      if (cleanRecord.batchNumber) med.batchNumber = cleanRecord.batchNumber;
+      if (cleanRecord.expiryDate) med.expiryDate = cleanRecord.expiryDate;
+      if (cleanRecord.storageLocation) med.storageLocation = cleanRecord.storageLocation;
+      if (unitCost > 0) med.costPrice = unitCost;
+
+      const movement = {
+        id: `mov-ing-${Date.now()}`,
+        type: 'in',
+        quantity: qty,
+        reason: `Entrada Almacén: Factura ${cleanRecord.invoiceNumber || id} - ${cleanRecord.supplier || 'Proveedor'}`,
+        date: dateStr,
+        user: cleanRecord.receivedBy || 'Farmacia Central'
+      };
+      med.movements = [movement, ...(med.movements || [])];
+      meds[medIdx] = med;
+      saveMedications(meds);
+    }
+  }
+
+  return { ingresses: updatedIngresses, record: cleanRecord };
+}
+
+export function deleteStockIngress(ingressId) {
+  const ingresses = getStockIngresses();
+  const target = ingresses.find(i => i.id === ingressId);
+  const filtered = ingresses.filter(i => i.id !== ingressId);
+  saveStockIngresses(filtered);
+
+  // If deleting an ingress, reverse the stock addition if possible
+  if (target && target.medicationId && target.quantity) {
+    const meds = getMedications();
+    const medIdx = meds.findIndex(m => m.id === target.medicationId);
+    if (medIdx >= 0) {
+      const med = { ...meds[medIdx] };
+      med.stock = Math.max(0, (med.stock || 0) - Number(target.quantity));
+      meds[medIdx] = med;
+      saveMedications(meds);
+    }
+  }
+
+  return filtered;
+}
+
+// ==========================================
+// 3. PATIENT DISPENSATIONS (DISPENSACIÓN)
+// ==========================================
+
+export function getPatientDispensations() {
+  try {
+    const raw = localStorage.getItem(DISPENSE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error reading patient dispensations', e);
+  }
+  try {
+    localStorage.setItem(DISPENSE_STORAGE_KEY, JSON.stringify(INITIAL_DISPENSATIONS));
+  } catch {}
+  return INITIAL_DISPENSATIONS;
+}
+
+export function savePatientDispensations(dispList) {
+  try {
+    localStorage.setItem(DISPENSE_STORAGE_KEY, JSON.stringify(dispList));
+  } catch (e) {
+    console.error('Failed to save patient dispensations', e);
+  }
+  return dispList;
+}
+
+export function savePatientDispensation(dispenseData) {
+  const dispensations = getPatientDispensations();
+  const id = dispenseData.id || `disp-${Date.now()}`;
+  const now = new Date();
+  const dateStr = dispenseData.dispenseDate || now.toISOString().split('T')[0];
+  const timeStr = dispenseData.dispenseTime || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const qty = Number(dispenseData.quantity) || 1;
+
+  const cleanRecord = {
+    ...dispenseData,
+    id,
+    dispenseDate: dateStr,
+    dispenseTime: timeStr,
+    quantity: qty,
+    status: dispenseData.status || 'completed'
+  };
+
+  const index = dispensations.findIndex(d => d.id === id);
+  let updatedDispensations;
+  const isNew = index < 0;
+
+  if (index >= 0) {
+    updatedDispensations = [...dispensations];
+    updatedDispensations[index] = cleanRecord;
+  } else {
+    updatedDispensations = [cleanRecord, ...dispensations];
+  }
+  savePatientDispensations(updatedDispensations);
+
+  // If newly dispensed, deduct stock from medication and log movement
+  if (isNew && cleanRecord.medicationId && qty > 0) {
+    const meds = getMedications();
+    const medIdx = meds.findIndex(m => m.id === cleanRecord.medicationId);
+    if (medIdx >= 0) {
+      const med = { ...meds[medIdx] };
+      med.stock = Math.max(0, (med.stock || 0) - qty);
+
+      const movement = {
+        id: `mov-disp-${Date.now()}`,
+        type: 'out',
+        quantity: qty,
+        reason: `Dispensación: ${cleanRecord.patientName || 'Paciente'} (Receta ${cleanRecord.prescriptionFolio || 'S/F'})`,
+        date: dateStr,
+        user: cleanRecord.dispensedBy || 'Farmacia'
+      };
+      med.movements = [movement, ...(med.movements || [])];
+      meds[medIdx] = med;
+      saveMedications(meds);
+    }
+  }
+
+  return { dispensations: updatedDispensations, record: cleanRecord };
+}
+
+export function deletePatientDispensation(dispenseId) {
+  const dispensations = getPatientDispensations();
+  const target = dispensations.find(d => d.id === dispenseId);
+  const filtered = dispensations.filter(d => d.id !== dispenseId);
+  savePatientDispensations(filtered);
+
+  // If deleting/cancelling a dispensation, restore the stock
+  if (target && target.medicationId && target.quantity) {
+    const meds = getMedications();
+    const medIdx = meds.findIndex(m => m.id === target.medicationId);
+    if (medIdx >= 0) {
+      const med = { ...meds[medIdx] };
+      med.stock = (med.stock || 0) + Number(target.quantity);
+      meds[medIdx] = med;
+      saveMedications(meds);
+    }
+  }
+
+  return filtered;
+}
+
+// ==========================================
+// 4. RESET ALL PHARMACY DATA
+// ==========================================
+
 export function resetMedicationsData() {
   saveMedications(INITIAL_MEDICATIONS);
-  return INITIAL_MEDICATIONS;
+  saveStockIngresses(INITIAL_STOCK_INGRESSES);
+  savePatientDispensations(INITIAL_DISPENSATIONS);
+  return {
+    medications: INITIAL_MEDICATIONS,
+    ingresses: INITIAL_STOCK_INGRESSES,
+    dispensations: INITIAL_DISPENSATIONS
+  };
 }

@@ -11,6 +11,7 @@ import {
   CalendarDays
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getClinicHolidays, getDoctorLeaves } from '../../utils/scheduleStorage';
 
 export default function ClinicalCalendar({
   encounters = [],
@@ -20,6 +21,14 @@ export default function ClinicalCalendar({
   onEncounterClick
 }) {
   const { t, locale } = useLanguage();
+  const holidays = useMemo(() => getClinicHolidays(), []);
+  const doctorLeaves = useMemo(() => getDoctorLeaves(), []);
+
+  const holidaysMap = useMemo(() => {
+    const map = {};
+    holidays.forEach(h => { map[h.date] = h; });
+    return map;
+  }, [holidays]);
 
   // Current calendar view month (Date object set to 1st of month)
   const [viewDate, setViewDate] = useState(() => {
@@ -258,6 +267,7 @@ export default function ClinicalCalendar({
         {calendarDays.map((day) => {
           const dayEncounters = encountersByDate[day.dateStr] || [];
           const isSelected = selectedDate === day.dateStr;
+          const holiday = holidaysMap[day.dateStr];
           const hasEncounters = dayEncounters.length > 0;
 
           return (
@@ -270,11 +280,15 @@ export default function ClinicalCalendar({
                 borderRadius: '0.625rem',
                 border: isSelected
                   ? '2px solid #0f766e'
+                  : holiday
+                  ? '1.5px solid #f59e0b'
                   : day.isToday
                   ? '1.5px solid #a7f3d0'
                   : '1px solid #f1f5f9',
                 backgroundColor: isSelected
                   ? '#f0fdfa'
+                  : holiday
+                  ? '#fefce8'
                   : day.isToday
                   ? '#ecfdf5'
                   : day.isCurrentMonth
@@ -290,30 +304,50 @@ export default function ClinicalCalendar({
               }}
               className="calendar-day-cell"
             >
-              {/* Top Row: Day Number & Today indicator */}
+              {/* Top Row: Day Number & Holiday / Quick Add */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span
-                  style={{
-                    fontSize: '0.8125rem',
-                    fontWeight: isSelected || day.isToday ? 800 : 600,
-                    color: isSelected
-                      ? '#0f766e'
-                      : day.isToday
-                      ? '#059669'
-                      : day.isCurrentMonth
-                      ? '#0f172a'
-                      : '#cbd5e1',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: isSelected ? '#ccfbf1' : 'transparent'
-                  }}
-                >
-                  {day.dayNum}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span
+                    style={{
+                      fontSize: '0.8125rem',
+                      fontWeight: isSelected || day.isToday || holiday ? 800 : 600,
+                      color: isSelected
+                        ? '#0f766e'
+                        : holiday
+                        ? '#92400e'
+                        : day.isToday
+                        ? '#059669'
+                        : day.isCurrentMonth
+                        ? '#0f172a'
+                        : '#cbd5e1',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isSelected ? '#ccfbf1' : 'transparent'
+                    }}
+                  >
+                    {day.dayNum}
+                  </span>
+
+                  {holiday && (
+                    <span
+                      style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        backgroundColor: '#fde68a',
+                        color: '#78350f',
+                        padding: '1px 4px',
+                        borderRadius: '4px'
+                      }}
+                      title={holiday.name}
+                    >
+                      Festivo
+                    </span>
+                  )}
+                </div>
 
                 {/* Quick Add Button */}
                 <button

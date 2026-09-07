@@ -123,9 +123,9 @@ export default function Sidebar({ onOpenSettings }) {
             );
           })}
 
-          {/* Settings Nav Button */}
-          <button
-            onClick={onOpenSettings}
+          {/* Settings Nav Link */}
+          <NavLink
+            to="/configuracion"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -133,19 +133,16 @@ export default function Sidebar({ onOpenSettings }) {
               padding: '0.65rem 1rem',
               borderRadius: '0.625rem',
               fontSize: '0.875rem',
-              fontWeight: 500,
-              color: '#475569',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              width: '100%',
-              textAlign: 'left',
+              fontWeight: location.pathname.startsWith('/configuracion') || location.pathname.startsWith('/settings') ? 700 : 500,
+              color: location.pathname.startsWith('/configuracion') || location.pathname.startsWith('/settings') ? '#047857' : '#475569',
+              backgroundColor: location.pathname.startsWith('/configuracion') || location.pathname.startsWith('/settings') ? '#5eead4' : 'transparent',
+              textDecoration: 'none',
               transition: 'all 0.15s ease'
             }}
           >
-            <Settings size={18} color="#64748b" />
+            <Settings size={18} color={location.pathname.startsWith('/configuracion') || location.pathname.startsWith('/settings') ? '#047857' : '#64748b'} />
             <span>{t('navSettings')}</span>
-          </button>
+          </NavLink>
         </nav>
       </div>
 

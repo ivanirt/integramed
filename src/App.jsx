@@ -12,6 +12,7 @@ import { checkProxyHealth } from './services/fhirApi';
 import { useLanguage } from './i18n/LanguageContext';
 
 import ConsultationPage from './pages/ConsultationPage';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -146,6 +147,26 @@ export default function App() {
               <PractitionersPage
                 addToast={addToast}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <SettingsPage
+                addToast={addToast}
+                serverInfo={serverInfo}
+                onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <SettingsPage
+                addToast={addToast}
+                serverInfo={serverInfo}
+                onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
               />
             }
           />

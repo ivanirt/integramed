@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Settings,
   Clock,
   Calendar,
   PartyPopper,
   UserCheck,
+  Building2,
   Server,
   Save,
   Plus,
@@ -41,12 +43,36 @@ import {
 } from '../utils/scheduleStorage';
 import { getPractitioners, updateProxyConfig, checkProxyHealth } from '../services/fhirApi';
 import HolidaysCalendarPicker from '../components/settings/HolidaysCalendarPicker';
+import FacilitiesPage from './FacilitiesPage';
 import { useLanguage } from '../i18n/LanguageContext';
 
-export default function SettingsPage({ addToast, serverInfo, onConfigUpdated }) {
-  const { t, locale } = useLanguage();
+export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, defaultTab }) {
+  const { t, locale, language } = useLanguage();
+  const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'holidays' | 'leaves' | 'fhir'
+  const getInitialTab = () => {
+    if (defaultTab) return defaultTab;
+    try {
+      const params = new URLSearchParams(location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['schedule', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+        return tabParam;
+      }
+    } catch (e) {}
+    return 'schedule';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['schedule', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    } catch (e) {}
+  }, [location.search]);
 
   // 1. Working Schedule State
   const [schedule, setSchedule] = useState(getClinicSchedule());
@@ -326,6 +352,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated }) 
     { id: 'schedule', label: t('tabClinicSchedule'), icon: Clock },
     { id: 'holidays', label: `${t('tabHolidays')} (${holidays.length})`, icon: PartyPopper },
     { id: 'leaves', label: `${t('tabDoctorLeaves')} (${doctorLeaves.length})`, icon: UserCheck },
+    { id: 'facilities', label: t('tabFacilities') || 'Planteles & Sedes', icon: Building2 },
     { id: 'fhir', label: t('tabFhirConnection'), icon: Server }
   ];
 
@@ -1373,6 +1400,15 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated }) 
             </button>
           </div>
         </form>
+      )}
+
+      {/* =========================================================================
+          TAB 5: PLANTELES & SEDES (ORGANIZATIONS & LOCATIONS)
+          ========================================================================= */}
+      {activeTab === 'facilities' && (
+        <div>
+          <FacilitiesPage addToast={addToast} embedded={true} />
+        </div>
       )}
     </div>
   );

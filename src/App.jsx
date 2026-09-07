@@ -228,24 +228,33 @@ export default function App() {
           <Route
             path="/planteles"
             element={
-              <FacilitiesPage
+              <SettingsPage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                defaultTab="facilities"
+                onConfigUpdated={(health) => setServerInfo(health)}
               />
             }
           />
           <Route
             path="/locations"
             element={
-              <FacilitiesPage
+              <SettingsPage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                defaultTab="facilities"
+                onConfigUpdated={(health) => setServerInfo(health)}
               />
             }
           />
           <Route
             path="/facilities"
             element={
-              <FacilitiesPage
+              <SettingsPage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                defaultTab="facilities"
+                onConfigUpdated={(health) => setServerInfo(health)}
               />
             }
           />

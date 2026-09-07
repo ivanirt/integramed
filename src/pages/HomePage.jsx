@@ -517,7 +517,7 @@ export default function HomePage({ addToast, onOpenScheduleModal }) {
 
             <button
               type="button"
-              onClick={() => navigate('/planteles')}
+              onClick={() => navigate('/configuracion?tab=facilities')}
               className="btn btn-secondary btn-sm"
               style={{ marginTop: '1.25rem', justifyContent: 'center', gap: '0.35rem' }}
             >
@@ -703,7 +703,7 @@ export default function HomePage({ addToast, onOpenScheduleModal }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '1rem' }}>
               <button
                 type="button"
-                onClick={() => navigate('/planteles')}
+                onClick={() => navigate('/configuracion?tab=facilities')}
                 className="btn btn-primary btn-sm"
                 style={{ backgroundColor: '#0f766e', gap: '0.35rem' }}
               >

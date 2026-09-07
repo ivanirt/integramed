@@ -74,6 +74,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8101',
     roles: ['doctor', 'admin'],
     primaryRole: 'doctor',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#0f766e',
     avatarText: '#ffffff',
@@ -139,6 +140,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8102',
     roles: ['doctor', 'therapist'],
     primaryRole: 'doctor',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#0369a1',
     avatarText: '#ffffff',
@@ -204,6 +206,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8103',
     roles: ['therapist'],
     primaryRole: 'therapist',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#0284c7',
     avatarText: '#ffffff',
@@ -259,6 +262,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8104',
     roles: ['nurse'],
     primaryRole: 'nurse',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#be123c',
     avatarText: '#ffffff',
@@ -324,6 +328,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8105',
     roles: ['nurse'],
     primaryRole: 'nurse',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#e11d48',
     avatarText: '#ffffff',
@@ -379,6 +384,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8106',
     roles: ['nurse'],
     primaryRole: 'nurse',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#db2777',
     avatarText: '#ffffff',
@@ -434,6 +440,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8107',
     roles: ['receptionist', 'lab', 'admin'],
     primaryRole: 'receptionist',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#d97706',
     avatarText: '#ffffff',
@@ -489,6 +496,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8108',
     roles: ['lab'],
     primaryRole: 'lab',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#4f46e5',
     avatarText: '#ffffff',
@@ -544,6 +552,7 @@ export const INITIAL_STAFF_DIRECTORY = [
     phone: '+52 55 5234 8109',
     roles: ['admin'],
     primaryRole: 'admin',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#6d28d9',
     avatarText: '#ffffff',
@@ -601,7 +610,10 @@ export function getStaffList() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map(item => ({
+          preferredLanguage: item.preferredLanguage || 'es',
+          ...item
+        }));
       }
     }
   } catch (e) {
@@ -666,6 +678,24 @@ export function updateStaffPassword(staffId, newPassword) {
       ...updatedList[index],
       password: newPassword,
       lastPasswordChange: new Date().toISOString()
+    };
+    saveStaffList(updatedList);
+    return updatedList[index];
+  }
+  return null;
+}
+
+/**
+ * Update a practitioner language preference
+ */
+export function updateStaffLanguage(staffId, newLanguage) {
+  const list = getStaffList();
+  const index = list.findIndex(s => s.id === staffId);
+  if (index >= 0) {
+    const updatedList = [...list];
+    updatedList[index] = {
+      ...updatedList[index],
+      preferredLanguage: newLanguage
     };
     saveStaffList(updatedList);
     return updatedList[index];

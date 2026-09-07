@@ -35,7 +35,7 @@ import {
 import OrganizationModal from '../components/facilities/OrganizationModal';
 import LocationModal from '../components/facilities/LocationModal';
 
-export default function FacilitiesPage({ addToast }) {
+export default function FacilitiesPage({ addToast, embedded = false }) {
   const { language, t } = useLanguage();
 
   const [organizations, setOrganizations] = useState(() => getOrganizations());
@@ -148,7 +148,7 @@ export default function FacilitiesPage({ addToast }) {
   };
 
   return (
-    <div style={{ padding: '1.75rem', maxWidth: '1440px', margin: '0 auto' }}>
+    <div style={{ padding: embedded ? '0' : '1.75rem', maxWidth: '1440px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>

@@ -49,6 +49,7 @@ export default function PractitionerAdminModal({
     password: 'IntegraMed27',
     roles: ['doctor'],
     primaryRole: 'doctor',
+    preferredLanguage: 'es',
     status: 'active',
     avatarBg: '#0f766e',
     avatarText: '#ffffff',
@@ -112,6 +113,7 @@ export default function PractitionerAdminModal({
           password: practitioner.password || 'IntegraMed27',
           roles: practitioner.roles || ['doctor'],
           primaryRole: practitioner.primaryRole || practitioner.roles?.[0] || 'doctor',
+          preferredLanguage: practitioner.preferredLanguage || 'es',
           status: practitioner.status || 'active',
           avatarBg: practitioner.avatarBg || '#0f766e',
           avatarText: practitioner.avatarText || '#ffffff',
@@ -147,6 +149,7 @@ export default function PractitionerAdminModal({
           password: 'IntegraMed27',
           roles: ['doctor'],
           primaryRole: 'doctor',
+          preferredLanguage: 'es',
           status: 'active',
           avatarBg: randomColor,
           avatarText: '#ffffff',
@@ -526,7 +529,7 @@ export default function PractitionerAdminModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                       {language === 'en' ? 'Gender' : 'Género'}
@@ -572,6 +575,20 @@ export default function PractitionerAdminModal({
                       <option value="on_call">{language === 'en' ? 'On Call' : 'En Guardia'}</option>
                       <option value="leave">{language === 'en' ? 'On Leave / Vacation' : 'Permiso / Vacaciones'}</option>
                       <option value="inactive">{language === 'en' ? 'Inactive' : 'Inactivo'}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                      {language === 'en' ? 'Language' : 'Idioma'}
+                    </label>
+                    <select
+                      className="form-input"
+                      value={formData.preferredLanguage || 'es'}
+                      onChange={(e) => setFormData({ ...formData, preferredLanguage: e.target.value })}
+                    >
+                      <option value="es">🇲🇽 Español</option>
+                      <option value="en">🇺🇸 English</option>
                     </select>
                   </div>
                 </div>

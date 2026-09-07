@@ -4,11 +4,13 @@ import {
   getStaffById,
   saveStaffMember,
   updateStaffPassword,
+  updateStaffLanguage,
   saveStaffList,
   deleteStaffMember,
   resetStaffToDefault,
   CLINICAL_ROLES
 } from '../utils/staffStorage';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const AuthContext = createContext();
 
@@ -61,12 +63,33 @@ export function AuthProvider({ children }) {
     }
   });
 
+  const { language, setLanguage } = useLanguage();
+
   // Keep activeRole consistent if user changes
   useEffect(() => {
     if (currentUser && !currentUser.roles?.includes(activeRole)) {
       setActiveRole(currentUser.primaryRole || currentUser.roles?.[0] || 'doctor');
     }
   }, [currentUser, activeRole]);
+
+  // Keep application language synchronized with currentUser's preferred language
+  useEffect(() => {
+    if (currentUser?.preferredLanguage && currentUser.preferredLanguage !== language) {
+      setLanguage(currentUser.preferredLanguage);
+    }
+  }, [currentUser?.id, currentUser?.preferredLanguage]);
+
+  // Method to update preferred language directly on current user profile
+  const updateUserLanguage = (newLang) => {
+    if (!currentUser) return;
+    setLanguage(newLang);
+    updateStaffLanguage(currentUser.id, newLang);
+    const updatedUser = { ...currentUser, preferredLanguage: newLang };
+    setCurrentUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+    refreshStaff();
+    return updatedUser;
+  };
 
   // Login method
   const login = (emailOrId, password = '', customRole = null, rememberMe = true) => {
@@ -98,6 +121,10 @@ export function AuthProvider({ children }) {
     setCurrentUser(user);
     setActiveRole(chosenRole);
     setIsAuthenticated(true);
+
+    if (user.preferredLanguage) {
+      setLanguage(user.preferredLanguage);
+    }
 
     if (rememberMe) {
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
@@ -138,6 +165,9 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       setActiveRole(role);
       setIsAuthenticated(true);
+      if (user.preferredLanguage) {
+        setLanguage(user.preferredLanguage);
+      }
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
       localStorage.setItem(STORAGE_KEY_ROLE, role);
       localStorage.setItem(STORAGE_KEY_IS_AUTH, 'true');
@@ -164,6 +194,9 @@ export function AuthProvider({ children }) {
       if (updatedUser) {
         setCurrentUser(updatedUser);
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+        if (updatedUser.preferredLanguage) {
+          setLanguage(updatedUser.preferredLanguage);
+        }
       }
     }
     return updatedList;
@@ -186,6 +219,9 @@ export function AuthProvider({ children }) {
     setStaffList(defaultList);
     setCurrentUser(defaultList[0]);
     setActiveRole(defaultList[0].primaryRole);
+    if (defaultList[0]?.preferredLanguage) {
+      setLanguage(defaultList[0].preferredLanguage);
+    }
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(defaultList[0]));
     localStorage.setItem(STORAGE_KEY_ROLE, defaultList[0].primaryRole);
     return defaultList;
@@ -201,6 +237,7 @@ export function AuthProvider({ children }) {
         logout,
         switchRole,
         switchUser,
+        updateUserLanguage,
         staffList,
         refreshStaff,
         updatePassword,

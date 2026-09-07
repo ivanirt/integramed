@@ -24,7 +24,7 @@ export const translations = {
     navAgenda: 'Agenda',
     navPatients: 'Patients',
     navEncounters: 'Consultations',
-    navPractitioners: 'Practitioners & Staff',
+    navPractitioners: 'Staff',
     navShiftsGuards: 'Shifts & Guards',
     navFacilities: 'Facilities & Locations',
     navInventory: 'Pharmacy & Stock',
@@ -352,6 +352,7 @@ export const translations = {
     tabClinicSchedule: 'Working Hours',
     tabHolidays: 'Clinic Holidays',
     tabDoctorLeaves: 'Doctor Leaves & Absences',
+    tabFacilities: 'Facilities & Locations',
     tabFhirConnection: 'FHIR Server',
     generalScheduleSettingsTitle: 'General Consultation Settings',
     generalScheduleSettingsDesc: 'Define standard duration for appointment slots',
@@ -465,7 +466,7 @@ export const translations = {
     logOut: 'Log Out',
 
     // Practitioners & Staff Administration
-    navPractitioners: 'Staff & Doctors',
+    navPractitioners: 'Staff',
     practitionersAdminTitle: 'Staff & Practitioners Administration',
     practitionersAdminSubtitle: 'Manage clinical staff profiles, medical specialties, CME courses, assigned shifts, and security credentials',
     newPractitionerBtn: 'New Practitioner',
@@ -526,7 +527,7 @@ export const translations = {
     navAgenda: 'Agenda',
     navPatients: 'Pacientes',
     navEncounters: 'Consulta',
-    navPractitioners: 'Personal Clínico',
+    navPractitioners: 'Personal',
     navShiftsGuards: 'Turnos & Guardias',
     navFacilities: 'Planteles & Sedes',
     navInventory: 'Farmacia & Inventario',
@@ -854,6 +855,7 @@ export const translations = {
     tabClinicSchedule: 'Horarios de Atención',
     tabHolidays: 'Días Festivos',
     tabDoctorLeaves: 'Ausencias por Médico',
+    tabFacilities: 'Planteles & Sedes',
     tabFhirConnection: 'Servidor FHIR',
     generalScheduleSettingsTitle: 'Configuración General de Citas',
     generalScheduleSettingsDesc: 'Define la duración estándar de cada bloque o intervalo de consulta',
@@ -967,7 +969,7 @@ export const translations = {
     logOut: 'Cerrar Sesión',
 
     // Practitioners & Staff Administration
-    navPractitioners: 'Personal Clínico',
+    navPractitioners: 'Personal',
     practitionersAdminTitle: 'Administración de Profesionales y Personal',
     practitionersAdminSubtitle: 'Gestión integral de personal clínico, especialidades, cursos de educación continua, turnos y contraseñas de acceso',
     newPractitionerBtn: 'Nuevo Profesional',

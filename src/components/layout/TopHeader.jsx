@@ -17,7 +17,8 @@ import {
   HeartPulse,
   Users,
   ShieldCheck,
-  FlaskConical
+  FlaskConical,
+  Globe
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -31,7 +32,7 @@ export default function TopHeader({
   onOpenSettings
 }) {
   const { language, setLanguage, t } = useLanguage();
-  const { currentUser, activeRole, switchRole, logout } = useAuth();
+  const { currentUser, activeRole, switchRole, updateUserLanguage, logout } = useAuth();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -281,50 +282,6 @@ export default function TopHeader({
 
       {/* Right Header Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        {/* Language Switcher */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: '#f1f5f9',
-            borderRadius: '9999px',
-            padding: '3px'
-          }}
-        >
-          <button
-            onClick={() => setLanguage('es')}
-            style={{
-              padding: '4px 9px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: language === 'es' ? '#0d9488' : 'transparent',
-              color: language === 'es' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            ES
-          </button>
-          <button
-            onClick={() => setLanguage('en')}
-            style={{
-              padding: '4px 9px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: language === 'en' ? '#0d9488' : 'transparent',
-              color: language === 'en' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            EN
-          </button>
-        </div>
-
         {/* Server Status Pill */}
         <div
           onClick={onOpenSettings}
@@ -514,6 +471,72 @@ export default function TopHeader({
                   </div>
                 </div>
               )}
+
+              {/* Account Language Preference in Profile */}
+              <div style={{ padding: '0.75rem 0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Globe size={13} color="#0d9488" />
+                  <span>{language === 'en' ? 'Account Language' : 'Idioma de la Cuenta'}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (updateUserLanguage) {
+                        updateUserLanguage('es');
+                      } else {
+                        setLanguage('es');
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.5rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      border: language === 'es' ? '1px solid #0d9488' : '1px solid #e2e8f0',
+                      backgroundColor: language === 'es' ? '#ecfdf5' : '#f8fafc',
+                      color: language === 'es' ? '#0f766e' : '#64748b',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>🇲🇽 Español</span>
+                    {language === 'es' && <Check size={13} color="#0d9488" strokeWidth={3} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (updateUserLanguage) {
+                        updateUserLanguage('en');
+                      } else {
+                        setLanguage('en');
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.5rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      border: language === 'en' ? '1px solid #0d9488' : '1px solid #e2e8f0',
+                      backgroundColor: language === 'en' ? '#ecfdf5' : '#f8fafc',
+                      color: language === 'en' ? '#0f766e' : '#64748b',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>🇺🇸 English</span>
+                    {language === 'en' && <Check size={13} color="#0d9488" strokeWidth={3} />}
+                  </button>
+                </div>
+              </div>
 
               {/* Actions */}
               <div style={{ paddingTop: '0.5rem' }}>

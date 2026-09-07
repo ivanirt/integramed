@@ -32,6 +32,7 @@ export const translations = {
     navPrescriptions: 'Prescriptions',
     navFollowUp: 'Follow-up',
     navSettings: 'Settings',
+    navUserProfile: 'My Profile & Users',
     doctorProfileTitle: 'Dr. Silva Ruiz',
     onlineStatus: 'Online',
     
@@ -542,6 +543,7 @@ export const translations = {
     navPrescriptions: 'Recetas',
     navFollowUp: 'Seguimiento',
     navSettings: 'Configuración',
+    navUserProfile: 'Mi Perfil & Usuarios',
     doctorProfileTitle: 'Dra. Silva Ruiz',
     onlineStatus: 'En línea',
     

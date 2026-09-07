@@ -294,11 +294,11 @@ export default function Sidebar({ onOpenSettings }) {
 
       {/* Footer / Profile Card */}
       <NavLink
-        to="/login"
+        to="/perfil"
         title={
           isCollapsed
-            ? `${currentUser ? getStaffFullName(currentUser) : 'Usuario'} (${roleConfig?.[language === 'en' ? 'labelEn' : 'labelEs']}) - ${language === 'en' ? 'Click to change user' : 'Clic para cambiar de usuario'}`
-            : (language === 'en' ? 'Click to change user' : 'Clic para cambiar de usuario')
+            ? `${currentUser ? getStaffFullName(currentUser) : 'Usuario'} (${roleConfig?.[language === 'en' ? 'labelEn' : 'labelEs']}) - ${language === 'en' ? 'My Profile & Users' : 'Mi Perfil y Usuarios'}`
+            : (language === 'en' ? 'My Profile & Users' : 'Mi Perfil y Usuarios')
         }
         style={{
           padding: isCollapsed ? '1rem 0' : '1rem 1.25rem',
@@ -308,7 +308,7 @@ export default function Sidebar({ onOpenSettings }) {
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           gap: '0.75rem',
           textDecoration: 'none',
-          backgroundColor: 'transparent',
+          backgroundColor: location.pathname.startsWith('/perfil') || location.pathname.startsWith('/profile') || location.pathname.startsWith('/usuarios') || location.pathname.startsWith('/users') ? '#ecfdf5' : 'transparent',
           transition: 'all 0.22s ease'
         }}
       >

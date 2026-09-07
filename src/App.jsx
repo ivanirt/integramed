@@ -20,6 +20,7 @@ import HomePage from './pages/HomePage';
 import FacilitiesPage from './pages/FacilitiesPage';
 import MedicationsInventoryPage from './pages/MedicationsInventoryPage';
 import StaffShiftsGuardsPage from './pages/StaffShiftsGuardsPage';
+import UserProfileAdminPage from './pages/UserProfileAdminPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -323,6 +324,46 @@ export default function App() {
                 addToast={addToast}
                 serverInfo={serverInfo}
                 onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
+              />
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <UserProfileAdminPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <UserProfileAdminPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/usuarios"
+            element={
+              <UserProfileAdminPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <UserProfileAdminPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/user-profile"
+            element={
+              <UserProfileAdminPage
+                addToast={addToast}
               />
             }
           />

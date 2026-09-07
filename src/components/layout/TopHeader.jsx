@@ -544,6 +544,31 @@ export default function TopHeader({
                   type="button"
                   onClick={() => {
                     setIsUserMenuOpen(false);
+                    navigate('/perfil');
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 0.625rem',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8125rem',
+                    color: '#0f766e',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                >
+                  <User size={15} />
+                  <span>{language === 'en' ? 'My Profile & User Settings' : 'Mi Perfil & Gestión de Usuarios'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
                     navigate('/login');
                   }}
                   style={{

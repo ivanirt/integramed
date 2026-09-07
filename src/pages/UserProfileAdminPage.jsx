@@ -1436,7 +1436,7 @@ export default function UserProfileAdminPage({ addToast }) {
 
                   <button
                     type="button"
-                    onClick={() => navigate('/turnos')}
+                    onClick={() => navigate('/practitioners?tab=guards')}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

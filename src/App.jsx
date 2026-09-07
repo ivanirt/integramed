@@ -284,26 +284,41 @@ export default function App() {
             }
           />
           <Route
+            path="/personal"
+            element={
+              <PractitionersPage
+                addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
             path="/turnos"
             element={
-              <StaffShiftsGuardsPage
+              <PractitionersPage
+                defaultTab="guards"
                 addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
           />
           <Route
             path="/guardias"
             element={
-              <StaffShiftsGuardsPage
+              <PractitionersPage
+                defaultTab="guards"
                 addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
           />
           <Route
             path="/shifts"
             element={
-              <StaffShiftsGuardsPage
+              <PractitionersPage
+                defaultTab="guards"
                 addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
           />

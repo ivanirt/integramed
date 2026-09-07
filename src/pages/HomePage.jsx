@@ -1034,7 +1034,7 @@ export default function HomePage({ addToast, onOpenScheduleModal }) {
         </div>
 
         <div
-          onClick={() => navigate('/turnos')}
+          onClick={() => navigate('/practitioners?tab=guards')}
           style={{
             backgroundColor: '#ffffff',
             borderRadius: '0.75rem',

@@ -16,6 +16,7 @@ import ConsultationPage from './pages/ConsultationPage';
 import SettingsPage from './pages/SettingsPage';
 import PrescriptionBuilderPage from './pages/PrescriptionBuilderPage';
 import LabsPage from './pages/LabsPage';
+import HomePage from './pages/HomePage';
 import FacilitiesPage from './pages/FacilitiesPage';
 import MedicationsInventoryPage from './pages/MedicationsInventoryPage';
 import StaffShiftsGuardsPage from './pages/StaffShiftsGuardsPage';
@@ -82,10 +83,27 @@ export default function App() {
           <Route
             path="/"
             element={
-              <PatientListPage
+              <HomePage
                 addToast={addToast}
-                formModal={formModal}
-                setFormModal={setFormModal}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/home"
+            element={
+              <HomePage
+                addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/inicio"
+            element={
+              <HomePage
+                addToast={addToast}
+                onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
           />

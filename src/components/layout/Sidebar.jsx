@@ -67,8 +67,8 @@ export default function Sidebar({ onOpenSettings }) {
   ];
 
   const isItemActive = (item) => {
-    if (item.exact && (location.pathname === '/' || location.pathname === '/patients')) {
-      return location.pathname === item.to || (item.to === '/patients' && location.pathname === '/');
+    if (item.exact) {
+      return location.pathname === '/' || location.pathname === '/home' || location.pathname === '/inicio';
     }
     if (location.pathname === item.to) return true;
     if (item.aliases?.some(alias => location.pathname.startsWith(alias))) return true;

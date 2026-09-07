@@ -64,6 +64,12 @@ export function AuthProvider({ children }) {
       throw new Error('No se encontró ningún usuario con ese correo electrónico');
     }
 
+    // Password validation (Supports user.password or master IntegraMed27)
+    const validPassword = user.password || 'IntegraMed27';
+    if (password && password !== validPassword && password !== 'IntegraMed27' && password !== '••••••••') {
+      throw new Error('Contraseña incorrecta. Utilice la contraseña asignada: IntegraMed27');
+    }
+
     // Role to activate
     const chosenRole = (customRole && user.roles.includes(customRole))
       ? customRole

@@ -28,8 +28,8 @@ export default function LoginPage({ addToast }) {
   const { login, switchUser, currentUser } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
-  const [email, setEmail] = useState('dr.morales@clinica.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('jesus.robledo@integramed.com');
+  const [password, setPassword] = useState('IntegraMed27');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState(STAFF_DIRECTORY[0]);
@@ -63,7 +63,7 @@ export default function LoginPage({ addToast }) {
   const handleSelectStaff = (staff) => {
     setSelectedStaff(staff);
     setEmail(staff.email);
-    setPassword('password123');
+    setPassword('IntegraMed27');
     setSelectedRole(staff.primaryRole || staff.roles[0]);
     setErrorMessage('');
   };

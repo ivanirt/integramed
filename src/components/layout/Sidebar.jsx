@@ -28,7 +28,7 @@ export default function Sidebar({ onOpenSettings }) {
     { to: '/patients', label: t('navPatients'), icon: Users, aliases: ['/patient/'] },
     { to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
     { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck },
-    { to: '/labs', label: t('navLabs'), icon: Microscope },
+    { to: '/laboratorios', label: t('navLabs'), icon: Microscope, aliases: ['/labs', '/laboratorios'] },
     { to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] },
     { to: '/follow-up', label: t('navFollowUp'), icon: Activity }
   ];

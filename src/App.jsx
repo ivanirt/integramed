@@ -15,6 +15,7 @@ import { useLanguage } from './i18n/LanguageContext';
 import ConsultationPage from './pages/ConsultationPage';
 import SettingsPage from './pages/SettingsPage';
 import PrescriptionBuilderPage from './pages/PrescriptionBuilderPage';
+import LabsPage from './pages/LabsPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -168,6 +169,22 @@ export default function App() {
               <PractitionersPage
                 addToast={addToast}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/labs"
+            element={
+              <LabsPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/laboratorios"
+            element={
+              <LabsPage
+                addToast={addToast}
               />
             }
           />

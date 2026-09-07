@@ -461,6 +461,14 @@ export const translations = {
     switchActiveRole: 'Switch Active Role',
     logOut: 'Log Out',
 
+    // Laboratories & Studies
+    labsPageTitle: 'Laboratory Studies',
+    dragDropStudiesTitle: 'Drag studies here or select files (PDF, JPG, DICOM)',
+    findingsSummaryTitle: 'Findings Summary',
+    inquireDeeperBtn: 'Inquire deeper with AI',
+    studyPanelsCount: '{count} study panels recorded',
+    studyLoadedToast: 'Study loaded and processed. Parameters integrated to FHIR.',
+
     // Toasts
     toastCreatedTitle: 'Resource Created',
     toastCreatedMsg: 'Patient "{name}" created on FHIR server.',
@@ -932,6 +940,14 @@ export const translations = {
     switchPractitionerProfile: 'Cambiar Perfil de Usuario',
     switchActiveRole: 'Cambiar Rol Activo',
     logOut: 'Cerrar Sesión',
+
+    // Laboratories & Studies
+    labsPageTitle: 'Estudios de Laboratorio',
+    dragDropStudiesTitle: 'Arrastra estudios aquí o selecciona archivos (PDF, JPG, DICOM)',
+    findingsSummaryTitle: 'Resumen de Hallazgos',
+    inquireDeeperBtn: 'Indagar más',
+    studyPanelsCount: '{count} estudios registrados',
+    studyLoadedToast: 'Estudio cargado y procesado. Parámetros integrados a FHIR.',
 
     // Toasts
     toastCreatedTitle: 'Recurso Creado',

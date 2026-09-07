@@ -862,7 +862,19 @@ export default function PatientProfilePage({ addToast }) {
 
       {/* TAB 3: LABORATORIOS (Vitals & Labs) */}
       {activeTab === 'laboratorios' && (
-        <VitalsTable readings={parsedVitals.allReadings} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => navigate(`/laboratorios?patientId=${id}`)}
+              className="btn btn-primary"
+              style={{ backgroundColor: '#0d9488', gap: '0.5rem' }}
+            >
+              <Microscope size={16} />
+              <span>Ver y Cargar Estudios de Laboratorio</span>
+            </button>
+          </div>
+          <VitalsTable readings={parsedVitals.allReadings} />
+        </div>
       )}
 
       {/* TAB 4: RECETAS (Medications) */}

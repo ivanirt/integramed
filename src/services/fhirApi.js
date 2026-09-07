@@ -552,6 +552,109 @@ export async function checkProxyHealth() {
 }
 
 /**
+ * Fetch patient laboratory observations or reports.
+ */
+export async function getPatientLabObservations(patientId) {
+  if (!patientId) throw new Error('Patient ID is required');
+
+  const url = `${API_BASE}/fhir/Observation?subject=Patient/${encodeURIComponent(patientId)}&category=laboratory&_count=100&_sort=-date`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/fhir+json, application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  const data = await response.json();
+  if (data.resourceType === 'Bundle' && Array.isArray(data.entry)) {
+    return data.entry.map(e => e.resource).filter(r => r && r.resourceType === 'Observation');
+  }
+
+  return [];
+}
+
+/**
+ * Create a new Laboratory Observation resource in FHIR.
+ */
+export async function createLabObservation({
+  patientId,
+  code = '24323-8',
+  display = 'Comprehensive metabolic 2000 panel',
+  value,
+  unit = 'mg/dL',
+  referenceRange = '0 - 100',
+  interpretation = 'N',
+  effectiveDateTime = new Date().toISOString()
+}) {
+  const observationResource = {
+    resourceType: 'Observation',
+    status: 'final',
+    category: [
+      {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+            code: 'laboratory',
+            display: 'Laboratory'
+          }
+        ]
+      }
+    ],
+    code: {
+      coding: [
+        {
+          system: 'http://loinc.org',
+          code: code,
+          display: display
+        }
+      ],
+      text: display
+    },
+    subject: {
+      reference: `Patient/${patientId}`
+    },
+    effectiveDateTime: effectiveDateTime,
+    ...(typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)))
+      ? {
+          valueQuantity: {
+            value: Number(value),
+            unit: unit,
+            system: 'http://unitsofmeasure.org',
+            code: unit
+          }
+        }
+      : {
+          valueString: String(value)
+        }),
+    referenceRange: [
+      {
+        text: referenceRange
+      }
+    ]
+  };
+
+  const response = await fetch(`${API_BASE}/fhir/Observation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/fhir+json',
+      'Accept': 'application/fhir+json, application/json'
+    },
+    body: JSON.stringify(observationResource)
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  return await response.json();
+}
+
+/**
  * Update runtime FHIR Proxy server settings.
  */
 export async function updateProxyConfig(fhirBaseUrl, fhirAuthToken) {
@@ -569,3 +672,4 @@ export async function updateProxyConfig(fhirBaseUrl, fhirAuthToken) {
 
   return await response.json();
 }
+

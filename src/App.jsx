@@ -16,6 +16,9 @@ import ConsultationPage from './pages/ConsultationPage';
 import SettingsPage from './pages/SettingsPage';
 import PrescriptionBuilderPage from './pages/PrescriptionBuilderPage';
 import LabsPage from './pages/LabsPage';
+import FacilitiesPage from './pages/FacilitiesPage';
+import MedicationsInventoryPage from './pages/MedicationsInventoryPage';
+import StaffShiftsGuardsPage from './pages/StaffShiftsGuardsPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -200,6 +203,78 @@ export default function App() {
             path="/prescriptions"
             element={
               <PrescriptionBuilderPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/planteles"
+            element={
+              <FacilitiesPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/locations"
+            element={
+              <FacilitiesPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/facilities"
+            element={
+              <FacilitiesPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/inventario"
+            element={
+              <MedicationsInventoryPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/medicamentos"
+            element={
+              <MedicationsInventoryPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/pharmacy"
+            element={
+              <MedicationsInventoryPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/turnos"
+            element={
+              <StaffShiftsGuardsPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/guardias"
+            element={
+              <StaffShiftsGuardsPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/shifts"
+            element={
+              <StaffShiftsGuardsPage
                 addToast={addToast}
               />
             }

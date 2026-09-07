@@ -16,11 +16,15 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
-  Menu
+  Menu,
+  Building2,
+  Pill,
+  Clock,
+  RotateCw
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { CLINICAL_ROLES, getStaffFullName } from '../../utils/staffData';
+import { CLINICAL_ROLES, getStaffFullName } from '../../utils/staffStorage';
 
 export default function Sidebar({ onOpenSettings }) {
   const { language, t } = useLanguage();
@@ -54,10 +58,12 @@ export default function Sidebar({ onOpenSettings }) {
     { to: '/agenda', label: t('navAgenda'), icon: Calendar },
     { to: '/patients', label: t('navPatients'), icon: Users, aliases: ['/patient/'] },
     { to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
-    { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck },
+    { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck, aliases: ['/practitioners', '/medicos'] },
+    { to: '/turnos', label: t('navShiftsGuards'), icon: Clock, aliases: ['/turnos', '/guardias', '/shifts'] },
+    { to: '/planteles', label: t('navFacilities'), icon: Building2, aliases: ['/planteles', '/locations', '/facilities'] },
+    { to: '/inventario', label: t('navInventory'), icon: Pill, aliases: ['/inventario', '/medicamentos', '/pharmacy'] },
     { to: '/laboratorios', label: t('navLabs'), icon: Microscope, aliases: ['/labs', '/laboratorios'] },
-    { to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] },
-    { to: '/follow-up', label: t('navFollowUp'), icon: Activity }
+    { to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] }
   ];
 
   const isItemActive = (item) => {

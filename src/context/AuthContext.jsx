@@ -5,6 +5,7 @@ import {
   saveStaffMember,
   updateStaffPassword,
   updateStaffLanguage,
+  updateStaffConsultationDuration,
   saveStaffList,
   deleteStaffMember,
   resetStaffToDefault,
@@ -202,6 +203,17 @@ export function AuthProvider({ children }) {
     return updatedList;
   };
 
+  // Update a practitioner's default consultation duration
+  const updateConsultationDuration = (staffId, minutes) => {
+    const updated = updateStaffConsultationDuration(staffId, minutes);
+    refreshStaff();
+    if (currentUser && currentUser.id === staffId && updated) {
+      setCurrentUser(updated);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+    }
+    return updated;
+  };
+
   // Delete a practitioner record
   const deletePractitioner = (staffId) => {
     const remaining = deleteStaffMember(staffId);
@@ -238,6 +250,7 @@ export function AuthProvider({ children }) {
         switchRole,
         switchUser,
         updateUserLanguage,
+        updateConsultationDuration,
         staffList,
         refreshStaff,
         updatePassword,

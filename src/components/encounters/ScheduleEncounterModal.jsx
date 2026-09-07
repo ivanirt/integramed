@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, User, UserCheck, Stethoscope, Clock, Save, AlertCircle, Loader2 } from 'lucide-react';
 import { getPatients, getPractitioners, createEncounter } from '../../services/fhirApi';
 import { getPatientFullName } from '../../utils/fhirHelper';
+import { getStaffList } from '../../utils/staffStorage';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function ScheduleEncounterModal({
@@ -252,6 +253,22 @@ export default function ScheduleEncounterModal({
                   );
                 })}
               </select>
+
+              {/* Expected duration hint based on doctor setting */}
+              {(() => {
+                if (!selectedPractitionerId) return null;
+                const staffList = getStaffList();
+                const matched = staffList.find(s => s.id === selectedPractitionerId || (s.givenName && selectedPractitionerId.toLowerCase().includes(s.givenName.toLowerCase())));
+                if (matched?.shiftInfo?.consultationDurationMin) {
+                  return (
+                    <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#0f766e', fontWeight: 600 }}>
+                      <Clock size={12} strokeWidth={2.5} />
+                      <span>{t('slotDurationLabel') || 'Duración de consulta'}: <strong>{matched.shiftInfo.consultationDurationMin} min</strong></span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             {/* Encounter Type & Status */}

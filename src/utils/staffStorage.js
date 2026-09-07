@@ -764,6 +764,28 @@ export function resetStaffToDefault() {
 }
 
 /**
+ * Update a practitioner consultation default duration in minutes
+ */
+export function updateStaffConsultationDuration(staffId, minutes) {
+  const list = getStaffList();
+  const index = list.findIndex(s => s.id === staffId);
+  if (index >= 0) {
+    const updatedList = [...list];
+    const shiftInfo = updatedList[index].shiftInfo || {};
+    updatedList[index] = {
+      ...updatedList[index],
+      shiftInfo: {
+        ...shiftInfo,
+        consultationDurationMin: Number(minutes) || 30
+      }
+    };
+    saveStaffList(updatedList);
+    return updatedList[index];
+  }
+  return null;
+}
+
+/**
  * Helper to get full name with title
  */
 export function getStaffFullName(staff) {

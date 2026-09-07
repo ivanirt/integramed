@@ -11,7 +11,7 @@ import {
   CalendarDays
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { getClinicHolidays, getDoctorLeaves } from '../../utils/scheduleStorage';
+import { getClinicHolidays, getDoctorLeaves, getDateOverrides } from '../../utils/scheduleStorage';
 
 export default function ClinicalCalendar({
   encounters = [],
@@ -23,12 +23,19 @@ export default function ClinicalCalendar({
   const { t, locale } = useLanguage();
   const holidays = useMemo(() => getClinicHolidays(), []);
   const doctorLeaves = useMemo(() => getDoctorLeaves(), []);
+  const dateOverrides = useMemo(() => getDateOverrides(), []);
 
   const holidaysMap = useMemo(() => {
     const map = {};
     holidays.forEach(h => { map[h.date] = h; });
     return map;
   }, [holidays]);
+
+  const overridesMap = useMemo(() => {
+    const map = {};
+    dateOverrides.forEach(o => { map[o.date] = o; });
+    return map;
+  }, [dateOverrides]);
 
   // Current calendar view month (Date object set to 1st of month)
   const [viewDate, setViewDate] = useState(() => {
@@ -345,6 +352,22 @@ export default function ClinicalCalendar({
                       title={holiday.name}
                     >
                       Festivo
+                    </span>
+                  )}
+
+                  {overridesMap[day.dateStr] && !holiday && (
+                    <span
+                      style={{
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        backgroundColor: overridesMap[day.dateStr].enabled ? '#ccfbf1' : '#ffe4e6',
+                        color: overridesMap[day.dateStr].enabled ? '#0f766e' : '#be123c',
+                        padding: '1px 4px',
+                        borderRadius: '4px'
+                      }}
+                      title={`${overridesMap[day.dateStr].reason} (${overridesMap[day.dateStr].start || ''} - ${overridesMap[day.dateStr].end || ''})`}
+                    >
+                      {overridesMap[day.dateStr].enabled ? `${overridesMap[day.dateStr].start}` : 'Cerrado'}
                     </span>
                   )}
                 </div>

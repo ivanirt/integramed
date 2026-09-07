@@ -1,12 +1,14 @@
 /**
- * Storage and helper utilities for Clinic Working Schedule, Holidays, and Doctor Non-Working Days.
+ * Storage and helper utilities for Clinic Working Schedule, Date Overrides, Holidays, and Doctor Non-Working Days.
  * Persists locally and synchronizes across the application.
  */
 
 const STORAGE_KEYS = {
   SCHEDULE: 'integramed_clinic_schedule',
+  DATE_OVERRIDES: 'integramed_date_overrides',
   HOLIDAYS: 'integramed_clinic_holidays',
-  DOCTOR_LEAVES: 'integramed_doctor_leaves'
+  DOCTOR_LEAVES: 'integramed_doctor_leaves',
+  PRACTITIONER_SCHEDULES: 'integramed_practitioner_schedules'
 };
 
 // Default Working Schedule
@@ -23,6 +25,32 @@ export const DEFAULT_SCHEDULE = {
   }
 };
 
+// Default Sample Date Overrides (Custom hours for specific calendar days)
+export const DEFAULT_DATE_OVERRIDES = [
+  {
+    id: 'override-1',
+    date: '2026-09-18',
+    enabled: true,
+    start: '07:30',
+    end: '15:00',
+    hasSplit: false,
+    reason: 'Jornada Intensiva de Consultas y Vacunación',
+    practitionerId: 'all'
+  },
+  {
+    id: 'override-2',
+    date: '2026-10-10',
+    enabled: true,
+    start: '09:00',
+    end: '13:00',
+    hasSplit: true,
+    startAfternoon: '15:00',
+    endAfternoon: '19:00',
+    reason: 'Horario especial de fin de semana extendido',
+    practitionerId: 'all'
+  }
+];
+
 // Default Holidays for the current year
 export const DEFAULT_HOLIDAYS = [
   { id: 'h-1', date: '2026-01-01', name: 'Año Nuevo' },
@@ -38,12 +66,12 @@ export const DEFAULT_HOLIDAYS = [
 export const DEFAULT_DOCTOR_LEAVES = [
   {
     id: 'leave-1',
-    practitionerId: '03ca699c-b020-336a-ad85-aeb60d5b0614',
-    practitionerName: 'Dr. Carlos Mendoza Ruiz',
+    practitionerId: 'staff-jesus-robledo',
+    practitionerName: 'Dr. Jesús Robledo',
     startDate: '2026-09-21',
     endDate: '2026-09-25',
     reason: 'Congreso',
-    notes: 'Congreso Internacional de Cardiología Clínica'
+    notes: 'Congreso Internacional de Medicina Interna'
   },
   {
     id: 'leave-2',
@@ -56,7 +84,7 @@ export const DEFAULT_DOCTOR_LEAVES = [
   }
 ];
 
-// 1. Working Schedule Methods
+// 1. General Working Schedule Methods
 export function getClinicSchedule() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SCHEDULE);
@@ -78,7 +106,63 @@ export function saveClinicSchedule(schedule) {
   }
 }
 
-// 2. Clinic Holidays Methods
+// 2. Date-Specific Working Hours Overrides (Cambiar horario de cualquier día específico)
+export function getDateOverrides() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DATE_OVERRIDES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(DEFAULT_DATE_OVERRIDES));
+      return DEFAULT_DATE_OVERRIDES;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return DEFAULT_DATE_OVERRIDES;
+  }
+}
+
+export function saveDateOverrides(overrides) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(overrides));
+    window.dispatchEvent(new Event('clinic_date_overrides_updated'));
+    return true;
+  } catch (err) {
+    console.error('Failed to save date overrides:', err);
+    return false;
+  }
+}
+
+export function setDateOverride(override) {
+  const current = getDateOverrides();
+  // Filter out if this date already has an override
+  const filtered = current.filter(o => o.date !== override.date);
+  const newOverride = {
+    id: override.id || `override-${Date.now()}`,
+    ...override
+  };
+  const updated = [...filtered, newOverride].sort((a, b) => a.date.localeCompare(b.date));
+  saveDateOverrides(updated);
+  return updated;
+}
+
+export function removeDateOverride(overrideIdOrDate) {
+  const current = getDateOverrides();
+  const updated = current.filter(o => o.id !== overrideIdOrDate && o.date !== overrideIdOrDate);
+  saveDateOverrides(updated);
+  return updated;
+}
+
+export function getDateOverrideForDate(dateStr, practitionerId = null) {
+  const overrides = getDateOverrides();
+  return overrides.find(o => {
+    if (o.date !== dateStr) return false;
+    if (practitionerId && o.practitionerId && o.practitionerId !== 'all' && o.practitionerId !== practitionerId) {
+      return false;
+    }
+    return true;
+  }) || null;
+}
+
+// 3. Clinic Holidays Methods
 export function getClinicHolidays() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
@@ -105,7 +189,6 @@ export function saveClinicHolidays(holidays) {
 
 export function addClinicHoliday(holiday) {
   const current = getClinicHolidays();
-  // Avoid duplicate date
   const filtered = current.filter(h => h.date !== holiday.date);
   const updated = [...filtered, { id: holiday.id || `h-${Date.now()}`, ...holiday }];
   updated.sort((a, b) => a.date.localeCompare(b.date));
@@ -125,7 +208,7 @@ export function isDateClinicHoliday(dateStr) {
   return holidays.find(h => h.date === dateStr) || null;
 }
 
-// 3. Doctor Non-Working Days / Leaves Methods
+// 4. Doctor Non-Working Days / Leaves Methods
 export function getDoctorLeaves() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DOCTOR_LEAVES);
@@ -176,4 +259,68 @@ export function getDoctorLeavesForDate(dateStr, practitionerId = null) {
     }
     return dateStr >= l.startDate && dateStr <= l.endDate;
   });
+}
+
+// 5. Unified Resolver: Get Exact Working Hours for ANY Date
+export function getWorkingHoursForDate(dateStr, practitionerId = null) {
+  // Check Holiday
+  const holiday = isDateClinicHoliday(dateStr);
+  
+  // Check Specific Date Override (Highest precedence for hours)
+  const override = getDateOverrideForDate(dateStr, practitionerId);
+  if (override) {
+    return {
+      isWorking: override.enabled,
+      source: 'override',
+      override,
+      start: override.start,
+      end: override.end,
+      hasSplit: override.hasSplit || false,
+      startAfternoon: override.startAfternoon || '',
+      endAfternoon: override.endAfternoon || '',
+      reason: override.reason || 'Horario especial por fecha'
+    };
+  }
+
+  // If holiday and no override
+  if (holiday) {
+    return {
+      isWorking: false,
+      source: 'holiday',
+      holiday,
+      reason: `Día Festivo: ${holiday.name}`
+    };
+  }
+
+  // Check Doctor Leave
+  const doctorLeaves = getDoctorLeavesForDate(dateStr, practitionerId);
+  if (doctorLeaves.length > 0) {
+    return {
+      isWorking: false,
+      source: 'leave',
+      leaves: doctorLeaves,
+      reason: `Ausencia Médica: ${doctorLeaves[0].reason}`
+    };
+  }
+
+  // Standard Weekly Schedule
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, d);
+  const dayOfWeek = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+  const schedule = getClinicSchedule();
+  const dayConfig = schedule.days?.[dayOfWeek] || { enabled: false, start: '08:00', end: '18:00' };
+
+  return {
+    isWorking: dayConfig.enabled,
+    source: 'weekly',
+    dayOfWeek,
+    dayName: dayConfig.name,
+    start: dayConfig.start || '08:00',
+    end: dayConfig.end || '18:00',
+    hasSplit: dayConfig.hasSplit || false,
+    startAfternoon: dayConfig.startAfternoon || '',
+    endAfternoon: dayConfig.endAfternoon || '',
+    reason: dayConfig.enabled ? 'Horario estándar de trabajo' : 'Día cerrado'
+  };
 }

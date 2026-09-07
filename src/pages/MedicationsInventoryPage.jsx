@@ -31,6 +31,7 @@ import {
 } from '../utils/medicationInventoryStorage';
 import MedicationModal from '../components/medications/MedicationModal';
 import StockMovementModal from '../components/medications/StockMovementModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function MedicationsInventoryPage({ addToast }) {
   const { language, t } = useLanguage();
@@ -145,22 +146,74 @@ export default function MedicationsInventoryPage({ addToast }) {
     }
   };
 
+  // Universal Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
+
   // Delete medication handler
   const handleDeleteMedication = (med) => {
-    if (window.confirm(language === 'en' ? `Delete medication ${med.genericName}?` : `¿Eliminar el medicamento ${med.genericName} del inventario?`)) {
-      const updated = deleteMedication(med.id);
-      setMedications(updated);
-      if (addToast) addToast('info', language === 'en' ? 'Medication removed' : 'Medicamento eliminado');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Medication' : 'Eliminar Medicamento del Inventario',
+      message: language === 'en'
+        ? `Are you sure you want to remove "${med.commercialName || med.genericName}" from inventory?`
+        : `¿Estás seguro de que deseas eliminar "${med.commercialName || med.genericName}" del catálogo de farmacia?`,
+      warningText: language === 'en'
+        ? `Current stock: ${med.stock} units. This medication will no longer be available in prescription builder.`
+        : `Existencia actual: ${med.stock} unidades. Este medicamento ya no estará disponible en el generador de recetas.`,
+      confirmText: language === 'en' ? 'Delete Medication' : 'Eliminar Medicamento',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteMedication(med.id);
+        setMedications(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `Medication ${med.genericName} removed` : `Medicamento ${med.genericName} eliminado`,
+            language === 'en' ? 'Medication Removed' : 'Medicamento Eliminado'
+          );
+        }
+      }
+    });
   };
 
   // Reset handler
   const handleReset = () => {
-    if (window.confirm(language === 'en' ? 'Reset pharmacy inventory to default demo items?' : '¿Restablecer el inventario de medicamentos a los valores iniciales?')) {
-      const defaultMeds = resetMedicationsData();
-      setMedications(defaultMeds);
-      if (addToast) addToast('success', language === 'en' ? 'Inventory reset' : 'Inventario restaurado');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Pharmacy Inventory' : 'Restablecer Inventario de Farmacia',
+      message: language === 'en'
+        ? 'Reset pharmacy stock and medication catalog to initial demo items?'
+        : '¿Restablecer el inventario y catálogo de medicamentos a los valores iniciales de prueba?',
+      warningText: language === 'en'
+        ? 'All stock movements and newly created medications will be reset.'
+        : 'Se restaurarán todos los movimientos de inventario y medicamentos creados recientemente.',
+      confirmText: language === 'en' ? 'Reset to Default' : 'Restablecer Inventario',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        const defaultMeds = resetMedicationsData();
+        setMedications(defaultMeds);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'success',
+            language === 'en' ? 'Pharmacy inventory restored to default items' : 'Inventario de medicamentos restaurado con éxito',
+            language === 'en' ? 'Inventory Reset' : 'Inventario Restaurado'
+          );
+        }
+      }
+    });
   };
 
   return (
@@ -693,6 +746,19 @@ export default function MedicationsInventoryPage({ addToast }) {
         onClose={() => setStockModal({ isOpen: false, medication: null })}
         medication={stockModal.medication}
         onSaveMovement={handleStockMovement}
+      />
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
       />
     </div>
   );

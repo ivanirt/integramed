@@ -33,6 +33,7 @@ import {
 } from '../../utils/clinicalServicesStorage';
 import { getLocations } from '../../utils/facilityStorage';
 import ClinicalServiceModal from './ClinicalServiceModal';
+import DeleteConfirmModal from '../DeleteConfirmModal';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function ClinicalServicesAdmin({ addToast }) {
@@ -113,25 +114,73 @@ export default function ClinicalServicesAdmin({ addToast }) {
     }
   };
 
+  // Universal Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
+
   const handleDeleteService = (serv) => {
     const name = language === 'en' ? serv.nameEn : serv.nameEs;
-    if (window.confirm(language === 'en' ? `Delete service "${name}"?` : `¿Eliminar el servicio "${name}"?`)) {
-      const updated = deleteClinicalService(serv.id);
-      setServices(updated);
-      if (addToast) {
-        addToast('info', language === 'en' ? 'Service removed' : 'Servicio eliminado del catálogo');
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Clinical Service' : 'Eliminar Servicio Clínico',
+      message: language === 'en'
+        ? `Are you sure you want to delete "${name}" from available services catalog?`
+        : `¿Estás seguro de que deseas eliminar "${name}" del catálogo de servicios clínicos?`,
+      warningText: language === 'en'
+        ? 'This service will no longer be available for appointment scheduling or diagnostic orders.'
+        : 'Este servicio ya no podrá ser agendado ni solicitado en órdenes de laboratorio/imagen.',
+      confirmText: language === 'en' ? 'Delete Service' : 'Eliminar Servicio',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteClinicalService(serv.id);
+        setServices(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `Service "${name}" removed` : `Servicio "${name}" eliminado del catálogo`,
+            language === 'en' ? 'Service Removed' : 'Servicio Eliminado'
+          );
+        }
       }
-    }
+    });
   };
 
   const handleResetCatalog = () => {
-    if (window.confirm(language === 'en' ? 'Reset clinical and diagnostic services to default catalog?' : '¿Restablecer el catálogo de servicios clínicos y diagnósticos a los valores de fábrica?')) {
-      const resetList = resetClinicalServicesToDefault();
-      setServices(resetList);
-      if (addToast) {
-        addToast('success', language === 'en' ? 'Default services catalog restored' : 'Catálogo de servicios restablecido exitosamente');
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Clinical Services Catalog' : 'Restablecer Catálogo de Servicios',
+      message: language === 'en'
+        ? 'Restore all default clinical, diagnostic, laboratory, and therapy services?'
+        : '¿Restablecer el catálogo completo de consultas, imagenología, laboratorios y terapias a los valores predeterminados?',
+      warningText: language === 'en'
+        ? 'Any newly registered services and custom fees will be reset to default demo catalog.'
+        : 'Se restaurarán todas las tarifas personalizadas y servicios nuevos creados recientemente.',
+      confirmText: language === 'en' ? 'Reset Catalog' : 'Restablecer Catálogo',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        const resetList = resetClinicalServicesToDefault();
+        setServices(resetList);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'success',
+            language === 'en' ? 'Default services catalog restored' : 'Catálogo de servicios restablecido exitosamente',
+            language === 'en' ? 'Catalog Reset' : 'Catálogo Restablecido'
+          );
+        }
       }
-    }
+    });
   };
 
   const renderCategoryIcon = (catId, size = 18) => {
@@ -769,6 +818,19 @@ export default function ClinicalServicesAdmin({ addToast }) {
         onClose={() => setModalState({ isOpen: false, service: null })}
         service={modalState.service}
         onSave={handleSaveService}
+      />
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
       />
     </div>
   );

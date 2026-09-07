@@ -31,6 +31,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { CLINICAL_ROLES, SHIFT_TYPES, getStaffFullName } from '../utils/staffStorage';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function PractitionersPage({ addToast, onOpenScheduleModal }) {
   const { language, t } = useLanguage();
@@ -140,41 +141,69 @@ export default function PractitionersPage({ addToast, onOpenScheduleModal }) {
     }
   };
 
+  // Universal Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
+
   // Delete handler
   const handleDeletePractitioner = (staff) => {
     const name = getStaffFullName(staff);
-    const confirmMsg = language === 'en'
-      ? `Are you sure you want to remove ${name} from the practitioners directory?`
-      : `¿Está seguro de que desea eliminar a ${name} del directorio de profesionales?`;
-
-    if (window.confirm(confirmMsg)) {
-      deletePractitioner(staff.id);
-      if (addToast) {
-        addToast(
-          'info',
-          language === 'en' ? `${name} was removed` : `${name} fue eliminado del directorio`,
-          language === 'en' ? 'Staff Removed' : 'Personal Eliminado'
-        );
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Practitioner Profile' : 'Eliminar Perfil de Profesional',
+      message: language === 'en'
+        ? `Are you sure you want to remove ${name} (${staff.email}) from the practitioners directory?`
+        : `¿Está seguro de que desea eliminar a ${name} (${staff.email}) del directorio de profesionales?`,
+      warningText: language === 'en' ? 'The practitioner credentials and shift data will be removed.' : 'Las credenciales y turnos asignados a este profesional serán eliminados.',
+      confirmText: language === 'en' ? 'Delete Practitioner' : 'Eliminar Profesional',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        deletePractitioner(staff.id);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `${name} was removed` : `${name} fue eliminado del directorio`,
+            language === 'en' ? 'Staff Removed' : 'Personal Eliminado'
+          );
+        }
       }
-    }
+    });
   };
 
   // Reset to default handler
   const handleResetStaff = () => {
-    const confirmMsg = language === 'en'
-      ? 'Reset staff directory back to original IntegraMed demo setup?'
-      : '¿Restablecer el directorio de personal a los valores iniciales de demostración de IntegraMed?';
-
-    if (window.confirm(confirmMsg)) {
-      resetStaff();
-      if (addToast) {
-        addToast(
-          'success',
-          language === 'en' ? 'Staff directory restored to initial demo state' : 'Directorio de personal restaurado a los valores iniciales',
-          language === 'en' ? 'Data Reset' : 'Datos Restaurados'
-        );
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Staff Directory' : 'Restablecer Directorio de Personal',
+      message: language === 'en'
+        ? 'Reset staff directory back to original IntegraMed demo setup?'
+        : '¿Restablecer el directorio de personal a los valores iniciales de demostración de IntegraMed?',
+      warningText: language === 'en' ? 'Any custom added staff profiles will be reset.' : 'Cualquier perfil de personal agregado recientemente se restablecerá a los valores iniciales.',
+      confirmText: language === 'en' ? 'Reset to Default' : 'Restablecer Datos',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        resetStaff();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'success',
+            language === 'en' ? 'Staff directory restored to initial demo state' : 'Directorio de personal restaurado a los valores iniciales',
+            language === 'en' ? 'Data Reset' : 'Datos Restaurados'
+          );
+        }
       }
-    }
+    });
   };
 
   return (
@@ -1042,6 +1071,19 @@ export default function PractitionersPage({ addToast, onOpenScheduleModal }) {
         onClose={() => setPasswordModal({ isOpen: false, practitioner: null })}
         practitioner={passwordModal.practitioner}
         onPasswordChanged={handlePasswordChanged}
+      />
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
       />
     </div>
   );

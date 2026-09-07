@@ -49,6 +49,7 @@ import {
 } from '../utils/staffStorage';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function UserProfileAdminPage({ addToast }) {
   const { language, t, setLanguage } = useLanguage();
@@ -94,6 +95,18 @@ export default function UserProfileAdminPage({ addToast }) {
       }
     } catch (e) {}
   }, [location.search]);
+
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
 
   // =========================================================================
   // TAB 1: MI PERFIL (MY PROFILE EDIT FORM)
@@ -455,23 +468,61 @@ export default function UserProfileAdminPage({ addToast }) {
     }
   };
 
-  // Handler to delete user
+  // Handler to delete user with visual confirmation modal
   const handleDeleteUser = (targetUser) => {
     const name = getStaffFullName(targetUser);
-    if (window.confirm(
-      language === 'en'
-        ? `Are you sure you want to delete the user profile of ${name}?`
-        : `¿Estás seguro de que deseas eliminar el perfil de ${name}?`
-    )) {
-      deletePractitioner(targetUser.id);
-      if (addToast) {
-        addToast(
-          'info',
-          language === 'en' ? `User ${name} deleted` : `Usuario ${name} eliminado`,
-          language === 'en' ? 'Deleted' : 'Eliminado'
-        );
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete User Profile' : 'Eliminar Perfil de Usuario',
+      message: language === 'en'
+        ? `Are you sure you want to permanently delete the profile of ${name} (${targetUser.email})?`
+        : `¿Estás seguro de que deseas eliminar permanentemente el perfil de ${name} (${targetUser.email})?`,
+      warningText: language === 'en'
+        ? 'This user will no longer be able to log in or access clinical records.'
+        : 'Este usuario ya no podrá iniciar sesión ni acceder al sistema clínico.',
+      confirmText: language === 'en' ? 'Delete User' : 'Eliminar Usuario',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        deletePractitioner(targetUser.id);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `User ${name} has been deleted.` : `El usuario ${name} ha sido eliminado.`,
+            language === 'en' ? 'User Deleted' : 'Usuario Eliminado'
+          );
+        }
       }
-    }
+    });
+  };
+
+  // Handler to reset demo staff data
+  const handleResetStaffConfirm = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Demo Users Directory' : 'Restablecer Catálogo de Usuarios',
+      message: language === 'en'
+        ? 'This will restore all default clinical and administrative staff users.'
+        : 'Esto restaurará todos los usuarios médicos y administrativos de muestra originales.',
+      warningText: language === 'en'
+        ? 'Any custom created user accounts will be reset to the default demo state.'
+        : 'Cualquier usuario creado recientemente se restablecerá a los valores iniciales de prueba.',
+      confirmText: language === 'en' ? 'Reset Demo' : 'Restablecer Catálogo',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        resetStaff();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? 'User directory reset to default demo records.' : 'Catálogo de usuarios restablecido a valores iniciales.',
+            language === 'en' ? 'Reset Complete' : 'Restablecimiento Completo'
+          );
+        }
+      }
+    });
   };
 
   // Avatar initials helper
@@ -794,15 +845,13 @@ export default function UserProfileAdminPage({ addToast }) {
 
                   <div>
                     <label className="form-label">{language === 'en' ? 'Primary Email (Login User)' : 'Correo Principal (Usuario Login)'}</label>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type="email"
-                        className="form-input"
-                        value={profileForm.email}
-                        onChange={(e) => handleProfileFormChange('email', e.target.value)}
-                        required
-                      />
-                    </div>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={profileForm.email}
+                      onChange={(e) => handleProfileFormChange('email', e.target.value)}
+                      required
+                    />
                   </div>
 
                   <div>
@@ -1562,7 +1611,7 @@ export default function UserProfileAdminPage({ addToast }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <button
                   type="button"
-                  onClick={() => resetStaff()}
+                  onClick={handleResetStaffConfirm}
                   title={language === 'en' ? 'Reset demo staff data' : 'Restaurar catálogo inicial de usuarios'}
                   style={{
                     display: 'flex',
@@ -2014,6 +2063,19 @@ export default function UserProfileAdminPage({ addToast }) {
           }}
         />
       )}
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
+      />
     </div>
   );
 }

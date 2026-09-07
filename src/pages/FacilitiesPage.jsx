@@ -34,6 +34,7 @@ import {
 } from '../utils/facilityStorage';
 import OrganizationModal from '../components/facilities/OrganizationModal';
 import LocationModal from '../components/facilities/LocationModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function FacilitiesPage({ addToast, embedded = false }) {
   const { language, t } = useLanguage();
@@ -106,13 +107,45 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
     }
   };
 
+  // Universal Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
+
   // Handle Delete Organization
   const handleDeleteOrg = (org) => {
-    if (window.confirm(language === 'en' ? `Delete organization ${org.name}?` : `¿Eliminar la organización ${org.name}?`)) {
-      const updated = deleteOrganization(org.id);
-      setOrganizations(updated);
-      if (addToast) addToast('info', language === 'en' ? 'Organization removed' : 'Organización eliminada');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Organization' : 'Eliminar Organización',
+      message: language === 'en'
+        ? `Are you sure you want to delete "${org.name}"?`
+        : `¿Estás seguro de que deseas eliminar la organización "${org.name}"?`,
+      warningText: language === 'en'
+        ? 'Locations linked to this organization may need reassignment.'
+        : 'Los planteles o sedes vinculadas a esta organización requerirán reasignación.',
+      confirmText: language === 'en' ? 'Delete Organization' : 'Eliminar Organización',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteOrganization(org.id);
+        setOrganizations(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `Organization "${org.name}" deleted` : `Organización "${org.name}" eliminada`,
+            language === 'en' ? 'Deleted' : 'Eliminado'
+          );
+        }
+      }
+    });
   };
 
   // Handle Save Location
@@ -130,21 +163,61 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
 
   // Handle Delete Location
   const handleDeleteLoc = (loc) => {
-    if (window.confirm(language === 'en' ? `Delete location ${loc.name}?` : `¿Eliminar el plantel ${loc.name}?`)) {
-      const updated = deleteLocation(loc.id);
-      setLocations(updated);
-      if (addToast) addToast('info', language === 'en' ? 'Location removed' : 'Plantel eliminado');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Location' : 'Eliminar Plantel o Sede',
+      message: language === 'en'
+        ? `Are you sure you want to delete location "${loc.name}"?`
+        : `¿Estás seguro de que deseas eliminar el plantel "${loc.name}"?`,
+      warningText: language === 'en'
+        ? 'Doctors and clinical services linked to this location will lose this campus association.'
+        : 'El personal médico y servicios clínicos asignados a esta sede perderán dicha vinculación.',
+      confirmText: language === 'en' ? 'Delete Location' : 'Eliminar Plantel',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteLocation(loc.id);
+        setLocations(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `Location "${loc.name}" removed` : `Plantel "${loc.name}" eliminado`,
+            language === 'en' ? 'Deleted' : 'Eliminado'
+          );
+        }
+      }
+    });
   };
 
   // Reset to default
   const handleReset = () => {
-    if (window.confirm(language === 'en' ? 'Reset all facilities data to default demo state?' : '¿Restablecer los planteles y organizaciones a los valores iniciales?')) {
-      const { organizations: newOrgs, locations: newLocs } = resetFacilitiesData();
-      setOrganizations(newOrgs);
-      setLocations(newLocs);
-      if (addToast) addToast('success', language === 'en' ? 'Facilities reset' : 'Planteles restaurados');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Facilities & Locations' : 'Restablecer Planteles y Sedes',
+      message: language === 'en'
+        ? 'Reset all organization and campus locations back to default demo setup?'
+        : '¿Restablecer las organizaciones y planteles a los valores iniciales de prueba?',
+      warningText: language === 'en'
+        ? 'All newly added campus locations and customized departments will be restored.'
+        : 'Se restaurarán todos los planteles y departamentos personalizados.',
+      confirmText: language === 'en' ? 'Reset to Default' : 'Restablecer Planteles',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        const { organizations: newOrgs, locations: newLocs } = resetFacilitiesData();
+        setOrganizations(newOrgs);
+        setLocations(newLocs);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'success',
+            language === 'en' ? 'Facilities restored to initial demo records' : 'Planteles y sedes restaurados con éxito',
+            language === 'en' ? 'Reset Complete' : 'Restablecimiento Completo'
+          );
+        }
+      }
+    });
   };
 
   return (
@@ -855,6 +928,19 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
         location={locModal.location}
         organizations={organizations}
         onSave={handleSaveLoc}
+      />
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
       />
     </div>
   );

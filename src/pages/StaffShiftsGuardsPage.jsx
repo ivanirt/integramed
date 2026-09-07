@@ -36,6 +36,7 @@ import {
 import { SHIFT_TYPES, getStaffFullName } from '../utils/staffStorage';
 import ScheduleGuardModal from '../components/shifts/ScheduleGuardModal';
 import CoverageRequestModal from '../components/shifts/CoverageRequestModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function StaffShiftsGuardsPage({ addToast }) {
   const { language, t } = useLanguage();
@@ -111,13 +112,39 @@ export default function StaffShiftsGuardsPage({ addToast }) {
     }
   };
 
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    confirmText: '',
+    variant: 'danger',
+    icon: 'trash',
+    onConfirm: null
+  });
+
   // Handle Delete Guard
   const handleDeleteGuard = (guard) => {
-    if (window.confirm(language === 'en' ? 'Delete this guard duty?' : '¿Eliminar esta asignación de guardia?')) {
-      const updated = deleteGuard(guard.id);
-      setGuards(updated);
-      if (addToast) addToast('info', language === 'en' ? 'Guard removed' : 'Guardia eliminada');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Guard Duty' : 'Eliminar Asignación de Guardia',
+      message: language === 'en'
+        ? `Are you sure you want to remove the guard duty on ${guard.date} (${guard.practitionerName})?`
+        : `¿Estás seguro de que deseas eliminar la asignación de guardia del día ${guard.date} (${guard.practitionerName})?`,
+      warningText: language === 'en' ? 'This guard slot will be left unassigned.' : 'Este turno de guardia quedará desasignado.',
+      confirmText: language === 'en' ? 'Delete Guard' : 'Eliminar Guardia',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteGuard(guard.id);
+        setGuards(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast('info', language === 'en' ? 'Guard removed' : 'Guardia eliminada', language === 'en' ? 'Deleted' : 'Eliminado');
+        }
+      }
+    });
   };
 
   // Handle Save Coverage
@@ -137,21 +164,49 @@ export default function StaffShiftsGuardsPage({ addToast }) {
 
   // Handle Delete Coverage
   const handleDeleteCoverage = (cov) => {
-    if (window.confirm(language === 'en' ? 'Delete this coverage record?' : '¿Eliminar este registro de suplencia?')) {
-      const updated = deleteCoverage(cov.id);
-      setCoverages(updated);
-      if (addToast) addToast('info', language === 'en' ? 'Coverage removed' : 'Suplencia eliminada');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Coverage Record' : 'Eliminar Registro de Suplencia',
+      message: language === 'en'
+        ? `Are you sure you want to remove coverage for ${cov.originalPractitionerName} on ${cov.date}?`
+        : `¿Estás seguro de que deseas eliminar la suplencia de ${cov.originalPractitionerName} para el ${cov.date}?`,
+      warningText: language === 'en' ? 'The original doctor will remain on duty without substitute.' : 'El médico titular volverá a figurar sin relevo asignado.',
+      confirmText: language === 'en' ? 'Delete Coverage' : 'Eliminar Suplencia',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        const updated = deleteCoverage(cov.id);
+        setCoverages(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast('info', language === 'en' ? 'Coverage removed' : 'Suplencia eliminada', language === 'en' ? 'Deleted' : 'Eliminado');
+        }
+      }
+    });
   };
 
   // Reset demo
   const handleReset = () => {
-    if (window.confirm(language === 'en' ? 'Reset shifts, guards, and coverages data to default demo state?' : '¿Restablecer el rol de guardias y relevos a los valores iniciales?')) {
-      const { guards: newGuards, coverages: newCoverages } = resetShiftGuardData();
-      setGuards(newGuards);
-      setCoverages(newCoverages);
-      if (addToast) addToast('success', language === 'en' ? 'Data reset' : 'Datos restaurados');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Shifts & Guards Data' : 'Restablecer Guardias y Relevos',
+      message: language === 'en'
+        ? 'This will reset all scheduled guards and coverage requests back to initial demo state.'
+        : 'Esto restaurará todas las guardias programadas y solicitudes de relevo a los valores iniciales de prueba.',
+      warningText: language === 'en' ? 'Custom changes made in this session will be restored.' : 'Los cambios personalizados realizados en esta sesión se restaurarán.',
+      confirmText: language === 'en' ? 'Reset to Default' : 'Restablecer Datos',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: () => {
+        const { guards: newGuards, coverages: newCoverages } = resetShiftGuardData();
+        setGuards(newGuards);
+        setCoverages(newCoverages);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast('info', language === 'en' ? 'Shifts & guards data reset to default' : 'Rol de guardias restaurado a valores iniciales', language === 'en' ? 'Reset Complete' : 'Restablecimiento Completo');
+        }
+      }
+    });
   };
 
   return (
@@ -904,6 +959,19 @@ export default function StaffShiftsGuardsPage({ addToast }) {
         onClose={() => setCoverageModal({ isOpen: false, coverage: null })}
         coverage={coverageModal.coverage}
         onSave={handleSaveCoverage}
+      />
+
+      {/* Universal Confirm Modal for Delete and Reset Actions */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        icon={confirmModal.icon}
       />
     </div>
   );

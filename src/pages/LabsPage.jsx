@@ -24,204 +24,14 @@ import {
   X,
   ExternalLink,
   Printer,
-  Download
+  Download,
+  RotateCcw
 } from 'lucide-react';
 import { getPatients, getPatientById, createLabObservation, getPatientLabObservations } from '../services/fhirApi';
 import { getPatientFullName, calculateAge, getPatientIdentifier } from '../utils/fhirHelper';
 import { useLanguage } from '../i18n/LanguageContext';
-
-// Default Sample Laboratory Studies Data
-const DEFAULT_LAB_PANELS = [
-  {
-    id: 'panel-quimica-6',
-    name: 'Química Sanguínea de 6 Elementos',
-    date: '2026-09-02',
-    dateFormatted: '02 Sep 2026',
-    laboratoryName: 'Laboratorio Clínico Central',
-    status: 'Completado',
-    isExpanded: true,
-    results: [
-      {
-        id: 'r-1',
-        parameter: 'Creatinina',
-        value: 0.85,
-        unit: 'mg/dL',
-        range: '0.5 - 1.2',
-        min: 0.5,
-        max: 1.2,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [0.82, 0.84, 0.85]
-      },
-      {
-        id: 'r-2',
-        parameter: 'Ácido Úrico',
-        value: 4.2,
-        unit: 'mg/dL',
-        range: '2.4 - 5.7',
-        min: 2.4,
-        max: 5.7,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [4.5, 4.3, 4.2]
-      },
-      {
-        id: 'r-3',
-        parameter: 'Glucosa',
-        value: 104,
-        unit: 'mg/dL',
-        range: '70 - 99',
-        min: 70,
-        max: 99,
-        status: 'borderline',
-        statusLabel: 'Límite',
-        trend: [92, 98, 104]
-      },
-      {
-        id: 'r-4',
-        parameter: 'Colesterol',
-        value: 218,
-        unit: 'mg/dL',
-        range: '< 200',
-        min: 120,
-        max: 200,
-        status: 'high',
-        statusLabel: 'Alto',
-        trend: [195, 205, 218]
-      },
-      {
-        id: 'r-5',
-        parameter: 'Triglicéridos',
-        value: 165,
-        unit: 'mg/dL',
-        range: '< 150',
-        min: 50,
-        max: 150,
-        status: 'high',
-        statusLabel: 'Alto',
-        trend: [140, 155, 165]
-      }
-    ]
-  },
-  {
-    id: 'panel-biometria',
-    name: 'Biometría Hemática Completa',
-    date: '2026-08-15',
-    dateFormatted: '15 Ago 2026',
-    laboratoryName: 'Laboratorio de Hematología Integral',
-    status: 'Completado',
-    isExpanded: false,
-    results: [
-      {
-        id: 'bh-1',
-        parameter: 'Leucocitos Totales',
-        value: 6.8,
-        unit: '10^3/µL',
-        range: '4.5 - 11.0',
-        min: 4.5,
-        max: 11.0,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [7.1, 6.9, 6.8]
-      },
-      {
-        id: 'bh-2',
-        parameter: 'Hemoglobina',
-        value: 13.5,
-        unit: 'g/dL',
-        range: '12.0 - 15.5',
-        min: 12.0,
-        max: 15.5,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [13.2, 13.4, 13.5]
-      },
-      {
-        id: 'bh-3',
-        parameter: 'Hematocrito',
-        value: 41.2,
-        unit: '%',
-        range: '36.0 - 46.0',
-        min: 36.0,
-        max: 46.0,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [40.5, 41.0, 41.2]
-      },
-      {
-        id: 'bh-4',
-        parameter: 'Plaquetas',
-        value: 240,
-        unit: '10^3/µL',
-        range: '150 - 450',
-        min: 150,
-        max: 450,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [230, 235, 240]
-      },
-      {
-        id: 'bh-5',
-        parameter: 'Linfocitos',
-        value: 32,
-        unit: '%',
-        range: '20 - 40',
-        min: 20,
-        max: 40,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [30, 31, 32]
-      }
-    ]
-  },
-  {
-    id: 'panel-tiroideo',
-    name: 'Perfil Tiroideo Integral (TSH, T3, T4)',
-    date: '2026-01-18',
-    dateFormatted: '18 Ene 2026',
-    laboratoryName: 'Laboratorio de Endocrinología y Metabolismo',
-    status: 'Completado',
-    isExpanded: false,
-    results: [
-      {
-        id: 'pt-1',
-        parameter: 'TSH (Hormona Tiroestimulante)',
-        value: 2.45,
-        unit: 'µUI/mL',
-        range: '0.40 - 4.00',
-        min: 0.4,
-        max: 4.0,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [2.30, 2.40, 2.45]
-      },
-      {
-        id: 'pt-2',
-        parameter: 'T4 Libre',
-        value: 1.22,
-        unit: 'ng/dL',
-        range: '0.80 - 1.80',
-        min: 0.8,
-        max: 1.8,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [1.18, 1.20, 1.22]
-      },
-      {
-        id: 'pt-3',
-        parameter: 'T3 Libre',
-        value: 3.1,
-        unit: 'pg/mL',
-        range: '2.0 - 4.4',
-        min: 2.0,
-        max: 4.4,
-        status: 'stable',
-        statusLabel: 'Estable',
-        trend: [2.9, 3.0, 3.1]
-      }
-    ]
-  }
-];
+import { getLabPanels, saveLabPanel, deleteLabPanel, resetLabPanelsToDefault } from '../utils/labsStorage';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function LabsPage({ addToast }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -237,8 +47,8 @@ export default function LabsPage({ addToast }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
 
-  // Labs State
-  const [panels, setPanels] = useState(DEFAULT_LAB_PANELS);
+  // Labs State (Persistent with localStorage)
+  const [panels, setPanels] = useState(() => getLabPanels());
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -246,6 +56,20 @@ export default function LabsPage({ addToast }) {
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState(null);
   const [isAiThinking, setIsAiThinking] = useState(false);
+
+  // Universal Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningText: '',
+    icon: 'trash',
+    isDanger: true,
+    confirmText: '',
+    onConfirm: null,
+    itemName: '',
+    itemId: ''
+  });
 
   // Load patients list
   useEffect(() => {
@@ -379,18 +203,84 @@ export default function LabsPage({ addToast }) {
         });
       }
 
-      setPanels(prev => [newPanel, ...prev]);
+      // Persist to local storage
+      saveLabPanel(newPanel);
+      setPanels(getLabPanels());
       setUploadedFiles(prev => [...prev, file.name]);
       setIsUploading(false);
 
       if (addToast) {
         addToast(
           'success',
-          `Estudio "${file.name}" cargado y procesado. Parámetros integrados a FHIR.`,
-          'Estudio Digital Procesado'
+          language === 'en'
+            ? `Study "${file.name}" uploaded and processed. Parameters integrated into FHIR.`
+            : `Estudio "${file.name}" cargado y procesado. Parámetros integrados a FHIR.`,
+          language === 'en' ? 'Digital Study Processed' : 'Estudio Digital Procesado'
         );
       }
     }, 900);
+  };
+
+  // Delete Lab Panel Confirmation Handlers
+  const handleDeletePanelClick = (e, panel) => {
+    e.stopPropagation();
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Delete Laboratory Study' : 'Eliminar Estudio de Laboratorio',
+      message: language === 'en'
+        ? `Are you sure you want to delete the study panel "${panel.name}"?`
+        : `¿Está seguro de que desea eliminar el panel de estudio "${panel.name}"?`,
+      warningText: language === 'en'
+        ? 'All clinical parameters, units and trend graphs in this panel will be removed.'
+        : 'Todos los parámetros clínicos, rangos y gráficas de tendencia de este estudio serán eliminados.',
+      icon: 'trash',
+      isDanger: true,
+      confirmText: language === 'en' ? 'Delete Study' : 'Eliminar Estudio',
+      itemName: panel.name,
+      itemId: panel.id,
+      onConfirm: () => {
+        const updated = deleteLabPanel(panel.id);
+        setPanels(updated);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'info',
+            language === 'en' ? `Study panel "${panel.name}" deleted.` : `Estudio "${panel.name}" eliminado correctamente.`,
+            language === 'en' ? 'Study Deleted' : 'Estudio Eliminado'
+          );
+        }
+      }
+    });
+  };
+
+  const handleResetPanelsClick = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'en' ? 'Reset Laboratory Catalog' : 'Restablecer Catálogo de Laboratorios',
+      message: language === 'en'
+        ? 'Are you sure you want to restore the default sample laboratory studies?'
+        : '¿Está seguro de que desea restaurar los paneles y estudios de laboratorio por defecto?',
+      warningText: language === 'en'
+        ? 'Custom and uploaded study panels will be reset back to the standard clinical demonstration dataset.'
+        : 'Los estudios personalizados o cargados manualmente se reemplazarán por el catálogo clínico estándar.',
+      icon: 'reset',
+      isDanger: false,
+      confirmText: language === 'en' ? 'Reset Catalog' : 'Restaurar Catálogo',
+      itemName: language === 'en' ? 'Default Diagnostic Panels' : 'Paneles Clínicos Estándar',
+      itemId: 'SEED-LABS-CATALOG',
+      onConfirm: () => {
+        const resetData = resetLabPanelsToDefault();
+        setPanels(resetData);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (addToast) {
+          addToast(
+            'success',
+            language === 'en' ? 'Laboratory studies catalog restored to defaults.' : 'Catálogo de laboratorios restaurado a valores por defecto.',
+            language === 'en' ? 'Catalog Restored' : 'Catálogo Restaurado'
+          );
+        }
+      }
+    });
   };
 
   // AI Interpretation
@@ -695,9 +585,29 @@ export default function LabsPage({ addToast }) {
               </h2>
             </div>
 
-            <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-              {panels.length} {language === 'en' ? 'study panels recorded' : 'estudios registrados'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={handleResetPanelsClick}
+                className="btn btn-outline"
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.35rem 0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  color: '#64748b',
+                  borderColor: '#cbd5e1'
+                }}
+                title={language === 'en' ? 'Reset studies catalog' : 'Restablecer catálogo por defecto'}
+              >
+                <RotateCcw size={13} />
+                <span>{language === 'en' ? 'Reset Demo' : 'Restablecer'}</span>
+              </button>
+              <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
+                {panels.length} {language === 'en' ? 'study panels recorded' : 'estudios registrados'}
+              </span>
+            </div>
           </div>
 
           {/* C. Collapsible Panels / Tables */}
@@ -735,7 +645,7 @@ export default function LabsPage({ addToast }) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                       {panel.status === 'Procesado con IA' && (
                         <span
                           style={{
@@ -754,6 +664,25 @@ export default function LabsPage({ addToast }) {
                           <span>IA Extracción</span>
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeletePanelClick(e, panel)}
+                        className="btn-icon text-danger"
+                        style={{
+                          padding: '4px',
+                          borderRadius: '6px',
+                          color: '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer'
+                        }}
+                        title={language === 'en' ? 'Delete study panel' : 'Eliminar panel de estudio'}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                       {panel.isExpanded ? <ChevronUp size={18} color="#64748b" /> : <ChevronDown size={18} color="#64748b" />}
                     </div>
                   </div>
@@ -1104,6 +1033,21 @@ export default function LabsPage({ addToast }) {
           </div>
         </div>
       )}
+
+      {/* Delete / Reset Universal Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        warningText={confirmModal.warningText}
+        icon={confirmModal.icon}
+        isDanger={confirmModal.isDanger}
+        confirmText={confirmModal.confirmText}
+        itemName={confirmModal.itemName}
+        itemId={confirmModal.itemId}
+      />
     </div>
   );
 }

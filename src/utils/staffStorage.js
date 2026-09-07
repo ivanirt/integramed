@@ -9,9 +9,71 @@
  * - LocalStorage persistence with fallback to initial seed
  */
 
-import { CLINICAL_ROLES } from './staffData';
-
-export { CLINICAL_ROLES };
+export const CLINICAL_ROLES = {
+  doctor: {
+    id: 'doctor',
+    labelEs: 'Médico / Doctor',
+    labelEn: 'Physician / Doctor',
+    badgeClass: 'badge-emerald',
+    icon: 'Stethoscope',
+    color: '#0d9488',
+    bgColor: '#ccfbf1'
+  },
+  therapist: {
+    id: 'therapist',
+    labelEs: 'Terapeuta Físico',
+    labelEn: 'Physical Therapist',
+    badgeClass: 'badge-teal',
+    icon: 'Activity',
+    color: '#0284c7',
+    bgColor: '#e0f2fe'
+  },
+  nurse: {
+    id: 'nurse',
+    labelEs: 'Enfermería',
+    labelEn: 'Nurse',
+    badgeClass: 'badge-blue',
+    icon: 'HeartPulse',
+    color: '#e11d48',
+    bgColor: '#ffe4e6'
+  },
+  receptionist: {
+    id: 'receptionist',
+    labelEs: 'Recepción',
+    labelEn: 'Receptionist',
+    badgeClass: 'badge-amber',
+    icon: 'Users',
+    color: '#d97706',
+    bgColor: '#fef3c7'
+  },
+  admin: {
+    id: 'admin',
+    labelEs: 'Administrador',
+    labelEn: 'Administrator',
+    badgeClass: 'badge-purple',
+    icon: 'ShieldCheck',
+    color: '#7c3aed',
+    bgColor: '#ede9fe'
+  },
+  lab: {
+    id: 'lab',
+    labelEs: 'Laboratorista',
+    labelEn: 'Lab Technician',
+    badgeClass: 'badge-indigo',
+    icon: 'FlaskConical',
+    color: '#4f46e5',
+    bgColor: '#e0e7ff'
+  },
+  pharmacist: {
+    id: 'pharmacist',
+    labelEs: 'Farmacia',
+    labelEn: 'Pharmacist',
+    badgeClass: 'badge-teal',
+    icon: 'Pill',
+    color: '#059669',
+    bgColor: '#ecfdf5'
+  }
+};
 
 export const SHIFT_TYPES = {
   morning: {

@@ -56,8 +56,39 @@ A clinical-grade Patient Management web application connected to a live **FHIR R
    - Supports `GET`, `POST`, `PUT`, `DELETE` operations.
    - Health check endpoint (`/api/health`) and runtime configuration modal.
 
-8. **Design & Aesthetics**:
-   - IntegraMed clinical design system featuring emerald/teal palettes, Plus Jakarta Sans typography, skeleton loaders, toast alerts, and responsive layouts.
+ 8. **Design & Aesthetics**:
+    - IntegraMed clinical design system featuring emerald/teal palettes, Plus Jakarta Sans typography, skeleton loaders, toast alerts, and responsive layouts.
+    - **Collapsible Icon-Only Sidebar**: Compact 72px icon mode for maximum screen workspace, expandable to 240px with persistent preference storage.
+
+ 9. **Authentication & Multi-Role Staff Access (`/login`)**:
+    - Split hero layout with clinic branding and credentials validation.
+    - Multi-role practitioner architecture supporting Doctors, Therapists, Nurses, Receptionists, Administrators, and Lab Technicians.
+    - Active clinical duty switcher allowing users with multiple roles to switch roles on the fly.
+    - Unified master demo password: `IntegraMed27`.
+
+ 10. **Clinical Agenda & Calendar (`/agenda`)**:
+     - Interactive calendar view with date selection and day-specific appointment slot tracking.
+     - Fast appointment creation modal with patient lookup, practitioner assignment, and schedule validation.
+
+ 11. **Clinical Consultation (`/consulta`)**:
+     - Complete clinical encounter interface with patient summary, chief complaint, SOAP notes, vital signs capture, and diagnosis coding.
+
+ 12. **Medical Prescription Builder (`/recetas`, `/prescriptions`)**:
+     - Searchable medication database with dosage and frequency autocomplete.
+     - Real-time printable digital prescription sheet with clinic letterhead, doctor credentials, and QR verification stamp.
+     - Clinical safety alerts (allergy contraindications and dosage warnings).
+     - Direct synchronization to FHIR `MedicationRequest` resources.
+
+ 13. **Patient Laboratories & Studies (`/laboratorios`, `/labs`)**:
+     - Drag-and-drop study ingestion dropzone with support for PDF, DICOM, and image files.
+     - Category-based accordion panels (Biomarkers, Imaging, Genetic Panels) with real-time range indicators.
+     - Interactive AI Clinical Findings Summary card with detailed study interrogation modal.
+
+ 14. **Advanced Clinic Schedule & Holidays Management (`/configuracion`)**:
+     - Customizable working hours per day with split-shift support (morning and afternoon blocks).
+     - Date-specific schedule overrides for custom operating hours on specific dates.
+     - Clinic-wide official holiday manager with interactive calendar date picker.
+     - Practitioner-specific non-working day manager (conferences, personal leaves, vacations).
 
 ---
 

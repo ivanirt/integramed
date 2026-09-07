@@ -1,0 +1,1041 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
+import {
+  Clock,
+  User,
+  AlertTriangle,
+  FileText,
+  Stethoscope,
+  Activity,
+  Mic,
+  MicOff,
+  Maximize2,
+  Minimize2,
+  Check,
+  Plus,
+  X,
+  Sparkles,
+  Send,
+  ShieldAlert,
+  Lightbulb,
+  FileCheck,
+  Pill,
+  Save,
+  CheckCircle2,
+  ChevronDown,
+  RefreshCw,
+  Heart,
+  Droplet
+} from 'lucide-react';
+import {
+  getPatients,
+  getPatientById,
+  getPatientObservations,
+  getPatientConditions,
+  getPatientMedications,
+  createEncounter
+} from '../services/fhirApi';
+import {
+  getPatientFullName,
+  calculateAge,
+  formatBirthDate,
+  getPatientIdentifier
+} from '../utils/fhirHelper';
+import { parseVitalObservations } from '../utils/vitalsParser';
+import { useLanguage } from '../i18n/LanguageContext';
+
+export default function ConsultationPage({ addToast }) {
+  const [searchParams] = useSearchParams();
+  const { id: paramId } = useParams();
+  const patientIdFromQuery = searchParams.get('patientId') || paramId;
+  const navigate = useNavigate();
+  const { t, locale } = useLanguage();
+
+  // Patients list for selector
+  const [patientsList, setPatientsList] = useState([]);
+  const [selectedPatientId, setSelectedPatientId] = useState(patientIdFromQuery || '');
+  const [patient, setPatient] = useState(null);
+  const [observations, setObservations] = useState([]);
+  const [conditions, setConditions] = useState([]);
+  const [medications, setMedications] = useState([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Consultation Timer
+  const [secondsElapsed, setSecondsElapsed] = useState(872); // starts around 14:32 for realism
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
+
+  // Voice recording simulation states
+  const [isRecordingSubjective, setIsRecordingSubjective] = useState(false);
+  const [isRecordingPhysical, setIsRecordingPhysical] = useState(false);
+  const [isRecordingPlan, setIsRecordingPlan] = useState(false);
+
+  // SOAP Note State
+  const [subjective, setSubjective] = useState('Refiere cefalea de 3 días de evolución, de tipo opresivo, intensidad 6/10, acompañada de fatiga.');
+  const [physicalExam, setPhysicalExam] = useState('Paciente consciente, orientado, ruidos cardíacos rítmicos sin soplos, campos pulmonares con adecuado murmullo vesicular.');
+  const [diagnoses, setDiagnoses] = useState([
+    { code: 'BA00', label: 'Hipertensión esencial' },
+    { code: '8A80', label: 'Asma' }
+  ]);
+  const [diagnosisInput, setDiagnosisInput] = useState('');
+  const [plan, setPlan] = useState('Continuar con losartán. Solicitar perfil lipídico de control. Cita de seguimiento en 3 meses.');
+
+  // AI Assistant Chat & Suggestions State
+  const [aiInput, setAiInput] = useState('');
+  const [aiChatMessages, setAiChatMessages] = useState([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+
+  // Timer interval
+  useEffect(() => {
+    let interval = null;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setSecondsElapsed(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
+  const formattedTimer = useMemo(() => {
+    const mins = Math.floor(secondsElapsed / 60);
+    const secs = secondsElapsed % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }, [secondsElapsed]);
+
+  // Load initial patients and selected patient data
+  useEffect(() => {
+    getPatients('')
+      .then(res => {
+        setPatientsList(res.patients || []);
+        if (!selectedPatientId && res.patients?.length > 0) {
+          setSelectedPatientId(res.patients[0].id);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  // Load selected patient records
+  useEffect(() => {
+    if (!selectedPatientId) return;
+    setIsLoading(true);
+
+    Promise.all([
+      getPatientById(selectedPatientId),
+      getPatientObservations(selectedPatientId).catch(() => []),
+      getPatientConditions(selectedPatientId).catch(() => []),
+      getPatientMedications(selectedPatientId).catch(() => [])
+    ])
+      .then(([patData, obsData, condData, medData]) => {
+        setPatient(patData);
+        setObservations(obsData);
+        setConditions(condData);
+        setMedications(medData);
+      })
+      .catch(err => {
+        console.error('Error loading consultation patient:', err);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [selectedPatientId]);
+
+  // Vitals summary
+  const parsedVitals = useMemo(() => {
+    return parseVitalObservations(observations);
+  }, [observations]);
+
+  const weightVal = parsedVitals.weight[parsedVitals.weight.length - 1]?.value || '62.4';
+  const heightVal = parsedVitals.height[parsedVitals.height.length - 1]?.value || '165';
+  const bmiVal = parsedVitals.bmi[parsedVitals.bmi.length - 1]?.value || '22.9';
+  const bpObj = parsedVitals.bloodPressure[parsedVitals.bloodPressure.length - 1];
+  const bpStr = bpObj ? `${bpObj.systolic ?? 120}/${bpObj.diastolic ?? 80}` : '120/80';
+  const spo2Val = parsedVitals.oxygenSaturation[parsedVitals.oxygenSaturation.length - 1]?.value || '98';
+  const tempVal = parsedVitals.temperature[parsedVitals.temperature.length - 1]?.value || '36.6';
+
+  // Handle Diagnosis tag remove
+  const handleRemoveDiagnosis = (code) => {
+    setDiagnoses(prev => prev.filter(d => d.code !== code));
+  };
+
+  // Handle Diagnosis tag add
+  const handleAddDiagnosis = (e) => {
+    if (e.key === 'Enter' && diagnosisInput.trim()) {
+      e.preventDefault();
+      const code = diagnosisInput.trim().toUpperCase();
+      setDiagnoses(prev => [...prev, { code: code.slice(0, 4), label: diagnosisInput.trim() }]);
+      setDiagnosisInput('');
+    }
+  };
+
+  // AI Quick Actions
+  const handleAddSuggestionToPlan = (suggestionText) => {
+    setPlan(prev => prev ? `${prev}\n• ${suggestionText}` : `• ${suggestionText}`);
+    if (addToast) {
+      addToast('success', t('suggestionAddedToast'), t('toastUpdatedTitle'));
+    }
+  };
+
+  const handleAiAction = (actionType) => {
+    setIsAiLoading(true);
+    setTimeout(() => {
+      if (actionType === 'summarize') {
+        const summary = `Paciente femenina de 34 años con antecedentes de HTA y Asma que acude por cefalea tensional de 3 días. Signos vitales estables (${bpStr} mmHg). Se continúa manejo antihipertensivo y se solicita perfil lipídico.`;
+        setAiChatMessages(prev => [...prev, {
+          sender: 'ai',
+          title: t('aiSummaryTitle'),
+          text: summary,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } else if (actionType === 'indications') {
+        const indications = `1. Tomar Losartán 50mg cada 24 horas por la mañana.\n2. Dieta baja en sodio y registro matutino de presión arterial.\n3. Salbutamol inhalador solo en caso de crisis de broncoespasmo (SOS).\n4. Acudir a toma de muestra de sangre en ayuno para perfil lipídico.`;
+        setAiChatMessages(prev => [...prev, {
+          sender: 'ai',
+          title: t('aiIndicationsTitle'),
+          text: indications,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } else if (actionType === 'audit') {
+        const audit = `✓ Losartán 50mg: Sin interacciones graves detectadas con la medicación actual.\n⚠️ Precaución: Evitar prescribir AINEs (Ketorolaco, Naproxeno) debido al antecedente de Asma.`;
+        setAiChatMessages(prev => [...prev, {
+          sender: 'ai',
+          title: t('aiAuditTitle'),
+          text: audit,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      }
+      setIsAiLoading(false);
+    }, 600);
+  };
+
+  // Handle AI Chat submit
+  const handleSendAiMessage = (e) => {
+    e.preventDefault();
+    if (!aiInput.trim()) return;
+
+    const userQuery = aiInput.trim();
+    setAiInput('');
+    setAiChatMessages(prev => [...prev, {
+      sender: 'user',
+      text: userQuery,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }]);
+
+    setIsAiLoading(true);
+    setTimeout(() => {
+      let reply = `Para el cuadro presentado, los lineamientos clínicos sugieren mantener la dosis de Losartán 50mg si la PA se mantiene < 130/80 mmHg. Se recomienda evaluar función renal y electrolitos si se añade diurético.`;
+      if (userQuery.toLowerCase().includes('dosis') || userQuery.toLowerCase().includes('dose')) {
+        reply = `Dosis estándar de Losartán para HTA Primaria: 50mg a 100mg vía oral una vez al día.`;
+      } else if (userQuery.toLowerCase().includes('asma') || userQuery.toLowerCase().includes('asthma')) {
+        reply = `En pacientes con asma, priorizar beta-2 agonistas de acción corta (Salbutamol 100-200 mcg) y corticoesteroides inhalados si los síntomas nocturnos aumentan.`;
+      }
+
+      setAiChatMessages(prev => [...prev, {
+        sender: 'ai',
+        title: 'Asistente Clínico',
+        text: reply,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+      setIsAiLoading(false);
+    }, 700);
+  };
+
+  // Save Draft
+  const handleSaveDraft = () => {
+    if (addToast) {
+      addToast('success', t('draftSavedToast'), t('toastUpdatedTitle'));
+    }
+  };
+
+  // Finalize Encounter
+  const handleFinalizeConsultation = async () => {
+    setIsFinishing(true);
+    try {
+      if (selectedPatientId) {
+        const patientName = patient ? getPatientFullName(patient) : `Patient ${selectedPatientId}`;
+        await createEncounter({
+          patientId: selectedPatientId,
+          patientName,
+          type: 'Consulta de Medicina General',
+          status: 'finished',
+          startTime: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
+          endTime: new Date().toISOString(),
+          reason: diagnoses.map(d => d.label).join(', ') || subjective.slice(0, 60)
+        });
+      }
+
+      if (addToast) {
+        addToast('success', t('consultationFinalizedToast'), t('toastCreatedTitle'));
+      }
+      setIsTimerRunning(false);
+      setTimeout(() => {
+        navigate('/agenda');
+      }, 1200);
+    } catch (err) {
+      console.error('Error finalizing encounter:', err);
+      if (addToast) {
+        addToast('error', err.message || 'Error al finalizar consulta', t('toastErrorTitle'));
+      }
+    } finally {
+      setIsFinishing(false);
+    }
+  };
+
+  const fullName = patient ? getPatientFullName(patient) : 'Mariana Silva Ruiz';
+  const age = calculateAge(patient?.birthDate) ?? 34;
+  const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '84920';
+
+  return (
+    <div style={{ padding: '1.25rem 1.75rem', maxWidth: '1600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* =========================================================================
+          TOP CONSULTATION STATUS BAR (Directly matching attached screenshot)
+          ========================================================================= */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Active Consultation Badge */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '9999px',
+              backgroundColor: '#fff1f2',
+              color: '#e11d48',
+              border: '1px solid #fecdd3',
+              fontSize: '0.8125rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase'
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e11d48', animation: 'pulse 1.5s infinite' }} />
+            <span>{t('activeConsultationBadge')}</span>
+          </div>
+
+          {/* Patient Quick Selector */}
+          {patientsList.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>{t('patient')}:</span>
+              <select
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                className="form-input"
+                style={{ height: '34px', fontSize: '0.8125rem', padding: '0.2rem 0.6rem', borderRadius: '6px' }}
+              >
+                {patientsList.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {getPatientFullName(p)} (ID: {p.id?.slice(0, 8)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* =========================================================================
+          MAIN 3-COLUMN CLINICAL LAYOUT (Directly matching the attached screenshot)
+          ========================================================================= */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '260px minmax(0, 1.8fr) minmax(300px, 340px)',
+          gap: '1.25rem',
+          alignItems: 'start'
+        }}
+      >
+        {/* =========================================================================
+            COLUMN 1: PATIENT CLINICAL SUMMARY (Left, ~260px)
+            ========================================================================= */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* 1. Timer Card */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '0.875rem',
+              border: '1px solid #e2e8f0',
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#0f766e' }}>
+              <Clock size={20} strokeWidth={2.5} />
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155', lineHeight: 1.2 }}>
+                {t('consultationTimeLabel')}
+              </div>
+            </div>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
+              {formattedTimer}
+            </div>
+          </div>
+
+          {/* 2. Patient Identity Card */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '0.875rem',
+              border: '1px solid #e2e8f0',
+              padding: '1.25rem',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '0.75rem' }}>
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  backgroundColor: '#e0f2fe',
+                  border: '2px solid #bae6fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  margin: '0 auto',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                }}
+              >
+                {patient?.gender === 'female' ? '👩' : '👨'}
+              </div>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-16px',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              >
+                #CLI-{expNumber}
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.25, marginBottom: '0.35rem' }}>
+              {fullName}
+            </h3>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#64748b' }}>
+              <span>{age} {t('yearsOld', { age: '' }).trim()}</span>
+              <span>•</span>
+              <span>{patient?.gender === 'female' ? '♀ Femenino' : '♂ Masculino'}</span>
+              <span>•</span>
+              <span style={{ color: '#059669', fontWeight: 700, backgroundColor: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
+                O+
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Alergias Card (Pink alert box) */}
+          <div
+            style={{
+              backgroundColor: '#fff1f2',
+              borderRadius: '0.875rem',
+              border: '1px solid #fecdd3',
+              padding: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.35rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#e11d48', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+              <AlertTriangle size={14} />
+              <span>{t('allergiesTitle')}</span>
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: '#be123c', fontWeight: 600, paddingLeft: '1.25rem' }}>
+              Penicilinas y derivados
+            </div>
+          </div>
+
+          {/* 4. Padecimientos Activos Card (Amber box) */}
+          <div
+            style={{
+              backgroundColor: '#fefce8',
+              borderRadius: '0.875rem',
+              border: '1px solid #fef08a',
+              padding: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ca8a04', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+              <Stethoscope size={14} />
+              <span>{t('activeConditionsTitle')}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', paddingLeft: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#854d0e', backgroundColor: '#ffffff', padding: '0.25rem 0.55rem', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                HTA Primaria Grado I
+              </div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#854d0e', backgroundColor: '#ffffff', padding: '0.25rem 0.55rem', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                Asma leve
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Medicación Actual Card */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '0.875rem',
+              border: '1px solid #e2e8f0',
+              padding: '1rem',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f766e', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+              <Pill size={14} />
+              <span>{t('currentMedicationTitle')}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.75rem', color: '#334155' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem' }}>
+                <span style={{ color: '#0d9488', fontWeight: 800 }}>•</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Losartán 50mg</div>
+                  <div style={{ color: '#64748b', fontSize: '0.7rem' }}>Cada 24h</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem' }}>
+                <span style={{ color: '#0d9488', fontWeight: 800 }}>•</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Salbutamol 100mcg</div>
+                  <div style={{ color: '#64748b', fontSize: '0.7rem' }}>PRN</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            COLUMN 2: NOTA CLÍNICA (SOAP) (Center, Main Editor)
+            ========================================================================= */}
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '0.875rem',
+            border: '1px solid #e2e8f0',
+            padding: '1.5rem',
+            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
+          }}
+        >
+          {/* SOAP Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <FileText size={20} color="#0f766e" />
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                {t('soapNoteTitle')}
+              </h2>
+            </div>
+
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: '#64748b',
+                cursor: 'pointer',
+                padding: '0.35rem',
+                borderRadius: '6px'
+              }}
+              title="Toggle fullscreen"
+            >
+              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+          </div>
+
+          {/* S - MOTIVO DE CONSULTA (Subjective) */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t('soapSubjectiveLabel')}
+              </label>
+
+              <button
+                onClick={() => setIsRecordingSubjective(!isRecordingSubjective)}
+                style={{
+                  border: 'none',
+                  background: isRecordingSubjective ? '#fee2e2' : '#f1f5f9',
+                  color: isRecordingSubjective ? '#ef4444' : '#64748b',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Dictar motivo de consulta"
+              >
+                {isRecordingSubjective ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
+            </div>
+
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={subjective}
+              onChange={(e) => setSubjective(e.target.value)}
+              placeholder="Refiere cefalea de 3 días de evolución..."
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
+                borderRadius: '0.625rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0'
+              }}
+            />
+          </div>
+
+          {/* O - SIGNOS VITALES (RECIENTES) (Objective Vitals KPI Row) */}
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.5rem' }}>
+              {t('soapObjectiveVitalsLabel')}
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+              {/* Peso / Talla */}
+              <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>PESO / TALLA</div>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                  {weightVal} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>kg /</span> {heightVal} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>cm</span>
+                </div>
+              </div>
+
+              {/* IMC */}
+              <div style={{ padding: '0.75rem', backgroundColor: '#ecfdf5', borderRadius: '0.625rem', border: '1px solid #a7f3d0', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.68rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase' }}>IMC</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#059669', marginTop: '0.1rem' }}>
+                  {bmiVal}
+                </div>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>NORMAL</span>
+              </div>
+
+              {/* Presión Arterial */}
+              <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>PRESIÓN A.</div>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                  {bpStr}
+                </div>
+                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>mmHg</span>
+              </div>
+
+              {/* SpO2 / Temp */}
+              <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>SPO2 / TEMP</div>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                  {spo2Val}% <span style={{ fontSize: '0.75rem', color: '#64748b' }}>/</span> {tempVal}°
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* EXPLORACIÓN FÍSICA (Physical Exam) */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t('soapPhysicalExamLabel')}
+              </label>
+
+              <button
+                onClick={() => setIsRecordingPhysical(!isRecordingPhysical)}
+                style={{
+                  border: 'none',
+                  background: isRecordingPhysical ? '#fee2e2' : '#f1f5f9',
+                  color: isRecordingPhysical ? '#ef4444' : '#64748b',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Dictar exploración física"
+              >
+                {isRecordingPhysical ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
+            </div>
+
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={physicalExam}
+              onChange={(e) => setPhysicalExam(e.target.value)}
+              placeholder="Paciente consciente, orientado, ruidos cardíacos rítmicos..."
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
+                borderRadius: '0.625rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0'
+              }}
+            />
+          </div>
+
+          {/* A - DIAGNÓSTICO (CIE-11) (Assessment & Diagnostic chips) */}
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.4rem' }}>
+              {t('soapAssessmentLabel')}
+            </label>
+
+            <div
+              style={{
+                backgroundColor: '#f8fafc',
+                borderRadius: '0.625rem',
+                border: '1px solid #e2e8f0',
+                padding: '0.6rem 0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}
+            >
+              {diagnoses.map((diag) => (
+                <div
+                  key={diag.code}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0369a1',
+                    border: '1px solid #bae6fd',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '6px',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600
+                  }}
+                >
+                  <span style={{ fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{diag.code}</span>
+                  <span>{diag.label}</span>
+                  <button
+                    onClick={() => handleRemoveDiagnosis(diag.code)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#0369a1',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                      marginLeft: '2px'
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+
+              <input
+                type="text"
+                value={diagnosisInput}
+                onChange={(e) => setDiagnosisInput(e.target.value)}
+                onKeyDown={handleAddDiagnosis}
+                placeholder={t('searchDiagnosisPlaceholder')}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '0.8125rem',
+                  color: '#0f172a',
+                  flex: 1,
+                  minWidth: '180px'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* P - PLAN Y TRATAMIENTO (Plan) */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t('soapPlanLabel')}
+              </label>
+
+              <button
+                onClick={() => setIsRecordingPlan(!isRecordingPlan)}
+                style={{
+                  border: 'none',
+                  background: isRecordingPlan ? '#fee2e2' : '#f1f5f9',
+                  color: isRecordingPlan ? '#ef4444' : '#64748b',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Dictar plan de tratamiento"
+              >
+                {isRecordingPlan ? <MicOff size={13} /> : <Mic size={13} />}
+              </button>
+            </div>
+
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              placeholder="Continuar con losartán. Solicitar perfil lipídico. Cita en 3 meses..."
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
+                borderRadius: '0.625rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0'
+              }}
+            />
+          </div>
+
+          {/* Bottom Actions Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleSaveDraft}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8125rem', padding: '0.55rem 1rem' }}
+            >
+              <Save size={15} />
+              <span>{t('saveDraftBtn')}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (addToast) addToast('info', t('prescriptionGeneratedToast'), t('toastCreatedTitle'));
+              }}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8125rem', padding: '0.55rem 1rem', color: '#0f766e', borderColor: '#a7f3d0' }}
+            >
+              <FileCheck size={15} />
+              <span>{t('generatePrescriptionBtn')}</span>
+            </button>
+
+            <button
+              onClick={handleFinalizeConsultation}
+              disabled={isFinishing}
+              className="btn btn-primary"
+              style={{
+                backgroundColor: '#0f766e',
+                boxShadow: '0 4px 10px rgba(15, 118, 110, 0.3)',
+                padding: '0.55rem 1.35rem',
+                fontSize: '0.8125rem',
+                gap: '0.4rem'
+              }}
+            >
+              <CheckCircle2 size={16} strokeWidth={2.5} />
+              <span>{isFinishing ? t('finalizingEncounter') : t('finalizeConsultationBtn')}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            COLUMN 3: IA CLÍNICA ACTIVA (Right, ~320px)
+            ========================================================================= */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* AI Header Card */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '0.875rem',
+              border: '1px solid #e2e8f0',
+              padding: '1.25rem',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {/* AI Title */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#5eead4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857' }}>
+                  <Sparkles size={15} />
+                </div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                  {t('activeClinicalAiTitle')}
+                </h3>
+              </div>
+
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+            </div>
+
+            {/* 1. Seguridad Farmacológica Card */}
+            <div
+              style={{
+                backgroundColor: '#fff1f2',
+                borderRadius: '0.75rem',
+                border: '1px solid #fecdd3',
+                padding: '0.875rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#e11d48', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                <ShieldAlert size={14} />
+                <span>{t('pharmacologicalSafetyTitle')}</span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.4 }}>
+                Paciente con Asma Leve. <strong style={{ color: '#be123c' }}>Evitar AINEs no selectivos</strong> si hay antecedentes de broncoespasmo inducido por aspirina.
+              </div>
+            </div>
+
+            {/* 2. Sugerencia Clínica Card */}
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                borderRadius: '0.75rem',
+                border: '1px solid #bbf7d0',
+                padding: '0.875rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.6rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#059669', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                <Lightbulb size={14} />
+                <span>{t('clinicalSuggestionTitle')}</span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.4 }}>
+                Considerar solicitar <strong>Perfil Lipídico</strong> de control anual para paciente con HTA Primaria en tratamiento.
+              </div>
+              <div>
+                <button
+                  onClick={() => handleAddSuggestionToPlan('Solicitar Perfil Lipídico de control anual para HTA')}
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: '#0f766e',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '6px',
+                    fontWeight: 600
+                  }}
+                >
+                  {t('addToPlanBtn')}
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Acciones Rápidas */}
+            <div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>
+                {t('quickActionsLabel')}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <button
+                  onClick={() => handleAiAction('summarize')}
+                  disabled={isAiLoading}
+                  className="btn btn-secondary btn-sm"
+                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
+                >
+                  <FileText size={14} color="#64748b" />
+                  <span>{t('summarizeSoapBtn')}</span>
+                </button>
+
+                <button
+                  onClick={() => handleAiAction('indications')}
+                  disabled={isAiLoading}
+                  className="btn btn-secondary btn-sm"
+                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
+                >
+                  <FileCheck size={14} color="#64748b" />
+                  <span>{t('generateIndicationsBtn')}</span>
+                </button>
+
+                <button
+                  onClick={() => handleAiAction('audit')}
+                  disabled={isAiLoading}
+                  className="btn btn-secondary btn-sm"
+                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
+                >
+                  <ShieldAlert size={14} color="#64748b" />
+                  <span>{t('auditInteractionsBtn')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* AI Messages Stream */}
+            {aiChatMessages.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
+                {aiChatMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: msg.sender === 'user' ? '#f1f5f9' : '#ecfdf5',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.4
+                    }}
+                  >
+                    {msg.title && (
+                      <div style={{ fontWeight: 800, color: '#047857', marginBottom: '0.2rem' }}>
+                        {msg.title}
+                      </div>
+                    )}
+                    <div style={{ color: '#0f172a', whiteSpace: 'pre-line' }}>{msg.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 4. AI Prompt Input Bar */}
+            <form onSubmit={handleSendAiMessage} style={{ position: 'relative', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', padding: '0.25rem 0.5rem' }}>
+                <Mic size={15} color="#94a3b8" style={{ marginRight: '0.35rem', cursor: 'pointer' }} />
+                <input
+                  type="text"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  placeholder={t('askAiPlaceholder')}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
+                    fontSize: '0.78rem',
+                    flex: 1,
+                    color: '#0f172a'
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!aiInput.trim() || isAiLoading}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: aiInput.trim() ? '#0f766e' : '#94a3b8',
+                    cursor: aiInput.trim() ? 'pointer' : 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.25rem'
+                  }}
+                >
+                  <Send size={14} />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

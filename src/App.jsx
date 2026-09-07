@@ -11,6 +11,8 @@ import Toast from './components/Toast';
 import { checkProxyHealth } from './services/fhirApi';
 import { useLanguage } from './i18n/LanguageContext';
 
+import ConsultationPage from './pages/ConsultationPage';
+
 export default function App() {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -93,6 +95,30 @@ export default function App() {
               <AgendaPage
                 addToast={addToast}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/consulta"
+            element={
+              <ConsultationPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/consulta/:id"
+            element={
+              <ConsultationPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/consultation"
+            element={
+              <ConsultationPage
+                addToast={addToast}
               />
             }
           />

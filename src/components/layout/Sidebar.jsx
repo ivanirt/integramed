@@ -23,7 +23,7 @@ export default function Sidebar({ onOpenSettings }) {
     { to: '/', label: t('navHome'), icon: Home, exact: true },
     { to: '/agenda', label: t('navAgenda'), icon: Calendar },
     { to: '/patients', label: t('navPatients'), icon: Users, aliases: ['/patient/'] },
-    { to: '/encounters', label: t('navEncounters'), icon: Stethoscope },
+    { to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
     { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck },
     { to: '/labs', label: t('navLabs'), icon: Microscope },
     { to: '/prescriptions', label: t('navPrescriptions'), icon: FileText },

@@ -338,7 +338,7 @@ export default function PatientProfilePage({ addToast }) {
             </button>
 
             <button
-              onClick={() => setIsScheduleOpen(true)}
+              onClick={() => navigate(`/consulta?patientId=${id}`)}
               className="btn btn-primary"
               style={{
                 borderRadius: '9999px',

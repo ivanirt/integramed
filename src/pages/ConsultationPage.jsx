@@ -43,8 +43,9 @@ import {
   getPatientIdentifier
 } from '../utils/fhirHelper';
 import {
-  getPatientPastEncounters,
+  loadPatientPastEncounters,
   savePatientEncounter,
+  syncEncounterSoapNote,
   saveConsultationDraft,
   getConsultationDraft,
   clearConsultationDraft
@@ -52,6 +53,7 @@ import {
 import { updateAppointmentStatusByPatientId } from '../utils/dashboardStorage';
 import PreviousEncountersListCard from '../components/encounters/PreviousEncountersListCard';
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
+import { parseVitalObservations } from '../utils/vitalsParser';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function ConsultationPage({ addToast }) {
@@ -145,14 +147,14 @@ export default function ConsultationPage({ addToast }) {
       getPatientConditions(selectedPatientId).catch(() => []),
       getPatientMedications(selectedPatientId).catch(() => [])
     ])
-      .then(([patData, obsData, condData, medData]) => {
+      .then(async ([patData, obsData, condData, medData]) => {
         setPatient(patData);
         setObservations(obsData);
         setConditions(condData);
         setMedications(medData);
 
         const patName = patData ? getPatientFullName(patData) : '';
-        const history = getPatientPastEncounters(selectedPatientId, patName);
+        const history = await loadPatientPastEncounters(selectedPatientId, patName);
         setPastEncounters(history);
 
         // Check for existing saved draft for this patient
@@ -185,8 +187,7 @@ export default function ConsultationPage({ addToast }) {
     const handleUpdate = () => {
       if (selectedPatientId) {
         const patName = patient ? getPatientFullName(patient) : '';
-        const history = getPatientPastEncounters(selectedPatientId, patName);
-        setPastEncounters(history);
+        loadPatientPastEncounters(selectedPatientId, patName).then(setPastEncounters);
       }
     };
     window.addEventListener('integramed_encounters_updated', handleUpdate);
@@ -353,8 +354,9 @@ export default function ConsultationPage({ addToast }) {
       const patientName = patient ? getPatientFullName(patient) : `Patient ${selectedPatientId}`;
       const reasonSummary = diagnoses.map(d => d.label).join(', ') || subjective.slice(0, 60);
 
+      let fhirEncounter = null;
       if (selectedPatientId) {
-        await createEncounter({
+        fhirEncounter = await createEncounter({
           patientId: selectedPatientId,
           patientName,
           type: diagnoses[0]?.label ? `Consulta: ${diagnoses[0].label}` : 'Consulta de Medicina General',
@@ -362,12 +364,16 @@ export default function ConsultationPage({ addToast }) {
           startTime: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
           endTime: new Date().toISOString(),
           reason: reasonSummary
-        }).catch(console.warn);
+        }).catch(err => {
+          console.warn(err);
+          return null;
+        });
       }
 
-      // Save complete clinical note to past encounters history
+      // Save complete clinical note to past encounters history and FHIR DocumentReference
       const finalizedEncounter = {
-        id: `enc-${selectedPatientId || 'pat'}-${Date.now()}`,
+        id: fhirEncounter?.id || `enc-${selectedPatientId || 'pat'}-${Date.now()}`,
+        fhirId: fhirEncounter?.id || null,
         patientId: selectedPatientId,
         patientName,
         date: new Date().toISOString(),
@@ -399,7 +405,8 @@ export default function ConsultationPage({ addToast }) {
           duration: 'Continuo'
         }))
       };
-      savePatientEncounter(finalizedEncounter);
+      const stored = savePatientEncounter(finalizedEncounter);
+      await syncEncounterSoapNote(stored);
 
       // Clear draft for this patient upon finalization
       if (selectedPatientId) {
@@ -1357,15 +1364,15 @@ export default function ConsultationPage({ addToast }) {
         onSelectEncounter={(enc) => setSelectedPastEncounter(enc)}
         onCopySubjective={handleCopySubjective}
         onCopyPlan={handleCopyPlan}
-        onEncounterUpdated={(updated) => {
+        onEncounterUpdated={async (updated) => {
           const patName = patient ? getPatientFullName(patient) : '';
-          const refreshed = getPatientPastEncounters(selectedPatientId, patName);
+          const refreshed = await loadPatientPastEncounters(selectedPatientId, patName);
           setPastEncounters(refreshed);
           setSelectedPastEncounter(updated);
         }}
-        onEncounterDeleted={() => {
+        onEncounterDeleted={async () => {
           const patName = patient ? getPatientFullName(patient) : '';
-          const refreshed = getPatientPastEncounters(selectedPatientId, patName);
+          const refreshed = await loadPatientPastEncounters(selectedPatientId, patName);
           setPastEncounters(refreshed);
           setIsReviewModalOpen(false);
           setSelectedPastEncounter(null);

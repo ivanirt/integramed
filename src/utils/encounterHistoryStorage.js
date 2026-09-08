@@ -3,7 +3,22 @@
  * Stores full SOAP notes, vitals, diagnoses, and prescriptions for previous patient visits.
  */
 
-import { updateEncounter, deleteEncounter } from '../services/fhirApi.js';
+import {
+  getEncounters,
+  updateEncounter,
+  deleteEncounter,
+  getPatientDocumentReferences,
+  extractSoapNoteFromDocument,
+  saveEncounterSoapNote,
+  deleteDocumentReference,
+  INTEGRAMED_SOAP_NOTE_TYPE
+} from '../services/fhirApi.js';
+
+function isLikelyFhirId(id) {
+  if (!id) return false;
+  const value = String(id);
+  return !value.startsWith('enc-') && !value.startsWith('serv-') && !value.startsWith('med-');
+}
 
 const STORAGE_KEY = 'integramed_patient_encounters_history';
 
@@ -167,18 +182,54 @@ export function getAllPatientEncounters() {
  * Get past encounters for a specific patient ID, sorted newest first.
  * If exact ID doesn't match and patient is Mariana/Demo, returns relevant sample encounters.
  */
-export function getPatientPastEncounters(patientId, patientName = '') {
+function extractRefId(reference = '') {
+  const value = String(reference || '');
+  if (!value) return '';
+  const parts = value.split('/');
+  return parts[parts.length - 1];
+}
+
+export function mapFhirEncounterToReview(enc, soap = {}) {
+  if (!enc) return null;
+  const patientId = extractRefId(enc.subject?.reference);
+  const practitioner = enc.participant?.[0]?.individual || {};
+  return {
+    id: enc.id,
+    fhirId: enc.id,
+    source: 'fhir',
+    patientId,
+    patientName: enc.subject?.display || soap.patientName || '',
+    date: enc.period?.start || enc.meta?.lastUpdated || soap.date || new Date().toISOString(),
+    type: enc.type?.[0]?.text || enc.type?.[0]?.coding?.[0]?.display || soap.type || 'Consulta',
+    status: enc.status || 'finished',
+    practitionerName: practitioner.display || soap.practitionerName || '',
+    practitionerId: extractRefId(practitioner.reference),
+    practitionerSpecialty: soap.practitionerSpecialty || '',
+    locationName: enc.location?.[0]?.location?.display || soap.locationName || '',
+    reason: enc.reasonCode?.[0]?.text || soap.reason || '',
+    summary: soap.summary || enc.reasonCode?.[0]?.text || '',
+    vitals: soap.vitals || {},
+    subjective: soap.subjective || '',
+    physicalExam: soap.physicalExam || '',
+    diagnoses: soap.diagnoses || [],
+    assessment: soap.assessment || '',
+    plan: soap.plan || '',
+    medications: soap.medications || [],
+    documentId: soap.documentId || null
+  };
+}
+
+function localEncountersForPatient(patientId, patientName = '') {
   const all = getAllPatientEncounters();
   if (!patientId && !patientName) return all;
 
   const idNorm = String(patientId || '').toLowerCase();
   const nameNorm = String(patientName || '').toLowerCase();
 
-  const matched = all.filter(enc => {
+  return all.filter(enc => {
     const encPatId = String(enc.patientId || '').toLowerCase();
     const encPatName = String(enc.patientName || '').toLowerCase();
-
-    if (encPatId === idNorm || idNorm.includes(encPatId) || encPatId.includes(idNorm)) {
+    if (idNorm && (encPatId === idNorm || encPatId.includes(idNorm) || idNorm.includes(encPatId))) {
       return true;
     }
     if (nameNorm && (encPatName.includes(nameNorm) || nameNorm.includes(encPatName))) {
@@ -186,19 +237,69 @@ export function getPatientPastEncounters(patientId, patientName = '') {
     }
     return false;
   });
+}
 
-  // If no match was found, provide the demo encounters adapted to this patient
-  if (matched.length === 0) {
-    const fallbackList = DEFAULT_PAST_ENCOUNTERS.slice(0, 3).map((enc, idx) => ({
-      ...enc,
-      id: `enc-${idNorm || 'pat'}-hist-${idx + 1}`,
-      patientId: patientId || enc.patientId,
-      patientName: patientName || enc.patientName
-    }));
-    return fallbackList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+export function getPatientPastEncounters(patientId, patientName = '') {
+  const matched = localEncountersForPatient(patientId, patientName);
+  return matched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+function soapFromDocument(doc) {
+  const parsed = extractSoapNoteFromDocument(doc) || {};
+  return {
+    ...parsed,
+    documentId: doc.id
+  };
+}
+
+function encounterIdFromDocument(doc) {
+  const ref = doc?.context?.encounter?.[0]?.reference || '';
+  return extractRefId(ref);
+}
+
+/**
+ * Load previous consultations from the FHIR Encounter + DocumentReference stores,
+ * overlaying locally cached SOAP notes when the server has no clinical note yet.
+ */
+export async function loadPatientPastEncounters(patientId, patientName = '') {
+  const local = getPatientPastEncounters(patientId, patientName);
+
+  if (!patientId) {
+    return local;
   }
 
-  return matched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  try {
+    const [fhirEncounters, documents] = await Promise.all([
+      getEncounters(patientId),
+      getPatientDocumentReferences(patientId)
+    ]);
+
+    const soapByEncounterId = {};
+    documents.forEach(doc => {
+      const typeText = doc.type?.text || doc.category?.[0]?.text || '';
+      const encId = encounterIdFromDocument(doc);
+      if (!encId) return;
+      if (typeText === INTEGRAMED_SOAP_NOTE_TYPE || typeText.toLowerCase().includes('soap') || typeText.toLowerCase().includes('progress')) {
+        soapByEncounterId[encId] = soapFromDocument(doc);
+      }
+    });
+
+    const fhirMapped = (fhirEncounters || []).map(enc => {
+      const localMatch = local.find(item => item.id === enc.id || item.fhirId === enc.id);
+      const soap = soapByEncounterId[enc.id] || localMatch || {};
+      return mapFhirEncounterToReview(enc, soap);
+    });
+
+    const fhirIds = new Set(fhirMapped.map(e => e.id));
+    const localOnly = local.filter(e => !fhirIds.has(e.id) && !fhirIds.has(e.fhirId));
+
+    return [...fhirMapped, ...localOnly].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  } catch (err) {
+    console.info('FHIR encounter review load skipped or offline:', err.message);
+    return local;
+  }
 }
 
 /**
@@ -214,8 +315,7 @@ export function savePatientEncounter(encounterData) {
       ...encounterData
     };
 
-    // Filter out if updating an existing one
-    const filtered = all.filter(e => e.id !== newEncounter.id);
+    const filtered = all.filter(e => e.id !== newEncounter.id && e.fhirId !== newEncounter.id);
     const updated = [newEncounter, ...filtered];
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -227,6 +327,39 @@ export function savePatientEncounter(encounterData) {
   }
 }
 
+export async function syncEncounterSoapNote(encounter) {
+  if (!encounter?.patientId || !encounter?.id) return encounter;
+  try {
+    const savedDoc = await saveEncounterSoapNote({
+      documentId: encounter.documentId,
+      patientId: encounter.patientId,
+      patientName: encounter.patientName,
+      encounterId: encounter.fhirId || encounter.id,
+      date: encounter.date,
+      soap: {
+        reason: encounter.reason,
+        summary: encounter.summary,
+        subjective: encounter.subjective,
+        physicalExam: encounter.physicalExam,
+        assessment: encounter.assessment,
+        plan: encounter.plan,
+        diagnoses: encounter.diagnoses,
+        medications: encounter.medications,
+        vitals: encounter.vitals,
+        type: encounter.type,
+        practitionerName: encounter.practitionerName,
+        locationName: encounter.locationName
+      }
+    });
+    if (savedDoc && savedDoc.id) {
+      return { ...encounter, documentId: savedDoc.id };
+    }
+  } catch (fhirErr) {
+    console.info('FHIR SOAP note sync skipped or offline:', fhirErr.message);
+  }
+  return encounter;
+}
+
 /**
  * Update an existing clinical encounter / note in history storage.
  */
@@ -235,11 +368,12 @@ export async function updatePatientEncounter(id, fields) {
     const all = getAllPatientEncounters();
     let updatedItem = null;
 
-    const updated = all.map(enc => {
-      if (enc.id === id) {
+    let updated = all.map(enc => {
+      if (enc.id === id || enc.fhirId === id) {
         updatedItem = {
           ...enc,
           ...fields,
+          id: enc.id || id,
           updatedAt: new Date().toISOString()
         };
         return updatedItem;
@@ -247,23 +381,41 @@ export async function updatePatientEncounter(id, fields) {
       return enc;
     });
 
-    if (updatedItem) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('integramed_encounters_updated', { detail: updatedItem }));
+    if (!updatedItem) {
+      updatedItem = {
+        id,
+        ...fields,
+        updatedAt: new Date().toISOString()
+      };
+      updated = [updatedItem, ...updated];
+    }
 
-      // Background FHIR sync
+    if (updatedItem) {
+      const fhirEncounterId = updatedItem.fhirId || id;
       try {
-        await updateEncounter(id, {
-          patientId: updatedItem.patientId,
-          patientName: updatedItem.patientName,
-          type: updatedItem.type,
-          status: updatedItem.status || 'finished',
-          startTime: updatedItem.date,
-          reason: updatedItem.reason || updatedItem.summary
-        });
+        if (isLikelyFhirId(fhirEncounterId)) {
+          await updateEncounter(fhirEncounterId, {
+            patientId: updatedItem.patientId,
+            patientName: updatedItem.patientName,
+            practitionerId: updatedItem.practitionerId,
+            practitionerName: updatedItem.practitionerName,
+            type: updatedItem.type,
+            status: updatedItem.status || 'finished',
+            startTime: updatedItem.date,
+            reason: updatedItem.reason || updatedItem.summary
+          });
+          updatedItem = await syncEncounterSoapNote({ ...updatedItem, fhirId: fhirEncounterId });
+        }
+        const withDoc = updated.map(enc => (enc.id === id || enc.fhirId === id ? updatedItem : enc));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(withDoc));
+        window.dispatchEvent(new CustomEvent('integramed_encounters_updated', { detail: updatedItem }));
+        return updatedItem;
       } catch (fhirErr) {
         console.info('FHIR encounter update sync skipped or offline:', fhirErr.message);
       }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('integramed_encounters_updated', { detail: updatedItem }));
     }
 
     return updatedItem;
@@ -279,14 +431,20 @@ export async function updatePatientEncounter(id, fields) {
 export async function deletePatientEncounter(id) {
   try {
     const all = getAllPatientEncounters();
-    const filtered = all.filter(e => e.id !== id);
+    const filtered = all.filter(e => e.id !== id && e.fhirId !== id);
 
+    const target = all.find(e => e.id === id || e.fhirId === id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     window.dispatchEvent(new CustomEvent('integramed_encounters_updated', { detail: { deletedId: id } }));
 
-    // Background FHIR sync
     try {
-      await deleteEncounter(id);
+      if (target?.documentId) {
+        await deleteDocumentReference(target.documentId);
+      }
+      const fhirId = target?.fhirId || id;
+      if (isLikelyFhirId(fhirId)) {
+        await deleteEncounter(fhirId);
+      }
     } catch (fhirErr) {
       console.info('FHIR encounter delete sync skipped or offline:', fhirErr.message);
     }

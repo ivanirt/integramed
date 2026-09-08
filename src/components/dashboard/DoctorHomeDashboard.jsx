@@ -41,7 +41,7 @@ import {
   sortTasksByCompletion,
   INITIAL_AI_SUGGESTIONS
 } from '../../utils/dashboardStorage';
-import { getPatientPastEncounters } from '../../utils/encounterHistoryStorage';
+import { loadPatientPastEncounters } from '../../utils/encounterHistoryStorage';
 import PreviousEncounterReviewModal from '../encounters/PreviousEncounterReviewModal';
 
 export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
@@ -193,8 +193,8 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
   };
 
   // Handle AI Review Trigger
-  const handleOpenAiHistory = (patientId, patientName) => {
-    const history = getPatientPastEncounters(patientId || 'carlos-mendoza', patientName || 'Carlos Mendoza Ruiz');
+  const handleOpenAiHistory = async (patientId, patientName) => {
+    const history = await loadPatientPastEncounters(patientId, patientName);
     if (history.length > 0) {
       setAiReviewEncounter(history[0]);
       setAiReviewList(history);
@@ -1331,6 +1331,21 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
         encountersList={aiReviewList}
         onClose={() => setIsAiReviewModalOpen(false)}
         onSelectEncounter={(enc) => setAiReviewEncounter(enc)}
+        onEncounterUpdated={(updated) => {
+          setAiReviewEncounter(updated);
+          setAiReviewList(prev => prev.map(item => item.id === updated.id ? updated : item));
+        }}
+        onEncounterDeleted={(deletedId) => {
+          const next = aiReviewList.filter(item => item.id !== deletedId);
+          setAiReviewList(next);
+          if (next.length === 0) {
+            setIsAiReviewModalOpen(false);
+            setAiReviewEncounter(null);
+          } else {
+            setAiReviewEncounter(next[0]);
+          }
+        }}
+        addToast={addToast}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Stethoscope,
   Radio,
@@ -29,7 +29,8 @@ import {
   saveClinicalService,
   deleteClinicalService,
   toggleClinicalServiceStatus,
-  resetClinicalServicesToDefault
+  resetClinicalServicesToDefault,
+  loadClinicalServicesFromFhir
 } from '../../utils/clinicalServicesStorage';
 import { getLocations } from '../../utils/facilityStorage';
 import ClinicalServiceModal from './ClinicalServiceModal';
@@ -41,6 +42,12 @@ export default function ClinicalServicesAdmin({ addToast }) {
 
   const [services, setServices] = useState(() => getClinicalServices());
   const [locations] = useState(() => getLocations());
+
+  useEffect(() => {
+    loadClinicalServicesFromFhir()
+      .then(list => setServices(list))
+      .catch(() => {});
+  }, []);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState('all');

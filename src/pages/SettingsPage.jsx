@@ -48,8 +48,6 @@ import {
 } from '../utils/scheduleStorage';
 import {
   getStaffList,
-  saveStaffMember,
-  deleteStaffMember,
   updateStaffConsultationDuration,
   CLINICAL_ROLES,
   SHIFT_TYPES,
@@ -93,7 +91,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   }, [location.search]);
 
   // Auth Context & Doctor Consultation Duration State
-  const { currentUser, updateConsultationDuration } = useAuth();
+  const { currentUser, updateConsultationDuration, savePractitioner, deletePractitioner } = useAuth();
   const [staffDirectory, setStaffDirectory] = useState(() => getStaffList());
   const [doctorSearch, setDoctorSearch] = useState('');
   const [doctorRoleFilter, setDoctorRoleFilter] = useState('all');
@@ -143,7 +141,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
 
   // Handle saving (create or update) practitioner
   const handleSavePractitioner = (practitionerData) => {
-    const updated = saveStaffMember(practitionerData);
+    const updated = savePractitioner(practitionerData);
     setStaffDirectory(updated);
     setPractitionerModal({ isOpen: false, practitioner: null });
     getPractitioners().then(docs => setPractitioners(docs || []));
@@ -181,7 +179,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     if (!practitionerDeleteModal.practitioner) return;
     const staff = practitionerDeleteModal.practitioner;
     const name = getStaffFullName(staff);
-    const updated = deleteStaffMember(staff.id);
+    const updated = deletePractitioner(staff.id);
     setStaffDirectory(updated);
     setPractitionerDeleteModal({ isOpen: false, practitioner: null });
     getPractitioners().then(docs => setPractitioners(docs || []));

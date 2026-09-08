@@ -455,6 +455,23 @@ export function deleteFacilityServiceCatalogItem(serviceName) {
   const list = getFacilityServicesCatalog();
   const updated = list.filter(s => s !== serviceName);
   saveFacilityServicesCatalog(updated);
+
+  const locations = getLocations();
+  let modifiedLocs = false;
+  const updatedLocs = locations.map(loc => {
+    if (loc.services && loc.services.includes(serviceName)) {
+      modifiedLocs = true;
+      return {
+        ...loc,
+        services: loc.services.filter(s => s !== serviceName)
+      };
+    }
+    return loc;
+  });
+  if (modifiedLocs) {
+    saveLocations(updatedLocs);
+  }
+
   return updated;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Pill,
   Plus,
@@ -40,7 +40,8 @@ import {
   getPatientDispensations,
   savePatientDispensation,
   deletePatientDispensation,
-  resetMedicationsData
+  resetMedicationsData,
+  loadMedicationsFromFhir
 } from '../utils/medicationInventoryStorage';
 import MedicationModal from '../components/medications/MedicationModal';
 import StockIngressModal from '../components/medications/StockIngressModal';
@@ -57,6 +58,12 @@ export default function MedicationsInventoryPage({ addToast }) {
   const [medications, setMedications] = useState(() => getMedications());
   const [ingresses, setIngresses] = useState(() => getStockIngresses());
   const [dispensations, setDispensations] = useState(() => getPatientDispensations());
+
+  useEffect(() => {
+    loadMedicationsFromFhir()
+      .then(list => setMedications(list))
+      .catch(() => {});
+  }, []);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');

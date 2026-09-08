@@ -761,6 +761,377 @@ export async function createLabObservation({
   return await response.json();
 }
 
+export const INTEGRAMED_SERVICE_SYSTEM = 'https://integramed.app/fhir/catalog/healthcare-service';
+export const INTEGRAMED_MEDICATION_SYSTEM = 'https://integramed.app/fhir/catalog/medication';
+export const INTEGRAMED_SOAP_NOTE_TYPE = 'integramed-soap-note';
+
+function bundleResources(data, resourceType) {
+  if (!data) return [];
+  if (data.resourceType === resourceType) return [data];
+  if (data.resourceType === 'Bundle' && Array.isArray(data.entry)) {
+    return data.entry
+      .map(e => e.resource)
+      .filter(r => r && (!resourceType || r.resourceType === resourceType));
+  }
+  return [];
+}
+
+/**
+ * Shared FHIR proxy request helper used by catalog and encounter review CRUD.
+ */
+export async function fhirRequest(path, { method = 'GET', body } = {}) {
+  const headers = {
+    Accept: 'application/fhir+json, application/json'
+  };
+  const options = { method, headers };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/fhir+json';
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(`${API_BASE}/fhir/${String(path).replace(/^\//, '')}`, options);
+
+  if (response.status === 204 || response.status === 202) {
+    return true;
+  }
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  const text = await response.text();
+  if (!text) return true;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+export async function getEncounterById(id) {
+  if (!id) throw new Error('Encounter ID is required');
+  return fhirRequest(`Encounter/${encodeURIComponent(id)}`);
+}
+
+export async function getPatientDocumentReferences(patientId) {
+  if (!patientId) return [];
+  try {
+    const data = await fhirRequest(
+      `DocumentReference?patient=${encodeURIComponent(patientId)}&_count=100&_sort=-date`
+    );
+    return bundleResources(data, 'DocumentReference');
+  } catch {
+    try {
+      const data = await fhirRequest(
+        `DocumentReference?subject=Patient/${encodeURIComponent(patientId)}&_count=100`
+      );
+      return bundleResources(data, 'DocumentReference');
+    } catch {
+      return [];
+    }
+  }
+}
+
+function encodeAttachmentJson(payload) {
+  const json = JSON.stringify(payload);
+  if (typeof btoa === 'function') {
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+  return Buffer.from(json, 'utf8').toString('base64');
+}
+
+function decodeAttachmentJson(attachment) {
+  if (!attachment) return null;
+  try {
+    if (attachment.data) {
+      const json = typeof atob === 'function'
+        ? decodeURIComponent(escape(atob(attachment.data)))
+        : Buffer.from(attachment.data, 'base64').toString('utf8');
+      return JSON.parse(json);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function extractSoapNoteFromDocument(doc) {
+  const attachment = doc?.content?.[0]?.attachment;
+  const parsed = decodeAttachmentJson(attachment);
+  if (parsed && typeof parsed === 'object') return parsed;
+  return null;
+}
+
+export function buildSoapDocumentReference({
+  id,
+  patientId,
+  patientName,
+  encounterId,
+  date,
+  soap
+}) {
+  return {
+    resourceType: 'DocumentReference',
+    ...(id ? { id } : {}),
+    status: 'current',
+    type: {
+      coding: [
+        {
+          system: 'http://loinc.org',
+          code: '11506-3',
+          display: 'Progress note'
+        }
+      ],
+      text: INTEGRAMED_SOAP_NOTE_TYPE
+    },
+    category: [
+      {
+        text: INTEGRAMED_SOAP_NOTE_TYPE
+      }
+    ],
+    subject: {
+      reference: `Patient/${patientId}`,
+      display: patientName || undefined
+    },
+    date: date || new Date().toISOString(),
+    description: soap?.reason || soap?.summary || 'IntegraMed SOAP note',
+    content: [
+      {
+        attachment: {
+          contentType: 'application/json',
+          title: 'IntegraMed SOAP clinical note',
+          data: encodeAttachmentJson(soap)
+        }
+      }
+    ],
+    context: encounterId
+      ? {
+          encounter: [{ reference: `Encounter/${encounterId}` }]
+        }
+      : undefined
+  };
+}
+
+export async function saveEncounterSoapNote({
+  documentId,
+  patientId,
+  patientName,
+  encounterId,
+  date,
+  soap
+}) {
+  const resource = buildSoapDocumentReference({
+    id: documentId,
+    patientId,
+    patientName,
+    encounterId,
+    date,
+    soap
+  });
+
+  if (documentId) {
+    return fhirRequest(`DocumentReference/${encodeURIComponent(documentId)}`, {
+      method: 'PUT',
+      body: resource
+    });
+  }
+
+  return fhirRequest('DocumentReference', {
+    method: 'POST',
+    body: resource
+  });
+}
+
+export async function deleteDocumentReference(id) {
+  if (!id) return true;
+  return fhirRequest(`DocumentReference/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function getHealthcareServices() {
+  const data = await fhirRequest('HealthcareService?_count=200');
+  return bundleResources(data, 'HealthcareService');
+}
+
+export function clinicalServiceToHealthcareService(service) {
+  const fhirId = service.fhirId || (service.id && !String(service.id).startsWith('serv-') ? service.id : undefined);
+  return {
+    resourceType: 'HealthcareService',
+    ...(fhirId ? { id: fhirId } : {}),
+    identifier: [
+      {
+        system: INTEGRAMED_SERVICE_SYSTEM,
+        value: service.id || fhirId || `serv-${Date.now()}`
+      }
+    ],
+    active: service.status !== 'temporarily_unavailable',
+    name: service.nameEn || service.nameEs,
+    comment: service.nameEs || service.nameEn,
+    extraDetails: JSON.stringify(service),
+    category: [{ text: service.category || 'consulta_especialidad' }],
+    type: [{ text: service.department || service.category || 'Clinical Service' }],
+    appointmentRequired: Boolean(service.requiresAppointment)
+  };
+}
+
+export function healthcareServiceToClinicalService(resource) {
+  if (!resource) return null;
+  let extra = {};
+  if (resource.extraDetails) {
+    try {
+      extra = JSON.parse(resource.extraDetails);
+    } catch {
+      extra = {};
+    }
+  }
+  const localId = resource.identifier?.find(i => i.system === INTEGRAMED_SERVICE_SYSTEM)?.value
+    || extra.id
+    || resource.id;
+
+  return {
+    ...extra,
+    id: localId,
+    fhirId: resource.id,
+    nameEn: extra.nameEn || resource.name || extra.nameEs,
+    nameEs: extra.nameEs || resource.comment || resource.name,
+    category: extra.category || resource.category?.[0]?.text || 'consulta_especialidad',
+    department: extra.department || resource.type?.[0]?.text || '',
+    status: resource.active === false ? 'temporarily_unavailable' : (extra.status || 'available'),
+    requiresAppointment: extra.requiresAppointment ?? Boolean(resource.appointmentRequired)
+  };
+}
+
+export async function createHealthcareService(service) {
+  return fhirRequest('HealthcareService', {
+    method: 'POST',
+    body: clinicalServiceToHealthcareService(service)
+  });
+}
+
+export async function updateHealthcareService(fhirId, service) {
+  if (!fhirId) throw new Error('HealthcareService ID is required for update');
+  return fhirRequest(`HealthcareService/${encodeURIComponent(fhirId)}`, {
+    method: 'PUT',
+    body: clinicalServiceToHealthcareService({ ...service, fhirId })
+  });
+}
+
+export async function deleteHealthcareService(fhirId) {
+  if (!fhirId) return true;
+  return fhirRequest(`HealthcareService/${encodeURIComponent(fhirId)}`, { method: 'DELETE' });
+}
+
+export async function getFhirMedications() {
+  const data = await fhirRequest('Medication?_count=200');
+  return bundleResources(data, 'Medication');
+}
+
+export function catalogMedicationToFhir(med) {
+  const fhirId = med.fhirId || (med.id && !String(med.id).startsWith('med-') ? med.id : undefined);
+  return {
+    resourceType: 'Medication',
+    ...(fhirId ? { id: fhirId } : {}),
+    identifier: [
+      {
+        system: INTEGRAMED_MEDICATION_SYSTEM,
+        value: med.id || fhirId || `med-${Date.now()}`
+      }
+    ],
+    code: {
+      text: med.genericName || med.brandName,
+      coding: med.code
+        ? [{ display: med.genericName || med.brandName, code: String(med.code).slice(0, 64) }]
+        : undefined
+    },
+    status: 'active',
+    form: { text: med.dosageForm || med.route || 'Oral' },
+    ingredient: [
+      {
+        itemCodeableConcept: { text: med.genericName || med.brandName },
+        strength: med.strength
+          ? { numerator: { value: parseFloat(String(med.strength)) || undefined, unit: String(med.strength) } }
+          : undefined
+      }
+    ]
+  };
+}
+
+export function fhirMedicationToCatalog(resource, fallback = {}) {
+  const localId = resource.identifier?.find(i => i.system === INTEGRAMED_MEDICATION_SYSTEM)?.value
+    || fallback.id
+    || resource.id;
+  return {
+    ...fallback,
+    id: localId,
+    fhirId: resource.id,
+    genericName: fallback.genericName || resource.code?.text || resource.ingredient?.[0]?.itemCodeableConcept?.text,
+    brandName: fallback.brandName || resource.code?.text,
+    dosageForm: fallback.dosageForm || resource.form?.text
+  };
+}
+
+export async function createFhirMedication(med) {
+  return fhirRequest('Medication', {
+    method: 'POST',
+    body: catalogMedicationToFhir(med)
+  });
+}
+
+export async function updateFhirMedication(fhirId, med) {
+  if (!fhirId) throw new Error('Medication ID is required for update');
+  return fhirRequest(`Medication/${encodeURIComponent(fhirId)}`, {
+    method: 'PUT',
+    body: catalogMedicationToFhir({ ...med, fhirId })
+  });
+}
+
+export async function deleteFhirMedication(fhirId) {
+  if (!fhirId) return true;
+  return fhirRequest(`Medication/${encodeURIComponent(fhirId)}`, { method: 'DELETE' });
+}
+
+export async function updatePractitioner(id, {
+  prefix = 'Dr.',
+  givenName,
+  familyName,
+  gender = 'unknown',
+  email,
+  phone,
+  qualification,
+  active = true
+}) {
+  if (!id) throw new Error('Practitioner ID is required for update');
+  const givenArray = givenName ? givenName.trim().split(/\s+/).filter(Boolean) : [];
+  const practitionerResource = {
+    resourceType: 'Practitioner',
+    id,
+    active,
+    name: [
+      {
+        use: 'official',
+        prefix: prefix ? [prefix] : ['Dr.'],
+        family: familyName ? familyName.trim() : '',
+        given: givenArray
+      }
+    ],
+    gender: gender || 'unknown',
+    telecom: [
+      ...(email ? [{ system: 'email', value: email.trim(), use: 'work' }] : []),
+      ...(phone ? [{ system: 'phone', value: phone.trim(), use: 'work' }] : [])
+    ]
+  };
+  if (qualification) {
+    practitionerResource.qualification = [{ code: { text: qualification.trim() } }];
+  }
+  return fhirRequest(`Practitioner/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: practitionerResource
+  });
+}
+
+export async function deletePractitionerResource(id) {
+  if (!id) throw new Error('Practitioner ID is required for deletion');
+  return fhirRequest(`Practitioner/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 /**
  * Update runtime FHIR Proxy server settings.
  */

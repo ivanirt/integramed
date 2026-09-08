@@ -7,6 +7,14 @@
  * - LocalStorage persistence with fallback to initial seed
  */
 
+import {
+  getHealthcareServices,
+  createHealthcareService,
+  updateHealthcareService,
+  deleteHealthcareService,
+  healthcareServiceToClinicalService
+} from '../services/fhirApi.js';
+
 export const SERVICE_CATEGORIES = {
   consulta_especialidad: {
     id: 'consulta_especialidad',
@@ -400,30 +408,57 @@ export function saveClinicalServicesList(servicesArray) {
   }
 }
 
+function persistList(updatedList) {
+  saveClinicalServicesList(updatedList);
+  return updatedList;
+}
+
+async function syncServiceToFhir(service) {
+  try {
+    if (service.fhirId) {
+      const saved = await updateHealthcareService(service.fhirId, service);
+      return saved?.id ? { ...service, fhirId: saved.id } : service;
+    }
+    const created = await createHealthcareService(service);
+    if (created?.id) {
+      const withFhir = { ...service, fhirId: created.id };
+      const list = getClinicalServices().map(item => item.id === service.id ? withFhir : item);
+      saveClinicalServicesList(list);
+      return withFhir;
+    }
+  } catch (err) {
+    console.info('FHIR HealthcareService catalog sync skipped or offline:', err.message);
+  }
+  return service;
+}
+
 /**
  * Save or update a clinical service
  */
 export function saveClinicalService(serviceData) {
   const list = getClinicalServices();
   const index = list.findIndex(s => s.id === serviceData.id);
+  let saved;
   let updatedList;
   if (index >= 0) {
-    updatedList = [...list];
-    updatedList[index] = {
-      ...updatedList[index],
+    saved = {
+      ...list[index],
       ...serviceData,
       updatedAt: new Date().toISOString()
     };
+    updatedList = [...list];
+    updatedList[index] = saved;
   } else {
-    const newService = {
+    saved = {
       ...serviceData,
       id: serviceData.id || `serv-${Date.now()}`,
       createdAt: new Date().toISOString(),
       status: serviceData.status || 'available'
     };
-    updatedList = [newService, ...list];
+    updatedList = [saved, ...list];
   }
-  saveClinicalServicesList(updatedList);
+  persistList(updatedList);
+  syncServiceToFhir(saved);
   return updatedList;
 }
 
@@ -441,7 +476,8 @@ export function toggleClinicalServiceStatus(serviceId) {
       status: current === 'available' ? 'temporarily_unavailable' : 'available',
       updatedAt: new Date().toISOString()
     };
-    saveClinicalServicesList(updatedList);
+    persistList(updatedList);
+    syncServiceToFhir(updatedList[index]);
     return updatedList;
   }
   return list;
@@ -452,9 +488,40 @@ export function toggleClinicalServiceStatus(serviceId) {
  */
 export function deleteClinicalService(serviceId) {
   const list = getClinicalServices();
+  const target = list.find(s => s.id === serviceId);
   const filtered = list.filter(s => s.id !== serviceId);
-  saveClinicalServicesList(filtered);
+  persistList(filtered);
+  if (target?.fhirId) {
+    deleteHealthcareService(target.fhirId).catch(err => {
+      console.info('FHIR HealthcareService delete skipped or offline:', err.message);
+    });
+  }
   return filtered;
+}
+
+/**
+ * Merge FHIR HealthcareService catalog with local clinical services.
+ */
+export async function loadClinicalServicesFromFhir() {
+  const local = getClinicalServices();
+  try {
+    const remote = await getHealthcareServices();
+    const mapped = (remote || []).map(healthcareServiceToClinicalService).filter(Boolean);
+    if (mapped.length === 0) return local;
+
+    const byId = new Map();
+    local.forEach(item => byId.set(item.id, item));
+    mapped.forEach(item => {
+      const existing = byId.get(item.id);
+      byId.set(item.id, existing ? { ...existing, ...item } : item);
+    });
+    const merged = Array.from(byId.values());
+    saveClinicalServicesList(merged);
+    return merged;
+  } catch (err) {
+    console.info('FHIR clinical services catalog load skipped or offline:', err.message);
+    return local;
+  }
 }
 
 /**

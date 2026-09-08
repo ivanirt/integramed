@@ -25,13 +25,15 @@ import {
   ExternalLink,
   Printer,
   Download,
-  RotateCcw
+  RotateCcw,
+  Pencil
 } from 'lucide-react';
 import { getPatients, getPatientById, createLabObservation, getPatientLabObservations } from '../services/fhirApi';
 import { getPatientFullName, calculateAge, getPatientIdentifier } from '../utils/fhirHelper';
 import { useLanguage } from '../i18n/LanguageContext';
 import { getLabPanels, saveLabPanel, deleteLabPanel, resetLabPanelsToDefault } from '../utils/labsStorage';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import LabPanelModal from '../components/labs/LabPanelModal';
 
 export default function LabsPage({ addToast }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,9 +69,10 @@ export default function LabsPage({ addToast }) {
     isDanger: true,
     confirmText: '',
     onConfirm: null,
-    itemName: '',
-    itemId: ''
+    itemId: '',
+    itemName: ''
   });
+  const [panelModal, setPanelModal] = useState({ isOpen: false, panel: null });
 
   // Load patients list
   useEffect(() => {
@@ -219,6 +222,18 @@ export default function LabsPage({ addToast }) {
         );
       }
     }, 900);
+  };
+
+  const handleSaveLabPanel = (panelData) => {
+    saveLabPanel(panelData);
+    setPanels(getLabPanels());
+    if (addToast) {
+      addToast(
+        'success',
+        language === 'en' ? 'Laboratory study saved' : 'Estudio de laboratorio guardado',
+        language === 'en' ? 'Catalog updated' : 'Catálogo actualizado'
+      );
+    }
   };
 
   // Delete Lab Panel Confirmation Handlers
@@ -588,6 +603,23 @@ export default function LabsPage({ addToast }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
                 type="button"
+                onClick={() => setPanelModal({ isOpen: true, panel: null })}
+                className="btn btn-outline"
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.35rem 0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  color: '#0f766e',
+                  borderColor: '#99f6e4'
+                }}
+              >
+                <Plus size={13} />
+                <span>{language === 'en' ? 'Add study' : 'Agregar estudio'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleResetPanelsClick}
                 className="btn btn-outline"
                 style={{
@@ -664,6 +696,27 @@ export default function LabsPage({ addToast }) {
                           <span>IA Extracción</span>
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPanelModal({ isOpen: true, panel });
+                        }}
+                        style={{
+                          padding: '4px',
+                          borderRadius: '6px',
+                          color: '#0f766e',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer'
+                        }}
+                        title={language === 'en' ? 'Edit study panel' : 'Editar panel de estudio'}
+                      >
+                        <Pencil size={16} />
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => handleDeletePanelClick(e, panel)}
@@ -1047,6 +1100,12 @@ export default function LabsPage({ addToast }) {
         confirmText={confirmModal.confirmText}
         itemName={confirmModal.itemName}
         itemId={confirmModal.itemId}
+      />
+      <LabPanelModal
+        isOpen={panelModal.isOpen}
+        panel={panelModal.panel}
+        onClose={() => setPanelModal({ isOpen: false, panel: null })}
+        onSave={handleSaveLabPanel}
       />
     </div>
   );

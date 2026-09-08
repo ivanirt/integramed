@@ -3,6 +3,14 @@
  * Aligned with HL7 FHIR R4 Medication, MedicationKnowledge, MedicationDispense and InventoryReport
  */
 
+import {
+  createFhirMedication,
+  updateFhirMedication,
+  deleteFhirMedication,
+  getFhirMedications,
+  fhirMedicationToCatalog
+} from '../services/fhirApi.js';
+
 export const INITIAL_MEDICATIONS = [
   {
     id: 'med-paracetamol-500',
@@ -374,14 +382,61 @@ export function saveMedication(medData) {
     updated = [cleanMed, ...list];
   }
   saveMedications(updated);
+
+  const saved = updated.find(m => m.id === id);
+  syncMedicationToFhir(saved);
   return updated;
+}
+
+async function syncMedicationToFhir(med) {
+  if (!med) return;
+  try {
+    if (med.fhirId) {
+      await updateFhirMedication(med.fhirId, med);
+      return;
+    }
+    const created = await createFhirMedication(med);
+    if (created?.id) {
+      const list = getMedications().map(item => item.id === med.id ? { ...item, fhirId: created.id } : item);
+      saveMedications(list);
+    }
+  } catch (err) {
+    console.info('FHIR Medication catalog sync skipped or offline:', err.message);
+  }
 }
 
 export function deleteMedication(medId) {
   const list = getMedications();
+  const target = list.find(m => m.id === medId);
   const updated = list.filter(m => m.id !== medId);
   saveMedications(updated);
+  if (target?.fhirId) {
+    deleteFhirMedication(target.fhirId).catch(err => {
+      console.info('FHIR Medication delete skipped or offline:', err.message);
+    });
+  }
   return updated;
+}
+
+export async function loadMedicationsFromFhir() {
+  const local = getMedications();
+  try {
+    const remote = await getFhirMedications();
+    if (!remote?.length) return local;
+    const mapped = remote.map(res => fhirMedicationToCatalog(res));
+    const byId = new Map();
+    local.forEach(item => byId.set(item.id, item));
+    mapped.forEach(item => {
+      const existing = byId.get(item.id);
+      byId.set(item.id, existing ? { ...existing, fhirId: item.fhirId } : { ...item, stock: 0, minStock: 10, maxStock: 100, reorderPoint: 20, movements: [] });
+    });
+    const merged = Array.from(byId.values());
+    saveMedications(merged);
+    return merged;
+  } catch (err) {
+    console.info('FHIR medication catalog load skipped or offline:', err.message);
+    return local;
+  }
 }
 
 export function adjustMedicationStock(medId, { type, quantity, reason, user }) {

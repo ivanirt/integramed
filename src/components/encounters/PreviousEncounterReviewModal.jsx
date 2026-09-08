@@ -106,6 +106,7 @@ export default function PreviousEncounterReviewModal({
     try {
       setIsSubmitting(true);
       const updated = await updatePatientEncounter(encounter.id, {
+        ...encounter,
         reason: editReason,
         subjective: editSubjective,
         physicalExam: editPhysicalExam,

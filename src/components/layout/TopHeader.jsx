@@ -5,24 +5,9 @@ import {
   Bell,
   Plus,
   User,
-  Activity,
-  Check,
-  RefreshCw,
-  X,
-  ChevronRight,
-  ChevronDown,
-  LogOut,
-  Shield,
-  Stethoscope,
-  HeartPulse,
-  Users,
-  ShieldCheck,
-  FlaskConical,
-  Globe
+  ChevronRight
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { useAuth } from '../../context/AuthContext';
-import { CLINICAL_ROLES, getStaffFullName } from '../../utils/staffData';
 import { getPatients } from '../../services/fhirApi';
 import { getPatientFullName } from '../../utils/fhirHelper';
 
@@ -31,28 +16,14 @@ export default function TopHeader({
   onScheduleEncounter,
   onOpenSettings
 }) {
-  const { language, setLanguage, t } = useLanguage();
-  const { currentUser, activeRole, switchRole, updateUserLanguage, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchRef = useRef(null);
-  const userMenuRef = useRef(null);
-
-  // Close user menu on click outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Debounced search for quick search dropdown in header
   useEffect(() => {
@@ -95,36 +66,7 @@ export default function TopHeader({
     navigate(`/patient/${patientId}`);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const isConnected = serverInfo?.status === 'connected';
-  const roleConfig = CLINICAL_ROLES[activeRole] || CLINICAL_ROLES.doctor;
-
-  const renderRoleIcon = (roleId, size = 14) => {
-    switch (roleId) {
-      case 'doctor':
-        return <Stethoscope size={size} />;
-      case 'therapist':
-        return <Activity size={size} />;
-      case 'nurse':
-        return <HeartPulse size={size} />;
-      case 'receptionist':
-        return <Users size={size} />;
-      case 'admin':
-        return <ShieldCheck size={size} />;
-      case 'lab':
-        return <FlaskConical size={size} />;
-      default:
-        return <Shield size={size} />;
-    }
-  };
-
-  const initials = currentUser
-    ? `${currentUser.givenName[0]}${currentUser.familyName[0]}`
-    : 'JR';
 
   return (
     <header
@@ -338,283 +280,6 @@ export default function TopHeader({
           <Plus size={16} strokeWidth={2.5} />
           <span>{t('btnNewAppointment')}</span>
         </button>
-
-        {/* Authenticated User Menu & Multi-Role Switcher */}
-        <div ref={userMenuRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.625rem',
-              padding: '4px 8px 4px 4px',
-              borderRadius: '9999px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <div
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                backgroundColor: currentUser?.avatarBg || '#0f766e',
-                color: currentUser?.avatarText || '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.8125rem',
-                flexShrink: 0
-              }}
-            >
-              {initials}
-            </div>
-
-            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
-                {getStaffFullName(currentUser)}
-              </span>
-              <span
-                style={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  color: roleConfig.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px'
-                }}
-              >
-                {renderRoleIcon(activeRole, 11)}
-                <span>{language === 'en' ? roleConfig.labelEn : roleConfig.labelEs}</span>
-              </span>
-            </div>
-
-            <ChevronDown size={14} color="#64748b" />
-          </button>
-
-          {/* User & Role Switcher Dropdown */}
-          {isUserMenuOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)',
-                right: 0,
-                width: '280px',
-                backgroundColor: '#ffffff',
-                borderRadius: '0.875rem',
-                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
-                border: '1px solid #e2e8f0',
-                padding: '0.75rem',
-                zIndex: 60
-              }}
-            >
-              {/* User Header */}
-              <div style={{ padding: '0.5rem 0.5rem 0.75rem', borderBottom: '1px solid #f1f5f9' }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0f172a' }}>
-                  {getStaffFullName(currentUser)}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  {currentUser?.specialty}
-                </div>
-                {currentUser?.license && (
-                  <div style={{ fontSize: '0.6875rem', color: '#0d9488', fontWeight: 600, marginTop: '2px' }}>
-                    {currentUser.license}
-                  </div>
-                )}
-              </div>
-
-              {/* Multi-role Switcher */}
-              {currentUser && currentUser.roles.length > 1 && (
-                <div style={{ padding: '0.75rem 0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                    {language === 'en' ? 'Switch Active Role' : 'Cambiar Rol Activo'}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                    {currentUser.roles.map(rKey => {
-                      const r = CLINICAL_ROLES[rKey];
-                      const isActive = activeRole === rKey;
-                      return (
-                        <button
-                          key={rKey}
-                          type="button"
-                          onClick={() => {
-                            switchRole(rKey);
-                            setIsUserMenuOpen(false);
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.4rem 0.625rem',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            border: 'none',
-                            backgroundColor: isActive ? r?.bgColor : '#f8fafc',
-                            color: isActive ? r?.color : '#475569',
-                            cursor: 'pointer',
-                            transition: 'all 0.12s ease'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {renderRoleIcon(rKey, 14)}
-                            <span>{language === 'en' ? r?.labelEn : r?.labelEs}</span>
-                          </div>
-                          {isActive && <Check size={14} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Account Language Preference in Profile */}
-              <div style={{ padding: '0.75rem 0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Globe size={13} color="#0d9488" />
-                  <span>{language === 'en' ? 'Account Language' : 'Idioma de la Cuenta'}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (updateUserLanguage) {
-                        updateUserLanguage('es');
-                      } else {
-                        setLanguage('es');
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.35rem',
-                      padding: '0.45rem 0.5rem',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      border: language === 'es' ? '1px solid #0d9488' : '1px solid #e2e8f0',
-                      backgroundColor: language === 'es' ? '#ecfdf5' : '#f8fafc',
-                      color: language === 'es' ? '#0f766e' : '#64748b',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <span>🇲🇽 Español</span>
-                    {language === 'es' && <Check size={13} color="#0d9488" strokeWidth={3} />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (updateUserLanguage) {
-                        updateUserLanguage('en');
-                      } else {
-                        setLanguage('en');
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.35rem',
-                      padding: '0.45rem 0.5rem',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      border: language === 'en' ? '1px solid #0d9488' : '1px solid #e2e8f0',
-                      backgroundColor: language === 'en' ? '#ecfdf5' : '#f8fafc',
-                      color: language === 'en' ? '#0f766e' : '#64748b',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <span>🇺🇸 English</span>
-                    {language === 'en' && <Check size={13} color="#0d9488" strokeWidth={3} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ paddingTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    navigate('/perfil');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 0.625rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.8125rem',
-                    color: '#0f766e',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700
-                  }}
-                >
-                  <User size={15} />
-                  <span>{language === 'en' ? 'My Profile & User Settings' : 'Mi Perfil & Gestión de Usuarios'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    navigate('/login');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 0.625rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.8125rem',
-                    color: '#0d9488',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  <Users size={15} />
-                  <span>{language === 'en' ? 'Switch Practitioner Profile' : 'Cambiar Perfil de Usuario'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 0.625rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.8125rem',
-                    color: '#e11d48',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  <LogOut size={15} />
-                  <span>{language === 'en' ? 'Log Out' : 'Cerrar Sesión'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </header>
   );

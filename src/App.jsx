@@ -51,12 +51,22 @@ export default function App() {
 
   // Check health on mount
   useEffect(() => {
-    checkProxyHealth()
-      .then(info => setServerInfo(info))
-      .catch(err => {
-        console.error('Health check error:', err);
-        setServerInfo({ status: 'unreachable', message: err.message });
-      });
+    let cancelled = false;
+    const run = () => {
+      checkProxyHealth()
+        .then((info) => {
+          if (!cancelled) setServerInfo(info);
+        })
+        .catch((err) => {
+          if (!cancelled) setServerInfo({ status: 'unreachable', message: err.message });
+        });
+    };
+    run();
+    const timer = setInterval(run, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   // Standalone Login Page

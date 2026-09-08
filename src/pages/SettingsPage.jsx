@@ -56,6 +56,7 @@ import {
 } from '../utils/staffStorage';
 import { useAuth } from '../context/AuthContext';
 import { getPractitioners, updateProxyConfig, checkProxyHealth } from '../services/fhirApi';
+import { getClinicalVaultStatus } from '../services/aiApi';
 import HolidaysCalendarPicker from '../components/settings/HolidaysCalendarPicker';
 import FacilitiesPage from './FacilitiesPage';
 import ClinicalServicesAdmin from '../components/services/ClinicalServicesAdmin';
@@ -228,6 +229,13 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   const [fhirToken, setFhirToken] = useState('');
   const [isSavingFhir, setIsSavingFhir] = useState(false);
   const [fhirStatusMsg, setFhirStatusMsg] = useState(null);
+  const [vaultStatus, setVaultStatus] = useState(null);
+
+  useEffect(() => {
+    getClinicalVaultStatus()
+      .then(setVaultStatus)
+      .catch(() => setVaultStatus({ exists: false, noteCount: 0 }));
+  }, []);
 
   // Load practitioners
   useEffect(() => {
@@ -1879,6 +1887,37 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                 <span className="form-helper">{t('bearerTokenHelper')}</span>
               </div>
             </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '0.875rem',
+              border: '1px solid #e2e8f0',
+              padding: '1.5rem',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+            }}
+          >
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
+              Vault clínico (Obsidian)
+            </h3>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Exporta o copia notas <code>.md</code> a la carpeta <code>vault/</code> del proyecto (o define
+              <code> CLINICAL_VAULT_PATH</code> en <code>.env</code>). Usa frontmatter con <code>tags: [mtc]</code> y
+              <code>condition</code> o un título H1. La API key del modelo se configura en Mi perfil, no aquí.
+            </p>
+            <div style={{ fontSize: '0.8125rem', color: vaultStatus?.exists ? '#047857' : '#b45309', fontWeight: 600 }}>
+              {vaultStatus
+                ? (vaultStatus.exists
+                  ? `${vaultStatus.noteCount} notas encontradas`
+                  : 'Aún no hay notas .md en el vault')
+                : 'Comprobando vault…'}
+            </div>
+            {vaultStatus?.path && (
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem', wordBreak: 'break-all' }}>
+                {vaultStatus.path}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

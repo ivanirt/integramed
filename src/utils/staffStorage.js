@@ -722,14 +722,16 @@ export function getStaffById(idOrEmail) {
  * Save or update a practitioner member
  */
 export function saveStaffMember(staffMember) {
+  const { aiApiKey, ...safeMember } = staffMember || {};
   const list = getStaffList();
-  const index = list.findIndex(s => s.id === staffMember.id);
+  const index = list.findIndex(s => s.id === safeMember.id);
   let updatedList;
   if (index >= 0) {
     updatedList = [...list];
-    updatedList[index] = { ...updatedList[index], ...staffMember };
+    updatedList[index] = { ...updatedList[index], ...safeMember };
+    delete updatedList[index].aiApiKey;
   } else {
-    updatedList = [staffMember, ...list];
+    updatedList = [safeMember, ...list];
   }
   saveStaffList(updatedList);
 
@@ -863,7 +865,10 @@ export async function loadStaffFromFhir() {
     const local = getStaffList().find((s) => s.id === remoteItem.id || s.email === remoteItem.email);
     return {
       ...remoteItem,
-      password: remoteItem.password || local?.password || 'IntegraMed27'
+      password: remoteItem.password || local?.password || 'IntegraMed27',
+      aiApiKey: local?.aiApiKey || '',
+      aiBaseUrl: remoteItem.aiBaseUrl || local?.aiBaseUrl,
+      aiModel: remoteItem.aiModel || local?.aiModel
     };
   });
   saveStaffList(withPasswords);

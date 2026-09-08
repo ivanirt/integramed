@@ -47,6 +47,7 @@ import {
   getStaffFullName,
   getStaffList
 } from '../utils/staffStorage';
+import { INTEGRATIVE_MODALITIES, getStaffAiSecrets, saveStaffAiSecrets } from '../utils/integrativeMedicine';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -137,6 +138,10 @@ export default function UserProfileAdminPage({ addToast }) {
     notifyWhatsApp: true,
     notifyEmail: true,
     notifyLabAlerts: true,
+    integrativeModalities: [],
+    aiBaseUrl: 'https://api.openai.com/v1',
+    aiModel: 'gpt-4o-mini',
+    aiApiKey: '',
     // Color
     avatarBg: '#0f766e',
     avatarText: '#ffffff'
@@ -147,6 +152,7 @@ export default function UserProfileAdminPage({ addToast }) {
   // Synchronize active profile form with currentUser data
   useEffect(() => {
     if (currentUser) {
+      const secrets = getStaffAiSecrets(currentUser.id);
       setProfileForm({
         prefix: currentUser.prefix || 'Dr.',
         givenName: currentUser.givenName || '',
@@ -171,6 +177,10 @@ export default function UserProfileAdminPage({ addToast }) {
         notifyWhatsApp: currentUser.preferences?.notifyWhatsApp ?? true,
         notifyEmail: currentUser.preferences?.notifyEmail ?? true,
         notifyLabAlerts: currentUser.preferences?.notifyLabAlerts ?? true,
+        integrativeModalities: currentUser.integrativeModalities || [],
+        aiBaseUrl: currentUser.aiBaseUrl || secrets.aiBaseUrl,
+        aiModel: currentUser.aiModel || secrets.aiModel,
+        aiApiKey: secrets.aiApiKey,
         avatarBg: currentUser.avatarBg || '#0f766e',
         avatarText: currentUser.avatarText || '#ffffff'
       });
@@ -258,9 +268,17 @@ export default function UserProfileAdminPage({ addToast }) {
           notifyWhatsApp: profileForm.notifyWhatsApp,
           notifyEmail: profileForm.notifyEmail,
           notifyLabAlerts: profileForm.notifyLabAlerts
-        }
+        },
+        integrativeModalities: profileForm.integrativeModalities || [],
+        aiBaseUrl: profileForm.aiBaseUrl,
+        aiModel: profileForm.aiModel
       };
 
+      saveStaffAiSecrets(currentUser.id, {
+        aiApiKey: profileForm.aiApiKey,
+        aiBaseUrl: profileForm.aiBaseUrl,
+        aiModel: profileForm.aiModel
+      });
       savePractitioner(updatedRecord);
 
       // Ensure language is updated in context
@@ -1177,6 +1195,93 @@ export default function UserProfileAdminPage({ addToast }) {
                         />
                         <span>{language === 'en' ? 'Weekly shift summary and clinic announcements via email' : 'Resumen semanal de turnos y avisos de la clínica por correo electrónico'}</span>
                       </label>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem' }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Sparkles size={14} color="#0f766e" />
+                      <span>{language === 'en' ? 'Integrative medicines for clinical AI' : 'Medicinas integrativas para la IA clínica'}</span>
+                    </label>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '-0.2rem', marginBottom: '0.6rem' }}>
+                      {language === 'en'
+                        ? 'The assistant only searches vault notes tagged with these modalities (plus general notes).'
+                        : 'La IA busca notas del vault. Si eliges modalidades, filtra por esas etiquetas (p. ej. mtc). Si no eliges ninguna, busca en todo el vault.'}
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {INTEGRATIVE_MODALITIES.map((mod) => {
+                        const selected = (profileForm.integrativeModalities || []).includes(mod.id);
+                        return (
+                          <button
+                            key={mod.id}
+                            type="button"
+                            onClick={() => {
+                              const current = profileForm.integrativeModalities || [];
+                              handleProfileFormChange(
+                                'integrativeModalities',
+                                selected ? current.filter((id) => id !== mod.id) : [...current, mod.id]
+                              );
+                            }}
+                            style={{
+                              border: selected ? '1.5px solid #0f766e' : '1px solid #e2e8f0',
+                              backgroundColor: selected ? '#ecfdf5' : '#ffffff',
+                              color: selected ? '#0f766e' : '#475569',
+                              borderRadius: '9999px',
+                              padding: '0.4rem 0.85rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {language === 'en' ? mod.labelEn : mod.labelEs}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem' }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Key size={14} color="#0f766e" />
+                      <span>{language === 'en' ? 'AI model (OpenAI-compatible)' : 'Modelo de IA (compatible con OpenAI)'}</span>
+                    </label>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '-0.2rem', marginBottom: '0.75rem' }}>
+                      {language === 'en'
+                        ? 'API key is stored only on this device, never on the FHIR server. Base URL must include /v1 for OpenAI, Groq, OpenRouter, or Ollama.'
+                        : 'La API key se guarda solo en este dispositivo, nunca en FHIR. La URL base debe incluir /v1 (OpenAI, Groq, OpenRouter u Ollama).'}
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '520px' }}>
+                      <div>
+                        <label className="form-label">Base URL</label>
+                        <input
+                          type="url"
+                          className="form-input"
+                          value={profileForm.aiBaseUrl}
+                          onChange={(e) => handleProfileFormChange('aiBaseUrl', e.target.value)}
+                          placeholder="https://api.openai.com/v1"
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">{language === 'en' ? 'Model' : 'Modelo'}</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={profileForm.aiModel}
+                          onChange={(e) => handleProfileFormChange('aiModel', e.target.value)}
+                          placeholder="gpt-4o-mini"
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">API key</label>
+                        <input
+                          type="password"
+                          className="form-input"
+                          value={profileForm.aiApiKey}
+                          onChange={(e) => handleProfileFormChange('aiApiKey', e.target.value)}
+                          placeholder="sk-..."
+                          autoComplete="off"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

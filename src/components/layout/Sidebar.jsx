@@ -307,6 +307,7 @@ export default function Sidebar({ onOpenSettings }) {
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           gap: '0.75rem',
           textDecoration: 'none',
+          cursor: 'pointer',
           backgroundColor: location.pathname.startsWith('/perfil') || location.pathname.startsWith('/profile') || location.pathname.startsWith('/usuarios') || location.pathname.startsWith('/users') ? '#ecfdf5' : 'transparent',
           transition: 'all 0.22s ease'
         }}

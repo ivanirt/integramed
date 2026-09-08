@@ -10,6 +10,7 @@ export const idSystem = (kind) => `https://integramed.app/fhir/id/${kind}`;
 export function attachPayload(resource, payload) {
   const clean = { ...payload };
   delete clean.password;
+  delete clean.aiApiKey;
   return {
     ...resource,
     extension: [

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
+import { loadVaultNotes, rankVaultNotes, excerptForPrompt } from './clinicalVault.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +27,22 @@ function applySystemCaStore() {
 
 applySystemCaStore();
 
+async function fetchFhirWithRetry(url, options, attempts = 3) {
+  let lastError;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastError = err;
+      const code = err?.cause?.code || err?.code || '';
+      const retryable = String(code).includes('TIMEOUT') || String(err?.message || '').includes('fetch failed');
+      if (!retryable || i === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 800 * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
 function describeFetchError(err) {
   const cause = err?.cause;
   const parts = [err?.message, cause?.code, cause?.message].filter(Boolean);
@@ -46,7 +63,14 @@ app.use(express.json({
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
 let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
 
+const CLINICAL_VAULT_PATH = path.resolve(
+  process.env.CLINICAL_VAULT_PATH
+    ? process.env.CLINICAL_VAULT_PATH
+    : path.join(__dirname, '../vault')
+);
+
 console.log(`[FHIR Proxy] Initialized with Base URL: ${FHIR_BASE_URL ? FHIR_BASE_URL : '(NOT SET)'}`);
+console.log(`[Clinical AI] Vault path: ${CLINICAL_VAULT_PATH}`);
 
 // Health check and status endpoint
 app.get('/api/health', async (req, res) => {
@@ -57,7 +81,7 @@ app.get('/api/health', async (req, res) => {
 
   if (isConfigured) {
     try {
-      const testRes = await fetch(`${FHIR_BASE_URL.replace(/\/$/, '')}/Patient?_summary=count`, {
+      const testRes = await fetchFhirWithRetry(`${FHIR_BASE_URL.replace(/\/$/, '')}/Patient?_summary=count`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${FHIR_AUTH_TOKEN}`,
@@ -104,6 +128,108 @@ app.post('/api/config', (req, res) => {
     serverUrl: FHIR_BASE_URL,
     hasToken: Boolean(FHIR_AUTH_TOKEN)
   });
+});
+
+app.get('/api/ai/vault-status', (req, res) => {
+  try {
+    const notes = loadVaultNotes(CLINICAL_VAULT_PATH);
+    res.json({
+      exists: notes.length > 0,
+      noteCount: notes.length,
+      path: CLINICAL_VAULT_PATH
+    });
+  } catch (err) {
+    res.status(500).json({ exists: false, noteCount: 0, error: err.message, path: CLINICAL_VAULT_PATH });
+  }
+});
+
+app.post('/api/ai/consult', async (req, res) => {
+  const apiKey = String(req.headers['x-ai-key'] || '').trim();
+  const baseUrl = String(req.headers['x-ai-base-url'] || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const model = String(req.headers['x-ai-model'] || 'gpt-4o-mini').trim();
+
+  if (!apiKey) {
+    return res.status(400).json({ error: 'Falta la API key del modelo. Configúrala en Mi perfil.' });
+  }
+
+  const diagnosis = req.body?.diagnosis;
+  const diagnosisText = Array.isArray(diagnosis)
+    ? diagnosis.map((item) => (typeof item === 'string' ? item : `${item.code || ''} ${item.label || ''}`)).join(' ')
+    : String(diagnosis || '');
+  const question = String(req.body?.question || '').trim();
+  const modalities = req.body?.modalities || [];
+
+  if (!diagnosisText.trim()) {
+    return res.status(400).json({ error: 'Indica al menos un diagnóstico antes de consultar la IA.' });
+  }
+
+  let notes = [];
+  try {
+    notes = loadVaultNotes(CLINICAL_VAULT_PATH);
+  } catch (err) {
+    return res.status(500).json({ error: `No se pudo leer el vault: ${err.message}` });
+  }
+
+  if (!notes.length) {
+    return res.status(404).json({
+      error: 'El vault está vacío. Copia notas .md a la carpeta vault/ (o CLINICAL_VAULT_PATH).'
+    });
+  }
+
+  const ranked = rankVaultNotes(notes, `${diagnosisText} ${question}`, modalities, 5);
+  const sources = ranked.map((note) => ({
+    file: note.file,
+    title: note.title,
+    excerpt: excerptForPrompt(note, 900)
+  }));
+
+  const contextBlock = sources.length
+    ? sources.map((src, idx) => `[${idx + 1}] ${src.file}\n${src.excerpt}`).join('\n\n')
+    : '(No hay notas del vault con coincidencia para este diagnóstico y las modalidades activas.)';
+
+  const systemPrompt = [
+    'Eres un asistente clínico de apoyo para un médico. No eres un prescriptor.',
+    'Usa SOLO el contexto del vault. Si no hay evidencia en el contexto, dilo claramente y no inventes tratamientos.',
+    'Cita los archivos de origen por nombre. No es una orden médica; el médico debe verificar antes de indicar.',
+    'Responde en el idioma del diagnóstico (español si el texto está en español).',
+    'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
+  ].join(' ');
+
+  const userPrompt = `Diagnóstico: ${diagnosisText}\nModalidades activas: ${(modalities || []).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda?'}\n\nContexto del vault:\n${contextBlock}`;
+
+  try {
+    const llmResponse = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    });
+
+    const llmData = await llmResponse.json().catch(() => ({}));
+    if (!llmResponse.ok) {
+      const detail = llmData?.error?.message || llmData?.error || llmResponse.statusText;
+      return res.status(llmResponse.status === 401 ? 401 : 502).json({
+        error: `El modelo no respondió: ${detail}`
+      });
+    }
+
+    const answer = llmData?.choices?.[0]?.message?.content || '';
+    res.json({
+      answer,
+      sources: sources.map(({ file, title, excerpt }) => ({ file, title, excerpt: excerpt.slice(0, 320) }))
+    });
+  } catch (err) {
+    res.status(502).json({ error: `Fallo al llamar al modelo: ${describeFetchError(err)}` });
+  }
 });
 
 // FHIR Proxy Endpoint
@@ -190,6 +316,18 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
+});
+
+const server = app.listen(PORT, () => {
   console.log(`🚀 IntegraMed FHIR Proxy Server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[FHIR Proxy] Port ${PORT} is already in use. Stop the old Node process and run npm run dev again.`);
+    process.exit(1);
+  }
+  throw err;
 });

@@ -16,8 +16,6 @@ import {
   X,
   Sparkles,
   Send,
-  ShieldAlert,
-  Lightbulb,
   FileCheck,
   Pill,
   Save,
@@ -55,7 +53,10 @@ import PreviousEncountersListCard from '../components/encounters/PreviousEncount
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
 import { parseVitalObservations } from '../utils/vitalsParser';
 import { hasSoapContent } from '../utils/clinicalContent';
+import { getStaffAiSecrets } from '../utils/integrativeMedicine';
+import { consultClinicalAi } from '../services/aiApi';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function ConsultationPage({ addToast }) {
   const [searchParams] = useSearchParams();
@@ -63,6 +64,7 @@ export default function ConsultationPage({ addToast }) {
   const patientIdFromQuery = searchParams.get('patientId') || paramId;
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
+  const { currentUser } = useAuth();
 
   // Patients list for selector
   const [patientsList, setPatientsList] = useState([]);
@@ -104,8 +106,10 @@ export default function ConsultationPage({ addToast }) {
 
   // AI Assistant Chat & Suggestions State
   const [aiInput, setAiInput] = useState('');
-  const [aiChatMessages, setAiChatMessages] = useState([]);
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiSources, setAiSources] = useState([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
   // Timer interval
@@ -225,74 +229,58 @@ export default function ConsultationPage({ addToast }) {
 
   // AI Quick Actions
   const handleAddSuggestionToPlan = (suggestionText) => {
+    if (!suggestionText) return;
     setPlan(prev => prev ? `${prev}\n• ${suggestionText}` : `• ${suggestionText}`);
     if (addToast) {
       addToast('success', t('suggestionAddedToast'), t('toastUpdatedTitle'));
     }
   };
 
-  const handleAiAction = (actionType) => {
+  const diagnosisQuery = useMemo(() => {
+    const chips = diagnoses.map((d) => d.label || d.code).filter(Boolean).join(', ');
+    return [chips, assessmentText].filter((part) => String(part || '').trim()).join(' — ');
+  }, [diagnoses, assessmentText]);
+
+  const aiSecrets = getStaffAiSecrets(currentUser?.id);
+
+  const handleConsultAi = async (question = '') => {
+    if (!diagnosisQuery.trim()) {
+      if (addToast) addToast('error', 'Escribe o selecciona un diagnóstico primero.', t('toastErrorTitle'));
+      return;
+    }
+    if (!aiSecrets.aiApiKey) {
+      if (addToast) addToast('error', 'Configura la API key de IA en Mi perfil.', t('toastErrorTitle'));
+      return;
+    }
+
+    setIsAiPanelOpen(true);
     setIsAiLoading(true);
-    setTimeout(() => {
-      if (actionType === 'summarize') {
-        const summary = `Paciente femenina de 34 años con antecedentes de HTA y Asma que acude por cefalea tensional de 3 días. Signos vitales estables (${bpStr} mmHg). Se continúa manejo antihipertensivo y se solicita perfil lipídico.`;
-        setAiChatMessages(prev => [...prev, {
-          sender: 'ai',
-          title: t('aiSummaryTitle'),
-          text: summary,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      } else if (actionType === 'indications') {
-        const indications = `1. Tomar Losartán 50mg cada 24 horas por la mañana.\n2. Dieta baja en sodio y registro matutino de presión arterial.\n3. Salbutamol inhalador solo en caso de crisis de broncoespasmo (SOS).\n4. Acudir a toma de muestra de sangre en ayuno para perfil lipídico.`;
-        setAiChatMessages(prev => [...prev, {
-          sender: 'ai',
-          title: t('aiIndicationsTitle'),
-          text: indications,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      } else if (actionType === 'audit') {
-        const audit = `✓ Losartán 50mg: Sin interacciones graves detectadas con la medicación actual.\n⚠️ Precaución: Evitar prescribir AINEs (Ketorolaco, Naproxeno) debido al antecedente de Asma.`;
-        setAiChatMessages(prev => [...prev, {
-          sender: 'ai',
-          title: t('aiAuditTitle'),
-          text: audit,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-      }
+    try {
+      const result = await consultClinicalAi({
+        diagnosis: diagnoses.length ? diagnoses : diagnosisQuery,
+        modalities: currentUser?.integrativeModalities || [],
+        question,
+        apiKey: aiSecrets.aiApiKey,
+        baseUrl: currentUser?.aiBaseUrl || aiSecrets.aiBaseUrl,
+        model: currentUser?.aiModel || aiSecrets.aiModel
+      });
+      setAiAnswer(result.answer || '');
+      setAiSources(result.sources || []);
+    } catch (err) {
+      setAiAnswer('');
+      setAiSources([]);
+      if (addToast) addToast('error', err.message || 'No se pudo consultar la IA', 'IA clínica');
+    } finally {
       setIsAiLoading(false);
-    }, 600);
+    }
   };
 
-  // Handle AI Chat submit
   const handleSendAiMessage = (e) => {
     e.preventDefault();
     if (!aiInput.trim()) return;
-
-    const userQuery = aiInput.trim();
+    const question = aiInput.trim();
     setAiInput('');
-    setAiChatMessages(prev => [...prev, {
-      sender: 'user',
-      text: userQuery,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }]);
-
-    setIsAiLoading(true);
-    setTimeout(() => {
-      let reply = `Para el cuadro presentado, los lineamientos clínicos sugieren mantener la dosis de Losartán 50mg si la PA se mantiene < 130/80 mmHg. Se recomienda evaluar función renal y electrolitos si se añade diurético.`;
-      if (userQuery.toLowerCase().includes('dosis') || userQuery.toLowerCase().includes('dose')) {
-        reply = `Dosis estándar de Losartán para HTA Primaria: 50mg a 100mg vía oral una vez al día.`;
-      } else if (userQuery.toLowerCase().includes('asma') || userQuery.toLowerCase().includes('asthma')) {
-        reply = `En pacientes con asma, priorizar beta-2 agonistas de acción corta (Salbutamol 100-200 mcg) y corticoesteroides inhalados si los síntomas nocturnos aumentan.`;
-      }
-
-      setAiChatMessages(prev => [...prev, {
-        sender: 'ai',
-        title: 'Asistente Clínico',
-        text: reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
-      setIsAiLoading(false);
-    }, 700);
+    handleConsultAi(question);
   };
 
   // Save Draft (Persistent in LocalStorage)
@@ -557,7 +545,9 @@ export default function ConsultationPage({ addToast }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '260px minmax(0, 1.8fr) minmax(300px, 340px)',
+          gridTemplateColumns: isAiPanelOpen
+            ? '260px minmax(0, 1.8fr) minmax(300px, 360px)'
+            : '260px minmax(0, 1fr)',
           gap: '1.25rem',
           alignItems: 'start'
         }}
@@ -978,7 +968,27 @@ export default function ConsultationPage({ addToast }) {
                 {t('soapAssessmentLabel')}
               </label>
 
-              <button
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handleConsultAi()}
+                  title={aiSecrets.aiApiKey ? 'Consultar IA del vault' : 'Configura la IA en Mi perfil'}
+                  style={{
+                    border: 'none',
+                    background: isAiPanelOpen ? '#ccfbf1' : '#ecfdf5',
+                    color: '#0f766e',
+                    borderRadius: '50%',
+                    width: '24px',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Sparkles size={13} />
+                </button>
+                <button
                 onClick={() => setIsRecordingAssessment(!isRecordingAssessment)}
                 style={{
                   border: 'none',
@@ -996,6 +1006,7 @@ export default function ConsultationPage({ addToast }) {
               >
                 {isRecordingAssessment ? <MicOff size={13} /> : <Mic size={13} />}
               </button>
+              </div>
             </div>
 
             {/* CIE-11 Tag Container */}
@@ -1182,11 +1193,8 @@ export default function ConsultationPage({ addToast }) {
           </div>
         </div>
 
-        {/* =========================================================================
-            COLUMN 3: IA CLÍNICA ACTIVA (Right, ~320px)
-            ========================================================================= */}
+        {isAiPanelOpen && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* AI Header Card */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1196,149 +1204,75 @@ export default function ConsultationPage({ addToast }) {
               boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.85rem'
             }}
           >
-            {/* AI Title */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#5eead4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857' }}>
                   <Sparkles size={15} />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                  {t('activeClinicalAiTitle')}
+                  IA del vault
                 </h3>
               </div>
-
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+              <button
+                type="button"
+                onClick={() => setIsAiPanelOpen(false)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}
+                title="Cerrar panel"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            {/* 1. Seguridad Farmacológica Card */}
-            <div
-              style={{
-                backgroundColor: '#fff1f2',
-                borderRadius: '0.75rem',
-                border: '1px solid #fecdd3',
-                padding: '0.875rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#e11d48', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-                <ShieldAlert size={14} />
-                <span>{t('pharmacologicalSafetyTitle')}</span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.4 }}>
-                Paciente con Asma Leve. <strong style={{ color: '#be123c' }}>Evitar AINEs no selectivos</strong> si hay antecedentes de broncoespasmo inducido por aspirina.
-              </div>
-            </div>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45, margin: 0 }}>
+              Material de apoyo del vault. Verificar antes de indicar.
+            </p>
 
-            {/* 2. Sugerencia Clínica Card */}
-            <div
-              style={{
-                backgroundColor: '#f0fdf4',
-                borderRadius: '0.75rem',
-                border: '1px solid #bbf7d0',
-                padding: '0.875rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.6rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#059669', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-                <Lightbulb size={14} />
-                <span>{t('clinicalSuggestionTitle')}</span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.4 }}>
-                Considerar solicitar <strong>Perfil Lipídico</strong> de control anual para paciente con HTA Primaria en tratamiento.
-              </div>
-              <div>
-                <button
-                  onClick={() => handleAddSuggestionToPlan('Solicitar Perfil Lipídico de control anual para HTA')}
-                  className="btn btn-sm"
-                  style={{
-                    backgroundColor: '#0f766e',
-                    color: '#ffffff',
-                    fontSize: '0.72rem',
-                    padding: '0.25rem 0.65rem',
-                    borderRadius: '6px',
-                    fontWeight: 600
-                  }}
-                >
-                  {t('addToPlanBtn')}
-                </button>
-              </div>
-            </div>
+            {isAiLoading && (
+              <div style={{ fontSize: '0.8125rem', color: '#0f766e', fontWeight: 600 }}>Buscando en el vault…</div>
+            )}
 
-            {/* 3. Acciones Rápidas */}
-            <div>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>
-                {t('quickActionsLabel')}
+            {!isAiLoading && aiAnswer && (
+              <div style={{ fontSize: '0.8125rem', color: '#0f172a', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                {aiAnswer}
               </div>
+            )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <button
-                  onClick={() => handleAiAction('summarize')}
-                  disabled={isAiLoading}
-                  className="btn btn-secondary btn-sm"
-                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
-                >
-                  <FileText size={14} color="#64748b" />
-                  <span>{t('summarizeSoapBtn')}</span>
-                </button>
-
-                <button
-                  onClick={() => handleAiAction('indications')}
-                  disabled={isAiLoading}
-                  className="btn btn-secondary btn-sm"
-                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
-                >
-                  <FileCheck size={14} color="#64748b" />
-                  <span>{t('generateIndicationsBtn')}</span>
-                </button>
-
-                <button
-                  onClick={() => handleAiAction('audit')}
-                  disabled={isAiLoading}
-                  className="btn btn-secondary btn-sm"
-                  style={{ justifyContent: 'flex-start', fontSize: '0.78rem', gap: '0.5rem', padding: '0.45rem 0.75rem' }}
-                >
-                  <ShieldAlert size={14} color="#64748b" />
-                  <span>{t('auditInteractionsBtn')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* AI Messages Stream */}
-            {aiChatMessages.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
-                {aiChatMessages.map((msg, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: msg.sender === 'user' ? '#f1f5f9' : '#ecfdf5',
-                      fontSize: '0.75rem',
-                      lineHeight: 1.4
-                    }}
-                  >
-                    {msg.title && (
-                      <div style={{ fontWeight: 800, color: '#047857', marginBottom: '0.2rem' }}>
-                        {msg.title}
-                      </div>
-                    )}
-                    <div style={{ color: '#0f172a', whiteSpace: 'pre-line' }}>{msg.text}</div>
+            {!isAiLoading && aiSources.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fuentes</div>
+                {aiSources.map((src) => (
+                  <div key={src.file} style={{ fontSize: '0.72rem', color: '#475569', background: '#f8fafc', borderRadius: '0.5rem', padding: '0.5rem 0.65rem' }}>
+                    <div style={{ fontWeight: 700, color: '#0f766e' }}>{src.title || src.file}</div>
+                    <div>{src.excerpt}</div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* 4. AI Prompt Input Bar */}
-            <form onSubmit={handleSendAiMessage} style={{ position: 'relative', marginTop: '0.25rem' }}>
+            {aiAnswer && (
+              <button
+                type="button"
+                onClick={() => handleAddSuggestionToPlan(aiAnswer)}
+                className="btn btn-sm"
+                style={{
+                  backgroundColor: '#0f766e',
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  alignSelf: 'flex-start'
+                }}
+              >
+                {t('addToPlanBtn')}
+              </button>
+            )}
+
+            <form onSubmit={handleSendAiMessage} style={{ marginTop: '0.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', padding: '0.25rem 0.5rem' }}>
-                <Mic size={15} color="#94a3b8" style={{ marginRight: '0.35rem', cursor: 'pointer' }} />
                 <input
                   type="text"
                   value={aiInput}
@@ -1372,6 +1306,7 @@ export default function ConsultationPage({ addToast }) {
             </form>
           </div>
         </div>
+        )}
       </div>
 
       {/* =========================================================================

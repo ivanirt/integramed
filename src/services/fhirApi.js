@@ -1,7 +1,7 @@
 /**
  * Client-side FHIR API service that interacts with the backend FHIR Proxy.
  */
-import { buildFhirPatientResource } from '../utils/fhirHelper';
+import { buildFhirPatientResource } from '../utils/fhirHelper.js';
 
 const API_BASE = '/api';
 
@@ -518,6 +518,113 @@ export async function createEncounter({
   }
 
   return await response.json();
+}
+
+/**
+ * Update an existing Encounter in the FHIR server via PUT.
+ */
+export async function updateEncounter(id, encounterData) {
+  if (!id) throw new Error('Encounter ID is required for update');
+
+  const startIso = encounterData.startTime
+    ? new Date(encounterData.startTime).toISOString()
+    : encounterData.date && encounterData.time
+    ? new Date(`${encounterData.date}T${encounterData.time}:00`).toISOString()
+    : new Date().toISOString();
+
+  const endIso = encounterData.endTime
+    ? new Date(encounterData.endTime).toISOString()
+    : new Date(new Date(startIso).getTime() + 30 * 60 * 1000).toISOString();
+
+  const encounterResource = {
+    resourceType: 'Encounter',
+    id,
+    status: encounterData.status || 'planned',
+    class: {
+      system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
+      code: 'AMB',
+      display: 'ambulatory'
+    },
+    type: [
+      {
+        coding: [
+          {
+            system: 'http://snomed.info/sct',
+            code: '162673000',
+            display: encounterData.type || 'General Examination'
+          }
+        ],
+        text: encounterData.type || 'General Examination'
+      }
+    ],
+    subject: {
+      reference: `Patient/${encounterData.patientId || ''}`,
+      display: encounterData.patientName || `Patient ${encounterData.patientId || ''}`
+    },
+    participant: encounterData.practitionerId || encounterData.practitionerName ? [
+      {
+        type: [
+          {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
+                code: 'PPRF',
+                display: 'primary performer'
+              }
+            ]
+          }
+        ],
+        individual: {
+          reference: encounterData.practitionerId ? `Practitioner/${encounterData.practitionerId}` : undefined,
+          display: encounterData.practitionerName || 'Practitioner'
+        }
+      }
+    ] : [],
+    period: {
+      start: startIso,
+      end: endIso
+    },
+    reasonCode: encounterData.reason ? [
+      {
+        text: encounterData.reason
+      }
+    ] : []
+  };
+
+  const response = await fetch(`${API_BASE}/fhir/Encounter/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/fhir+json',
+      'Accept': 'application/fhir+json, application/json'
+    },
+    body: JSON.stringify(encounterResource)
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Delete / Cancel an Encounter in the FHIR server.
+ */
+export async function deleteEncounter(id) {
+  if (!id) throw new Error('Encounter ID is required for deletion');
+
+  const response = await fetch(`${API_BASE}/fhir/Encounter/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: {
+      'Accept': 'application/fhir+json, application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  return true;
 }
 
 /**

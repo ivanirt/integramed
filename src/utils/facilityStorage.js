@@ -163,8 +163,84 @@ export const INITIAL_LOCATIONS = [
   }
 ];
 
+export const DEFAULT_FACILITY_RESOURCE_TYPES = [
+  {
+    id: 'consultingRooms',
+    nameEs: 'Consultorios Médicos',
+    nameEn: 'Consulting Rooms',
+    category: 'consulting',
+    icon: 'Stethoscope',
+    defaultUnit: 'consultorios',
+    color: '#15803d',
+    bgColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+    descriptionEs: 'Espacios asignados para consulta médica general y de especialidades.',
+    descriptionEn: 'Dedicated spaces for general and specialty medical consultations.'
+  },
+  {
+    id: 'therapyBooths',
+    nameEs: 'Cabinas de Terapia & Fisioterapia',
+    nameEn: 'Therapy & Rehab Booths',
+    category: 'therapy',
+    icon: 'Activity',
+    defaultUnit: 'cabinas',
+    color: '#0284c7',
+    bgColor: '#e0f2fe',
+    borderColor: '#bae6fd',
+    descriptionEs: 'Módulos individuales y boxes para fisioterapia, masajes y electroterapia.',
+    descriptionEn: 'Individual booths for physical therapy and electrotherapy.'
+  },
+  {
+    id: 'operatingTheaters',
+    nameEs: 'Quirófanos Ambulatorios & Cirugía Menor',
+    nameEn: 'Operating Theaters & Minor Surgery',
+    category: 'surgery',
+    icon: 'Building',
+    defaultUnit: 'quirófanos',
+    color: '#7c3aed',
+    bgColor: '#ede9fe',
+    borderColor: '#ddd6fe',
+    descriptionEs: 'Salas de cirugía ambulatoria, procedimientos estériles y curaciones mayores.',
+    descriptionEn: 'Ambulatory surgery suites and sterile procedure rooms.'
+  },
+  {
+    id: 'recoveryBeds',
+    nameEs: 'Camas de Observación & Recuperación',
+    nameEn: 'Observation & Recovery Beds',
+    category: 'beds',
+    icon: 'Bed',
+    defaultUnit: 'camas',
+    color: '#d97706',
+    bgColor: '#fef3c7',
+    borderColor: '#fde68a',
+    descriptionEs: 'Camas clínicas para recuperación post-procedimiento, corta estancia y urgencias.',
+    descriptionEn: 'Hospital and recovery beds for observation and short-stay care.'
+  }
+];
+
+export const DEFAULT_FACILITY_SERVICES_CATALOG = [
+  'Urgencias y Triage 24h',
+  'Laboratorio Clínico FHIR R4',
+  'Rayos X Digital y Ecografía POCUS',
+  'Farmacia Intrahospitalaria',
+  'Gimnasio Terapéutico Bobath',
+  'Quirófano Ambulatorio',
+  'Estacionamiento con Valet Parking',
+  'Acceso 100% Accesible (Rampas/Elevador)',
+  'Consulta de Especialidades',
+  'Módulo de Toma de Muestras y Laboratorio',
+  'Chequeos Médicos Ejecutivos',
+  'Terapia Manual Ortopédica y Punción Seca',
+  'Electromiografía y Biofeedback',
+  'Área de Terapia Ocupacional',
+  'Valoración Biomecánica Digital',
+  'Sala de Choque y Reanimación'
+];
+
 const ORGS_STORAGE_KEY = 'integramed_organizations_data';
 const LOCS_STORAGE_KEY = 'integramed_locations_data';
+const RESOURCE_TYPES_STORAGE_KEY = 'integramed_facility_resource_types';
+const SERVICES_CATALOG_STORAGE_KEY = 'integramed_facility_services_catalog';
 
 export function getOrganizations() {
   try {
@@ -256,8 +332,146 @@ export function deleteLocation(locId) {
   return updated;
 }
 
+/**
+ * Facility Resource Types (Consultorios, Cabinas, Quirófanos, Camas, etc.) Storage & CRUD
+ */
+export function getFacilityResourceTypes() {
+  try {
+    const raw = localStorage.getItem(RESOURCE_TYPES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error loading facility resource types', e);
+  }
+  try {
+    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(DEFAULT_FACILITY_RESOURCE_TYPES));
+  } catch {}
+  return DEFAULT_FACILITY_RESOURCE_TYPES;
+}
+
+export function saveFacilityResourceTypes(typesList) {
+  try {
+    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(typesList));
+  } catch (e) {
+    console.error('Failed to save facility resource types', e);
+  }
+}
+
+export function saveFacilityResourceType(resourceType) {
+  const list = getFacilityResourceTypes();
+  const index = list.findIndex(r => r.id === resourceType.id);
+  let updated;
+  if (index >= 0) {
+    updated = [...list];
+    updated[index] = { ...updated[index], ...resourceType };
+  } else {
+    updated = [...list, resourceType];
+  }
+  saveFacilityResourceTypes(updated);
+  return updated;
+}
+
+export function deleteFacilityResourceType(resourceTypeId) {
+  const list = getFacilityResourceTypes();
+  const updated = list.filter(r => r.id !== resourceTypeId);
+  saveFacilityResourceTypes(updated);
+  return updated;
+}
+
+export function resetFacilityResourceTypes() {
+  saveFacilityResourceTypes(DEFAULT_FACILITY_RESOURCE_TYPES);
+  return DEFAULT_FACILITY_RESOURCE_TYPES;
+}
+
+/**
+ * Facility Services Catalog Storage & CRUD
+ */
+export function getFacilityServicesCatalog() {
+  try {
+    const raw = localStorage.getItem(SERVICES_CATALOG_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error loading facility services catalog', e);
+  }
+  try {
+    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(DEFAULT_FACILITY_SERVICES_CATALOG));
+  } catch {}
+  return DEFAULT_FACILITY_SERVICES_CATALOG;
+}
+
+export function saveFacilityServicesCatalog(servicesList) {
+  try {
+    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(servicesList));
+  } catch (e) {
+    console.error('Failed to save facility services catalog', e);
+  }
+}
+
+export function saveFacilityServiceCatalogItem(serviceName) {
+  if (!serviceName || typeof serviceName !== 'string' || !serviceName.trim()) return getFacilityServicesCatalog();
+  const cleanName = serviceName.trim();
+  const list = getFacilityServicesCatalog();
+  if (!list.includes(cleanName)) {
+    const updated = [...list, cleanName];
+    saveFacilityServicesCatalog(updated);
+    return updated;
+  }
+  return list;
+}
+
+export function updateFacilityServiceCatalogItem(oldName, newName) {
+  if (!oldName || !newName || !newName.trim()) return getFacilityServicesCatalog();
+  const cleanNew = newName.trim();
+  const list = getFacilityServicesCatalog();
+  const updated = list.map(item => item === oldName ? cleanNew : item);
+  saveFacilityServicesCatalog(updated);
+
+  // Also update locations that contain oldName
+  const locations = getLocations();
+  let modifiedLocs = false;
+  const updatedLocs = locations.map(loc => {
+    if (loc.services && loc.services.includes(oldName)) {
+      modifiedLocs = true;
+      return {
+        ...loc,
+        services: loc.services.map(s => s === oldName ? cleanNew : s)
+      };
+    }
+    return loc;
+  });
+  if (modifiedLocs) {
+    saveLocations(updatedLocs);
+  }
+
+  return updated;
+}
+
+export function deleteFacilityServiceCatalogItem(serviceName) {
+  const list = getFacilityServicesCatalog();
+  const updated = list.filter(s => s !== serviceName);
+  saveFacilityServicesCatalog(updated);
+  return updated;
+}
+
+export function resetFacilityServicesCatalog() {
+  saveFacilityServicesCatalog(DEFAULT_FACILITY_SERVICES_CATALOG);
+  return DEFAULT_FACILITY_SERVICES_CATALOG;
+}
+
 export function resetFacilitiesData() {
   saveOrganizations(INITIAL_ORGANIZATIONS);
   saveLocations(INITIAL_LOCATIONS);
-  return { organizations: INITIAL_ORGANIZATIONS, locations: INITIAL_LOCATIONS };
+  saveFacilityResourceTypes(DEFAULT_FACILITY_RESOURCE_TYPES);
+  saveFacilityServicesCatalog(DEFAULT_FACILITY_SERVICES_CATALOG);
+  return {
+    organizations: INITIAL_ORGANIZATIONS,
+    locations: INITIAL_LOCATIONS,
+    resourceTypes: DEFAULT_FACILITY_RESOURCE_TYPES,
+    servicesCatalog: DEFAULT_FACILITY_SERVICES_CATALOG
+  };
 }

@@ -12,9 +12,20 @@ import {
   Trash2,
   CheckCircle2,
   ShieldCheck,
-  Layers
+  Layers,
+  Sparkles,
+  Stethoscope,
+  Activity,
+  Bed,
+  HeartPulse
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  getFacilityResourceTypes,
+  getFacilityServicesCatalog,
+  saveFacilityServiceCatalogItem
+} from '../../utils/facilityStorage';
+import { getResourceIconComponent } from './FacilityCatalogManagerModal';
 
 export default function LocationModal({
   isOpen,
@@ -24,6 +35,10 @@ export default function LocationModal({
   onSave
 }) {
   const { language, t } = useLanguage();
+
+  const [resourceTypes, setResourceTypes] = useState(() => getFacilityResourceTypes());
+  const [servicesCatalog, setServicesCatalog] = useState(() => getFacilityServicesCatalog());
+
   const [formData, setFormData] = useState({
     id: '',
     organizationId: '',
@@ -59,23 +74,18 @@ export default function LocationModal({
   const [newRoomSpecialty, setNewRoomSpecialty] = useState('');
   const [error, setError] = useState('');
 
-  const commonServices = [
-    'Urgencias y Triage 24h',
-    'Laboratorio Clínico FHIR R4',
-    'Rayos X Digital y Ecografía POCUS',
-    'Farmacia Intrahospitalaria',
-    'Gimnasio Terapéutico Bobath',
-    'Quirófano Ambulatorio',
-    'Estacionamiento con Valet Parking',
-    'Acceso 100% Accesible'
-  ];
-
   useEffect(() => {
     if (isOpen) {
       setError('');
       setNewService('');
       setNewRoomName('');
       setNewRoomSpecialty('');
+
+      // Refresh dynamic catalogs
+      const freshResourceTypes = getFacilityResourceTypes();
+      const freshServicesCatalog = getFacilityServicesCatalog();
+      setResourceTypes(freshResourceTypes);
+      setServicesCatalog(freshServicesCatalog);
 
       if (location) {
         setFormData({
@@ -99,6 +109,17 @@ export default function LocationModal({
         });
       } else {
         const defaultOrgId = organizations[0]?.id || 'org-integramed-central';
+        
+        // Build initial capacity from current resource types
+        const initialCapacity = {};
+        freshResourceTypes.forEach(rt => {
+          if (rt.id === 'consultingRooms') initialCapacity[rt.id] = 8;
+          else if (rt.id === 'therapyBooths') initialCapacity[rt.id] = 3;
+          else if (rt.id === 'operatingTheaters') initialCapacity[rt.id] = 1;
+          else if (rt.id === 'recoveryBeds') initialCapacity[rt.id] = 4;
+          else initialCapacity[rt.id] = 0;
+        });
+
         setFormData({
           id: `loc-${Date.now()}`,
           organizationId: defaultOrgId,
@@ -119,17 +140,12 @@ export default function LocationModal({
             postalCode: '03940',
             country: 'México'
           },
-          capacity: {
-            consultingRooms: 8,
-            therapyBooths: 3,
-            operatingTheaters: 1,
-            recoveryBeds: 4
-          },
+          capacity: initialCapacity,
           services: [
             'Consulta de Especialidades',
             'Laboratorio Clínico FHIR R4',
             'Farmacia Intrahospitalaria',
-            'Acceso 100% Accesible'
+            'Acceso 100% Accesible (Rampas/Elevador)'
           ],
           rooms: [
             { id: `r-${Date.now()}-1`, name: 'Consultorio 101', specialty: 'Medicina General' },
@@ -154,12 +170,16 @@ export default function LocationModal({
 
   const handleAddCustomService = () => {
     if (!newService.trim()) return;
-    if (!formData.services.includes(newService.trim())) {
+    const clean = newService.trim();
+    if (!formData.services.includes(clean)) {
       setFormData(prev => ({
         ...prev,
-        services: [...prev.services, newService.trim()]
+        services: [...prev.services, clean]
       }));
     }
+    // Also add to global catalog
+    const updatedCatalog = saveFacilityServiceCatalogItem(clean);
+    setServicesCatalog(updatedCatalog);
     setNewService('');
   };
 
@@ -535,87 +555,116 @@ export default function LocationModal({
               </div>
             </div>
 
-            {/* Capacity Numbers */}
+            {/* Capacity Numbers (Dynamic Resource Types: Consultorios, Cabinas, Quirófanos, Camas, etc.) */}
             <div style={{ backgroundColor: '#f0fdf4', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#166534', marginBottom: '0.75rem' }}>
-                {language === 'en' ? 'Clinical Capacity & Infrastructure Units' : 'Capacidad Instalada y Unidades de Atención'}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Building size={16} />
+                  <span>{language === 'en' ? 'Clinical Capacity & Infrastructure Units' : 'Capacidad Instalada y Unidades de Atención'}</span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
+                  {resourceTypes.length} {language === 'en' ? 'resource types' : 'tipos de recursos'}
+                </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#15803d', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Consulting Rooms' : 'Consultorios'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-input"
-                    value={formData.capacity?.consultingRooms || 0}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      capacity: { ...formData.capacity, consultingRooms: parseInt(e.target.value) || 0 }
-                    })}
-                  />
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                {resourceTypes.map(rt => {
+                  const IconComp = getResourceIconComponent(rt.icon);
+                  const currentCount = formData.capacity?.[rt.id] !== undefined ? formData.capacity[rt.id] : 0;
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#15803d', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Therapy Booths' : 'Cabinas de Terapia'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-input"
-                    value={formData.capacity?.therapyBooths || 0}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      capacity: { ...formData.capacity, therapyBooths: parseInt(e.target.value) || 0 }
-                    })}
-                  />
-                </div>
+                  return (
+                    <div
+                      key={rt.id}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        padding: '0.75rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        border: `1px solid ${rt.borderColor || '#cbd5e1'}`
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                        <div
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '6px',
+                            backgroundColor: rt.bgColor || '#f0fdf4',
+                            color: rt.color || '#15803d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                        >
+                          <IconComp size={14} />
+                        </div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rt.nameEs}>
+                          {language === 'en' ? rt.nameEn || rt.nameEs : rt.nameEs}
+                        </label>
+                      </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#15803d', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Operating Theaters' : 'Quirófanos'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-input"
-                    value={formData.capacity?.operatingTheaters || 0}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      capacity: { ...formData.capacity, operatingTheaters: parseInt(e.target.value) || 0 }
-                    })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#15803d', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Recovery Beds' : 'Camas Observación'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-input"
-                    value={formData.capacity?.recoveryBeds || 0}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      capacity: { ...formData.capacity, recoveryBeds: parseInt(e.target.value) || 0 }
-                    })}
-                  />
-                </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          className="form-input"
+                          style={{ fontSize: '0.875rem', fontWeight: 700, height: '34px', color: rt.color || '#15803d' }}
+                          value={currentCount}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            capacity: {
+                              ...formData.capacity,
+                              [rt.id]: parseInt(e.target.value, 10) || 0
+                            }
+                          })}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          {rt.defaultUnit || 'unid.'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Medical Services Available */}
+            {/* Medical Services Available (Dynamic Services Catalog) */}
             <div>
-              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.5rem' }}>
-                {language === 'en' ? 'Clinical & Diagnostic Services Available' : 'Servicios Clínicos y Diagnósticos Disponibles'}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sparkles size={15} color="#0f766e" />
+                  <span>{language === 'en' ? 'Clinical & Diagnostic Services Available' : 'Servicios Clínicos y Diagnósticos Disponibles'}</span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#0f766e', fontWeight: 700 }}>
+                  {formData.services?.length || 0} {language === 'en' ? 'active in this facility' : 'activos en este plantel'}
+                </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                {commonServices.map(service => {
+              {/* Quick Add Custom Service input */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ fontSize: '0.8125rem' }}
+                  value={newService}
+                  onChange={(e) => setNewService(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomService(); } }}
+                  placeholder={language === 'en' ? 'Add new service to this plantel and catalog...' : 'Escribir nuevo servicio para agregar al plantel y al catálogo...'}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomService}
+                  className="btn btn-secondary btn-sm"
+                  style={{ flexShrink: 0, gap: '0.35rem', color: '#0f766e' }}
+                >
+                  <Plus size={14} />
+                  <span>{language === 'en' ? 'Add Service' : 'Agregar Servicio'}</span>
+                </button>
+              </div>
+
+              {/* Services Checkbox Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
+                {servicesCatalog.map(service => {
                   const isChecked = formData.services.includes(service);
                   return (
                     <div
@@ -633,11 +682,14 @@ export default function LocationModal({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        gap: '0.35rem',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      <span>{service}</span>
-                      {isChecked && <CheckCircle2 size={14} color="#059669" />}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={service}>
+                        {service}
+                      </span>
+                      {isChecked ? <CheckCircle2 size={14} color="#059669" flexShrink={0} /> : <span style={{ width: '14px', height: '14px', borderRadius: '4px', border: '1px solid #cbd5e1', display: 'inline-block', flexShrink: 0 }} />}
                     </div>
                   );
                 })}

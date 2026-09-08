@@ -86,6 +86,8 @@ export default function App() {
             element={
               <HomePage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
@@ -95,6 +97,8 @@ export default function App() {
             element={
               <HomePage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }
@@ -104,6 +108,8 @@ export default function App() {
             element={
               <HomePage
                 addToast={addToast}
+                serverInfo={serverInfo}
+                onConfigUpdated={(newInfo) => setServerInfo(newInfo)}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
               />
             }

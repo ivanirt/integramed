@@ -27,7 +27,9 @@ import {
   Filter,
   Stethoscope,
   Timer,
-  Zap
+  Zap,
+  Edit3,
+  UserPlus
 } from 'lucide-react';
 import {
   getClinicSchedule,
@@ -46,6 +48,8 @@ import {
 } from '../utils/scheduleStorage';
 import {
   getStaffList,
+  saveStaffMember,
+  deleteStaffMember,
   updateStaffConsultationDuration,
   CLINICAL_ROLES,
   SHIFT_TYPES,
@@ -56,6 +60,8 @@ import { getPractitioners, updateProxyConfig, checkProxyHealth } from '../servic
 import HolidaysCalendarPicker from '../components/settings/HolidaysCalendarPicker';
 import FacilitiesPage from './FacilitiesPage';
 import ClinicalServicesAdmin from '../components/services/ClinicalServicesAdmin';
+import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, defaultTab }) {
@@ -92,6 +98,10 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   const [doctorSearch, setDoctorSearch] = useState('');
   const [doctorRoleFilter, setDoctorRoleFilter] = useState('all');
 
+  // Practitioner CRUD Modal States
+  const [practitionerModal, setPractitionerModal] = useState({ isOpen: false, practitioner: null });
+  const [practitionerDeleteModal, setPractitionerDeleteModal] = useState({ isOpen: false, practitioner: null });
+
   // Filtered staff list for duration table
   const filteredStaff = useMemo(() => {
     return staffDirectory.filter(s => {
@@ -127,6 +137,59 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
           ? `Consultation duration for ${name} set to ${numMinutes} min`
           : `Tiempo de consulta de ${name} actualizado a ${numMinutes} min`,
         language === 'en' ? 'Duration Saved' : 'Duración Guardada'
+      );
+    }
+  };
+
+  // Handle saving (create or update) practitioner
+  const handleSavePractitioner = (practitionerData) => {
+    const updated = saveStaffMember(practitionerData);
+    setStaffDirectory(updated);
+    setPractitionerModal({ isOpen: false, practitioner: null });
+    getPractitioners().then(docs => setPractitioners(docs || []));
+    if (addToast) {
+      const name = getStaffFullName(practitionerData);
+      addToast(
+        'success',
+        language === 'en' ? `Practitioner ${name} saved successfully` : `Profesional ${name} guardado exitosamente`,
+        language === 'en' ? 'Practitioner Saved' : 'Profesional Guardado'
+      );
+    }
+  };
+
+  // Handle requesting practitioner deletion
+  const handleDeletePractitioner = (staff) => {
+    if (currentUser?.id === staff.id) {
+      if (addToast) {
+        addToast(
+          'error',
+          language === 'en' ? 'Cannot delete your own active user account' : 'No puedes eliminar tu propio usuario activo',
+          'Acción Denegada'
+        );
+      }
+      return;
+    }
+    const name = getStaffFullName(staff);
+    setPractitionerDeleteModal({
+      isOpen: true,
+      practitioner: staff
+    });
+  };
+
+  // Handle confirmed deletion of practitioner
+  const handleConfirmDeletePractitioner = () => {
+    if (!practitionerDeleteModal.practitioner) return;
+    const staff = practitionerDeleteModal.practitioner;
+    const name = getStaffFullName(staff);
+    const updated = deleteStaffMember(staff.id);
+    setStaffDirectory(updated);
+    setPractitionerDeleteModal({ isOpen: false, practitioner: null });
+    getPractitioners().then(docs => setPractitioners(docs || []));
+    if (addToast) {
+      addToast(
+        'info',
+        language === 'en' ? `Practitioner ${name} removed from directory` : `Profesional ${name} eliminado del directorio`,
+        language === 'en' ? 'Practitioner Removed' : 'Profesional Eliminado'
       );
     }
   };
@@ -577,6 +640,16 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                     {t('doctorConsultationDurationsSubtitle')}
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPractitionerModal({ isOpen: true, practitioner: null })}
+                  className="btn btn-primary"
+                  style={{ backgroundColor: '#0f766e', fontSize: '0.8125rem', gap: '0.4rem', padding: '0.5rem 1rem' }}
+                >
+                  <UserPlus size={15} strokeWidth={2.5} />
+                  <span>{language === 'en' ? '+ Register Practitioner' : '+ Registrar Profesional'}</span>
+                </button>
               </div>
 
               {/* Quick Card for Logged-In Doctor (if currentUser exists) */}
@@ -727,6 +800,9 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                       <th style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#475569' }}>
                         {language === 'en' ? 'Est. Appts / Shift' : 'Citas Estimadas / Jornada'}
                       </th>
+                      <th style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#475569', textAlign: 'right' }}>
+                        {language === 'en' ? 'Actions' : 'Acciones'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -843,6 +919,41 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                               <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
                                 {language === 'en' ? 'appts / shift' : 'citas / día'}
                               </span>
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setPractitionerModal({ isOpen: true, practitioner: staff })}
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '0.75rem', padding: '4px 8px', gap: '3px', color: '#0f766e', borderColor: '#99f6e4' }}
+                                title={language === 'en' ? 'Edit practitioner' : 'Editar profesional'}
+                              >
+                                <Edit3 size={12} />
+                                <span>{language === 'en' ? 'Edit' : 'Editar'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePractitioner(staff)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#94a3b8',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                                title={language === 'en' ? 'Delete practitioner' : 'Eliminar profesional'}
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1791,6 +1902,34 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
         <div>
           <FacilitiesPage addToast={addToast} embedded={true} />
         </div>
+      )}
+
+      {/* Practitioner Create / Edit Modal */}
+      {practitionerModal.isOpen && (
+        <PractitionerAdminModal
+          isOpen={practitionerModal.isOpen}
+          onClose={() => setPractitionerModal({ isOpen: false, practitioner: null })}
+          practitioner={practitionerModal.practitioner}
+          initialTab="user"
+          onSave={handleSavePractitioner}
+        />
+      )}
+
+      {/* Practitioner Delete Confirmation Modal */}
+      {practitionerDeleteModal.isOpen && (
+        <DeleteConfirmModal
+          isOpen={practitionerDeleteModal.isOpen}
+          onClose={() => setPractitionerDeleteModal({ isOpen: false, practitioner: null })}
+          onConfirm={handleConfirmDeletePractitioner}
+          title={language === 'en' ? 'Remove Practitioner' : 'Eliminar Profesional del Directorio'}
+          message={language === 'en'
+            ? `Are you sure you want to delete ${getStaffFullName(practitionerDeleteModal.practitioner)} (${practitionerDeleteModal.practitioner?.email})?`
+            : `¿Estás seguro de que deseas eliminar a ${getStaffFullName(practitionerDeleteModal.practitioner)} (${practitionerDeleteModal.practitioner?.email}) del directorio?`}
+          warningText={language === 'en'
+            ? 'This will remove the practitioner default consultation duration, shift assignments, and credentials.'
+            : 'Esta acción removerá la configuración de tiempo de consulta por defecto, turnos asignados y credenciales de este médico.'}
+          confirmText={language === 'en' ? 'Delete Practitioner' : 'Eliminar Profesional'}
+        />
       )}
     </div>
   );

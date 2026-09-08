@@ -3,6 +3,7 @@ import { X, Calendar, User, UserCheck, Stethoscope, Clock, Save, AlertCircle, Lo
 import { getPatients, getPractitioners, createEncounter } from '../../services/fhirApi';
 import { getPatientFullName } from '../../utils/fhirHelper';
 import { getStaffList } from '../../utils/staffStorage';
+import { createAppointment } from '../../utils/appointmentStorage';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function ScheduleEncounterModal({
@@ -32,18 +33,23 @@ export default function ScheduleEncounterModal({
   // Initialize date time
   useEffect(() => {
     if (isOpen) {
-      let targetDate = new Date();
-      if (initialDate) {
-        if (typeof initialDate === 'string' && initialDate.length === 10) {
-          // YYYY-MM-DD
-          const [y, m, d] = initialDate.split('-').map(Number);
-          targetDate = new Date(y, m - 1, d, 10, 0, 0);
+      if (initialDate && typeof initialDate === 'string') {
+        if (initialDate.includes('T')) {
+          setDatetime(initialDate.slice(0, 16));
+        } else if (initialDate.length === 10) {
+          setDatetime(`${initialDate}T10:00`);
         } else {
-          targetDate = new Date(initialDate);
+          setDatetime(new Date(initialDate).toISOString().slice(0, 16));
         }
+      } else {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        setDatetime(`${y}-${m}-${d}T${hh}:${mm}`);
       }
-      targetDate.setMinutes(targetDate.getMinutes() - targetDate.getTimezoneOffset());
-      setDatetime(targetDate.toISOString().slice(0, 16));
       setSubmitError(null);
 
       if (preselectedPatient?.id) {
@@ -96,15 +102,19 @@ export default function ScheduleEncounterModal({
         ? `${selectedPractitioner.name?.[0]?.prefix?.[0] || 'Dr.'} ${selectedPractitioner.name?.[0]?.given?.join(' ')} ${selectedPractitioner.name?.[0]?.family}`.trim()
         : 'Medical Staff';
 
-      const created = await createEncounter({
+      const practitionerSpecialty = selectedPractitioner?.qualification?.[0]?.code?.text || 'Medicina General';
+
+      const created = await createAppointment({
         patientId: selectedPatientId,
         patientName,
         practitionerId: selectedPractitionerId || undefined,
         practitionerName,
+        practitionerSpecialty,
         type: encounterType,
         status,
         startTime: datetime,
-        reason: reason.trim()
+        reason: reason.trim(),
+        room: 'Consultorio 101'
       });
 
       if (onSuccess) {
@@ -116,7 +126,7 @@ export default function ScheduleEncounterModal({
       onClose();
     } catch (err) {
       console.error('Failed to schedule encounter:', err);
-      setSubmitError(err.message || 'Failed to create encounter on FHIR server.');
+      setSubmitError(err.message || 'Error al agendar la cita.');
     } finally {
       setIsSubmitting(false);
     }

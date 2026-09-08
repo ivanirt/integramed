@@ -25,7 +25,8 @@ import {
   ChevronDown,
   RefreshCw,
   Heart,
-  Droplet
+  Droplet,
+  History
 } from 'lucide-react';
 import {
   getPatients,
@@ -41,7 +42,16 @@ import {
   formatBirthDate,
   getPatientIdentifier
 } from '../utils/fhirHelper';
-import { parseVitalObservations } from '../utils/vitalsParser';
+import {
+  getPatientPastEncounters,
+  savePatientEncounter,
+  saveConsultationDraft,
+  getConsultationDraft,
+  clearConsultationDraft
+} from '../utils/encounterHistoryStorage';
+import { updateAppointmentStatusByPatientId } from '../utils/dashboardStorage';
+import PreviousEncountersListCard from '../components/encounters/PreviousEncountersListCard';
+import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function ConsultationPage({ addToast }) {
@@ -54,10 +64,16 @@ export default function ConsultationPage({ addToast }) {
   // Patients list for selector
   const [patientsList, setPatientsList] = useState([]);
   const [selectedPatientId, setSelectedPatientId] = useState(patientIdFromQuery || '');
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState(null);
   const [patient, setPatient] = useState(null);
   const [observations, setObservations] = useState([]);
   const [conditions, setConditions] = useState([]);
   const [medications, setMedications] = useState([]);
+
+  // Previous Encounters History State
+  const [pastEncounters, setPastEncounters] = useState([]);
+  const [selectedPastEncounter, setSelectedPastEncounter] = useState(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -118,7 +134,7 @@ export default function ConsultationPage({ addToast }) {
       .catch(console.error);
   }, []);
 
-  // Load selected patient records
+  // Load selected patient records and previous encounters
   useEffect(() => {
     if (!selectedPatientId) return;
     setIsLoading(true);
@@ -134,6 +150,27 @@ export default function ConsultationPage({ addToast }) {
         setObservations(obsData);
         setConditions(condData);
         setMedications(medData);
+
+        const patName = patData ? getPatientFullName(patData) : '';
+        const history = getPatientPastEncounters(selectedPatientId, patName);
+        setPastEncounters(history);
+
+        // Check for existing saved draft for this patient
+        const savedDraft = getConsultationDraft(selectedPatientId);
+        if (savedDraft) {
+          if (savedDraft.subjective !== undefined) setSubjective(savedDraft.subjective);
+          if (savedDraft.physicalExam !== undefined) setPhysicalExam(savedDraft.physicalExam);
+          if (savedDraft.diagnoses !== undefined) setDiagnoses(savedDraft.diagnoses);
+          if (savedDraft.assessmentText !== undefined) setAssessmentText(savedDraft.assessmentText);
+          if (savedDraft.plan !== undefined) setPlan(savedDraft.plan);
+          if (savedDraft.savedAt) setLastDraftSavedAt(savedDraft.savedAt);
+          if (savedDraft.secondsElapsed) setSecondsElapsed(savedDraft.secondsElapsed);
+        } else {
+          setLastDraftSavedAt(null);
+        }
+
+        // Mark appointment status as in_consultation
+        updateAppointmentStatusByPatientId(selectedPatientId, 'in_consultation');
       })
       .catch(err => {
         console.error('Error loading consultation patient:', err);
@@ -142,6 +179,19 @@ export default function ConsultationPage({ addToast }) {
         setIsLoading(false);
       });
   }, [selectedPatientId]);
+
+  // Listen for background encounter history updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (selectedPatientId) {
+        const patName = patient ? getPatientFullName(patient) : '';
+        const history = getPatientPastEncounters(selectedPatientId, patName);
+        setPastEncounters(history);
+      }
+    };
+    window.addEventListener('integramed_encounters_updated', handleUpdate);
+    return () => window.removeEventListener('integramed_encounters_updated', handleUpdate);
+  }, [selectedPatientId, patient]);
 
   // Vitals summary
   const parsedVitals = useMemo(() => {
@@ -243,10 +293,56 @@ export default function ConsultationPage({ addToast }) {
     }, 700);
   };
 
-  // Save Draft
+  // Save Draft (Persistent in LocalStorage)
   const handleSaveDraft = () => {
+    if (!selectedPatientId) return;
+    const draftData = {
+      subjective,
+      physicalExam,
+      diagnoses,
+      assessmentText,
+      plan,
+      secondsElapsed
+    };
+    saveConsultationDraft(selectedPatientId, draftData);
+    setLastDraftSavedAt(new Date().toISOString());
     if (addToast) {
-      addToast('success', t('draftSavedToast'), t('toastUpdatedTitle'));
+      addToast('success', t('draftSavedToast') || 'Borrador de nota clínica guardado', t('toastUpdatedTitle') || 'Guardado');
+    }
+  };
+
+  // Start new blank note / clean draft
+  const handleNewNote = () => {
+    setSubjective('');
+    setPhysicalExam('');
+    setDiagnoses([]);
+    setDiagnosisInput('');
+    setAssessmentText('');
+    setPlan('');
+    setSecondsElapsed(0);
+    setLastDraftSavedAt(null);
+    if (selectedPatientId) {
+      clearConsultationDraft(selectedPatientId);
+    }
+    if (addToast) {
+      addToast('info', 'Campos de nota clínica reiniciados para nueva consulta', 'Nueva Nota');
+    }
+  };
+
+  // Copy helpers for past encounters review
+  const handleCopySubjective = (pastSubjectiveText) => {
+    if (!pastSubjectiveText) return;
+    setSubjective(prev => prev ? `${prev}\n\n[Antecedente de visita previa]:\n${pastSubjectiveText}` : pastSubjectiveText);
+    if (addToast) {
+      addToast('success', t('subjectiveCopiedToast'), t('toastUpdatedTitle'));
+    }
+  };
+
+  const handleCopyPlan = (pastPlanText) => {
+    if (!pastPlanText) return;
+    setPlan(prev => prev ? `${prev}\n\n[Continuación de plan previo]:\n${pastPlanText}` : pastPlanText);
+    if (addToast) {
+      addToast('success', t('planCopiedToast'), t('toastUpdatedTitle'));
     }
   };
 
@@ -254,26 +350,70 @@ export default function ConsultationPage({ addToast }) {
   const handleFinalizeConsultation = async () => {
     setIsFinishing(true);
     try {
+      const patientName = patient ? getPatientFullName(patient) : `Patient ${selectedPatientId}`;
+      const reasonSummary = diagnoses.map(d => d.label).join(', ') || subjective.slice(0, 60);
+
       if (selectedPatientId) {
-        const patientName = patient ? getPatientFullName(patient) : `Patient ${selectedPatientId}`;
         await createEncounter({
           patientId: selectedPatientId,
           patientName,
-          type: 'Consulta de Medicina General',
+          type: diagnoses[0]?.label ? `Consulta: ${diagnoses[0].label}` : 'Consulta de Medicina General',
           status: 'finished',
           startTime: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
           endTime: new Date().toISOString(),
-          reason: diagnoses.map(d => d.label).join(', ') || subjective.slice(0, 60)
-        });
+          reason: reasonSummary
+        }).catch(console.warn);
+      }
+
+      // Save complete clinical note to past encounters history
+      const finalizedEncounter = {
+        id: `enc-${selectedPatientId || 'pat'}-${Date.now()}`,
+        patientId: selectedPatientId,
+        patientName,
+        date: new Date().toISOString(),
+        type: diagnoses[0]?.label ? `Consulta: ${diagnoses[0].label}` : 'Consulta de Medicina General',
+        status: 'finished',
+        practitionerName: 'Dra. Mariana Silva Ruiz',
+        practitionerSpecialty: 'Medicina General',
+        locationName: 'Plantel Central - Consultorio 102',
+        reason: reasonSummary,
+        summary: assessmentText || subjective.slice(0, 100),
+        vitals: {
+          bloodPressure: bpStr,
+          heartRate: '72',
+          temperature: tempVal,
+          respiratoryRate: '16',
+          oxygenSaturation: spo2Val,
+          weight: weightVal,
+          height: heightVal,
+          bmi: bmiVal
+        },
+        subjective,
+        physicalExam,
+        diagnoses,
+        assessment: assessmentText,
+        plan,
+        medications: medications.map(m => ({
+          name: m.medicationCodeableConcept?.text || 'Medicamento',
+          dosage: 'Según prescripción médica',
+          duration: 'Continuo'
+        }))
+      };
+      savePatientEncounter(finalizedEncounter);
+
+      // Clear draft for this patient upon finalization
+      if (selectedPatientId) {
+        clearConsultationDraft(selectedPatientId);
+        updateAppointmentStatusByPatientId(selectedPatientId, 'finished');
       }
 
       if (addToast) {
-        addToast('success', t('consultationFinalizedToast'), t('toastCreatedTitle'));
+        addToast('success', t('consultationFinalizedToast') || 'Consulta finalizada con éxito. Regresando al inicio...', t('toastCreatedTitle') || 'Consulta');
       }
       setIsTimerRunning(false);
       setTimeout(() => {
-        navigate('/agenda');
-      }, 1200);
+        navigate('/');
+      }, 1000);
     } catch (err) {
       console.error('Error finalizing encounter:', err);
       if (addToast) {
@@ -294,7 +434,7 @@ export default function ConsultationPage({ addToast }) {
           TOP CONSULTATION STATUS BAR (Directly matching attached screenshot)
           ========================================================================= */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Active Consultation Badge */}
           <div
             style={{
@@ -315,6 +455,49 @@ export default function ConsultationPage({ addToast }) {
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e11d48', animation: 'pulse 1.5s infinite' }} />
             <span>{t('activeConsultationBadge')}</span>
           </div>
+
+          {/* Previous Encounters Quick Trigger Button in Header */}
+          <button
+            type="button"
+            onClick={() => {
+              if (pastEncounters.length > 0) {
+                setSelectedPastEncounter(pastEncounters[0]);
+                setIsReviewModalOpen(true);
+              } else if (addToast) {
+                addToast('info', t('noPastEncounters'), t('previousEncountersTitle'));
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '9999px',
+              backgroundColor: '#f0fdfa',
+              color: '#0f766e',
+              border: '1px solid #99f6e4',
+              fontSize: '0.8125rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            title={t('previousEncountersSubtitle')}
+          >
+            <History size={14} strokeWidth={2.5} />
+            <span>{t('previousEncountersTitle')}</span>
+            <span
+              style={{
+                backgroundColor: '#0f766e',
+                color: '#ffffff',
+                borderRadius: '9999px',
+                padding: '1px 6px',
+                fontSize: '0.7rem',
+                fontWeight: 800
+              }}
+            >
+              {pastEncounters.length}
+            </span>
+          </button>
 
           {/* Patient Quick Selector */}
           {patientsList.length > 1 && (
@@ -520,6 +703,16 @@ export default function ConsultationPage({ addToast }) {
               </div>
             </div>
           </div>
+
+          {/* 6. Consultas Anteriores Card */}
+          <PreviousEncountersListCard
+            encounters={pastEncounters}
+            onNewNote={handleNewNote}
+            onSelectEncounter={(enc) => {
+              setSelectedPastEncounter(enc);
+              setIsReviewModalOpen(true);
+            }}
+          />
         </div>
 
         {/* =========================================================================
@@ -538,28 +731,74 @@ export default function ConsultationPage({ addToast }) {
           }}
         >
           {/* SOAP Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <FileText size={20} color="#0f766e" />
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                 {t('soapNoteTitle')}
               </h2>
+              {lastDraftSavedAt && (
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    color: '#0f766e',
+                    backgroundColor: '#f0fdfa',
+                    border: '1px solid #ccfbf1',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                  title={`Último autoguardado de borrador: ${new Date(lastDraftSavedAt).toLocaleTimeString()}`}
+                >
+                  <Check size={11} strokeWidth={3} />
+                  Borrador guardado
+                </span>
+              )}
             </div>
 
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: '#64748b',
-                cursor: 'pointer',
-                padding: '0.35rem',
-                borderRadius: '6px'
-              }}
-              title="Toggle fullscreen"
-            >
-              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={handleNewNote}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#0f766e',
+                  backgroundColor: '#f0fdfa',
+                  border: '1px solid #99f6e4',
+                  borderRadius: '0.5rem',
+                  padding: '0.3rem 0.65rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Limpiar campos e iniciar una nueva nota clínica"
+              >
+                <Plus size={13} strokeWidth={2.5} />
+                <span>+ Nueva Nota</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '0.35rem',
+                  borderRadius: '6px'
+                }}
+                title="Toggle fullscreen"
+              >
+                {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
+            </div>
           </div>
 
           {/* S - MOTIVO DE CONSULTA (Subjective) */}
@@ -1103,6 +1342,36 @@ export default function ConsultationPage({ addToast }) {
           </div>
         </div>
       </div>
+
+      {/* =========================================================================
+          PREVIOUS ENCOUNTER REVIEW MODAL / DRAWER
+          ========================================================================= */}
+      <PreviousEncounterReviewModal
+        isOpen={isReviewModalOpen}
+        encounter={selectedPastEncounter}
+        encountersList={pastEncounters}
+        onClose={() => {
+          setIsReviewModalOpen(false);
+          setSelectedPastEncounter(null);
+        }}
+        onSelectEncounter={(enc) => setSelectedPastEncounter(enc)}
+        onCopySubjective={handleCopySubjective}
+        onCopyPlan={handleCopyPlan}
+        onEncounterUpdated={(updated) => {
+          const patName = patient ? getPatientFullName(patient) : '';
+          const refreshed = getPatientPastEncounters(selectedPatientId, patName);
+          setPastEncounters(refreshed);
+          setSelectedPastEncounter(updated);
+        }}
+        onEncounterDeleted={() => {
+          const patName = patient ? getPatientFullName(patient) : '';
+          const refreshed = getPatientPastEncounters(selectedPatientId, patName);
+          setPastEncounters(refreshed);
+          setIsReviewModalOpen(false);
+          setSelectedPastEncounter(null);
+        }}
+        addToast={addToast}
+      />
     </div>
   );
 }

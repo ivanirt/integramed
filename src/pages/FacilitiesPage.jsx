@@ -30,17 +30,21 @@ import {
   getLocations,
   saveLocation,
   deleteLocation,
-  resetFacilitiesData
+  resetFacilitiesData,
+  getFacilityResourceTypes,
+  getFacilityServicesCatalog
 } from '../utils/facilityStorage';
 import OrganizationModal from '../components/facilities/OrganizationModal';
 import LocationModal from '../components/facilities/LocationModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import FacilityCatalogManagerModal, { getResourceIconComponent } from '../components/facilities/FacilityCatalogManagerModal';
 
 export default function FacilitiesPage({ addToast, embedded = false }) {
   const { language, t } = useLanguage();
 
   const [organizations, setOrganizations] = useState(() => getOrganizations());
   const [locations, setLocations] = useState(() => getLocations());
+  const [resourceTypes, setResourceTypes] = useState(() => getFacilityResourceTypes());
 
   const [activeTab, setActiveTab] = useState('locations'); // 'locations' | 'organizations'
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +54,7 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
   // Modals state
   const [orgModal, setOrgModal] = useState({ isOpen: false, organization: null });
   const [locModal, setLocModal] = useState({ isOpen: false, location: null });
+  const [catalogModal, setCatalogModal] = useState({ isOpen: false });
 
   // Filtered Locations
   const filteredLocations = useMemo(() => {
@@ -74,25 +79,28 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
     });
   }, [locations, selectedOrgFilter, selectedTypeFilter, searchQuery]);
 
-  // Statistics
+  // Statistics (Dynamically calculated for all resource types)
   const stats = useMemo(() => {
     const totalLocations = locations.length;
     const activeLocations = locations.filter(l => l.status === 'active').length;
-    const totalConsultingRooms = locations.reduce((acc, l) => acc + (l.capacity?.consultingRooms || 0), 0);
-    const totalTherapyBooths = locations.reduce((acc, l) => acc + (l.capacity?.therapyBooths || 0), 0);
-    const totalTheaters = locations.reduce((acc, l) => acc + (l.capacity?.operatingTheaters || 0), 0);
-    const totalBeds = locations.reduce((acc, l) => acc + (l.capacity?.recoveryBeds || 0), 0);
+    
+    // Dynamic totals per registered resource type
+    const resourceTotals = {};
+    resourceTypes.forEach(rt => {
+      resourceTotals[rt.id] = locations.reduce((acc, l) => acc + (Number(l.capacity?.[rt.id]) || 0), 0);
+    });
 
     return {
       totalLocations,
       activeLocations,
       totalOrgs: organizations.length,
-      totalConsultingRooms,
-      totalTherapyBooths,
-      totalTheaters,
-      totalBeds
+      resourceTotals,
+      totalConsultingRooms: resourceTotals.consultingRooms || 0,
+      totalTherapyBooths: resourceTotals.therapyBooths || 0,
+      totalTheaters: resourceTotals.operatingTheaters || 0,
+      totalBeds: resourceTotals.recoveryBeds || 0
     };
-  }, [locations, organizations]);
+  }, [locations, organizations, resourceTypes]);
 
   // Handle Save Organization
   const handleSaveOrg = (orgData) => {
@@ -265,6 +273,16 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
 
           <button
             type="button"
+            onClick={() => setCatalogModal({ isOpen: true })}
+            className="btn btn-secondary btn-sm"
+            style={{ fontSize: '0.8125rem', gap: '0.4rem', borderColor: '#0f766e', color: '#0f766e', backgroundColor: '#f0fdfa' }}
+          >
+            <Layers size={15} />
+            <span>{language === 'en' ? 'Manage Resources & Services' : 'Catálogo de Recursos & Servicios'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setOrgModal({ isOpen: true, organization: null })}
             className="btn btn-secondary btn-sm"
             style={{ fontSize: '0.8125rem', gap: '0.35rem', borderColor: '#cbd5e1' }}
@@ -285,8 +303,8 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
         </div>
       </div>
 
-      {/* KPI Stats Tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* KPI Stats Tiles (Dynamic for All Registered Resource Types) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {/* Total Locations */}
         <div
           style={{
@@ -328,119 +346,54 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
           </div>
         </div>
 
-        {/* Consulting Rooms */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0',
-            padding: '1.15rem 1.25rem',
-            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              backgroundColor: '#f0f9ff',
-              border: '1px solid #bae6fd',
-              color: '#0284c7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Stethoscope size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Consulting Rooms' : 'Consultorios Médicos'}
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-              {stats.totalConsultingRooms}
-            </div>
-          </div>
-        </div>
+        {/* Dynamic Tiles for each registered resource type */}
+        {resourceTypes.map(rt => {
+          const IconComp = getResourceIconComponent(rt.icon);
+          const totalCount = stats.resourceTotals?.[rt.id] || 0;
 
-        {/* Therapy Booths */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0',
-            padding: '1.15rem 1.25rem',
-            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              backgroundColor: '#faf5ff',
-              border: '1px solid #e9d5ff',
-              color: '#7c3aed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Activity size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Therapy Booths' : 'Cabinas de Terapia'}
+          return (
+            <div
+              key={rt.id}
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '0.75rem',
+                border: '1px solid #e2e8f0',
+                padding: '1.15rem 1.25rem',
+                boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}
+            >
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '10px',
+                  backgroundColor: rt.bgColor || '#f0fdf4',
+                  border: `1px solid ${rt.borderColor || '#bbf7d0'}`,
+                  color: rt.color || '#15803d',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <IconComp size={22} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rt.nameEs}>
+                  {language === 'en' ? rt.nameEn || rt.nameEs : rt.nameEs}
+                </div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                  {totalCount}{' '}
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>
+                    {rt.defaultUnit || 'unid.'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-              {stats.totalTherapyBooths}
-            </div>
-          </div>
-        </div>
-
-        {/* Theaters and Beds */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0',
-            padding: '1.15rem 1.25rem',
-            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              backgroundColor: '#fff1f2',
-              border: '1px solid #fecdd3',
-              color: '#e11d48',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Bed size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Theaters & Beds' : 'Quirófanos & Camas'}
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-              {stats.totalTheaters} Qx / {stats.totalBeds} Camas
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Main Tabs (Locations vs Organizations) */}
@@ -665,12 +618,12 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
                       </div>
                     </div>
 
-                    {/* Capacity Overview */}
+                    {/* Capacity Overview (Dynamic for all resource types) */}
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
-                        gap: '0.5rem',
+                        gridTemplateColumns: `repeat(auto-fit, minmax(70px, 1fr))`,
+                        gap: '0.4rem',
                         padding: '0.625rem',
                         backgroundColor: '#f0fdf4',
                         borderRadius: '0.5rem',
@@ -679,22 +632,19 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
                         marginBottom: '0.875rem'
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>{language === 'en' ? 'Rooms' : 'Consultorios'}</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#15803d' }}>{loc.capacity?.consultingRooms || 0}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>{language === 'en' ? 'Therapy' : 'Cabinas'}</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#15803d' }}>{loc.capacity?.therapyBooths || 0}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>{language === 'en' ? 'Theaters' : 'Quirófanos'}</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#15803d' }}>{loc.capacity?.operatingTheaters || 0}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>{language === 'en' ? 'Beds' : 'Camas'}</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#15803d' }}>{loc.capacity?.recoveryBeds || 0}</div>
-                      </div>
+                      {resourceTypes.map(rt => {
+                        const count = loc.capacity?.[rt.id] !== undefined ? loc.capacity[rt.id] : 0;
+                        return (
+                          <div key={rt.id} style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.63rem', color: rt.color || '#166534', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rt.nameEs}>
+                              {language === 'en' ? rt.nameEn || rt.nameEs : rt.nameEs}
+                            </div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: rt.color || '#15803d' }}>
+                              {count}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Services Chips */}
@@ -924,11 +874,31 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
       {/* Location Modal */}
       <LocationModal
         isOpen={locModal.isOpen}
-        onClose={() => setLocModal({ isOpen: false, location: null })}
+        onClose={() => {
+          setLocModal({ isOpen: false, location: null });
+          setLocations(getLocations());
+        }}
         location={locModal.location}
         organizations={organizations}
         onSave={handleSaveLoc}
       />
+
+      {/* Facility Catalog Manager Modal (Resources & Services CRUD) */}
+      {catalogModal.isOpen && (
+        <FacilityCatalogManagerModal
+          isOpen={catalogModal.isOpen}
+          onClose={() => {
+            setCatalogModal({ isOpen: false });
+            setResourceTypes(getFacilityResourceTypes());
+            setLocations(getLocations());
+          }}
+          onCatalogChanged={() => {
+            setResourceTypes(getFacilityResourceTypes());
+            setLocations(getLocations());
+          }}
+          addToast={addToast}
+        />
+      )}
 
       {/* Universal Confirm Modal for Delete and Reset Actions */}
       <DeleteConfirmModal

@@ -18,20 +18,30 @@ import {
   CalendarRange,
   ListFilter,
   Layers,
+  FileText,
   X
 } from 'lucide-react';
 import { getEncounters } from '../services/fhirApi';
 import ClinicalCalendar from '../components/encounters/ClinicalCalendar';
+import ClinicalWeeklyCalendar from '../components/encounters/ClinicalWeeklyCalendar';
 import ScheduleEncounterModal from '../components/encounters/ScheduleEncounterModal';
+import AppointmentManageModal from '../components/encounters/AppointmentManageModal';
 import ErrorAlert from '../components/ErrorAlert';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { useLanguage } from '../i18n/LanguageContext';
+import { getStaffList } from '../utils/staffStorage';
+import { getStoredAppointments, updateAppointment } from '../utils/appointmentStorage';
+import { generateWeeklySampleEncounters } from '../utils/weeklyAgendaData';
 
 export default function AgendaPage({ addToast, onOpenScheduleModal }) {
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
 
   const [encounters, setEncounters] = useState([]);
+  const [storedAppointments, setStoredAppointments] = useState(() => getStoredAppointments());
+  const [selectedEncounterForManage, setSelectedEncounterForManage] = useState(null);
+  const [isManageOpen, setIsManageOpen] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -50,13 +60,27 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  // Filters
+  // Three required filters: Paciente, Doctor, Motivo
+  const [filterPatient, setFilterPatient] = useState('');
+  const [filterDoctor, setFilterDoctor] = useState('');
+  const [filterReason, setFilterReason] = useState('');
+
+  // Status & general search filters for list view
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'planned' | 'in-progress' | 'finished'
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [scheduleInitialDate, setScheduleInitialDate] = useState(null);
+
+  // Listen to appointment changes across app (Create, Update, Delete)
+  useEffect(() => {
+    const handleSync = () => {
+      setStoredAppointments(getStoredAppointments());
+    };
+    window.addEventListener('integramed_appointments_changed', handleSync);
+    return () => window.removeEventListener('integramed_appointments_changed', handleSync);
+  }, []);
 
   const loadEncounters = useCallback(async (isBackground = false) => {
     if (!isBackground) setIsLoading(true);
@@ -82,36 +106,98 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
     loadEncounters();
   }, [loadEncounters]);
 
+  // Doctors & therapists for the filter dropdown
+  const doctorsList = useMemo(() => {
+    try {
+      const staff = getStaffList();
+      return staff.filter(s => s.roles?.includes('doctor') || s.roles?.includes('therapist'));
+    } catch {
+      return [];
+    }
+  }, []);
+
   // Handle scheduling for a specific date
   const handleOpenScheduleForDate = (dateStr) => {
     setScheduleInitialDate(dateStr || selectedDate);
     setIsScheduleOpen(true);
   };
 
-  // Encounters specifically for the selected calendar date
-  const selectedDateEncounters = useMemo(() => {
-    if (!selectedDate) return [];
-    return encounters.filter(enc => {
-      const start = enc.period?.start;
-      if (!start) return false;
-      try {
-        const d = new Date(start);
-        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return dateKey === selectedDate;
-      } catch {
-        return false;
+  // Handle scheduling for a specific 30-min slot from weekly grid
+  const handleOpenScheduleForSlot = (dateStr, timeStr) => {
+    setScheduleInitialDate(`${dateStr}T${timeStr}:00`);
+    setIsScheduleOpen(true);
+  };
+
+  // Combined encounters: persistent stored appointments (CRUD) + real FHIR encounters + today's appointments
+  const allEncounters = useMemo(() => {
+    const list = [...storedAppointments];
+    const seenIds = new Set(storedAppointments.map(e => e.id));
+
+    // Include any external FHIR encounters not already in local storage
+    encounters.forEach(enc => {
+      if (!seenIds.has(enc.id)) {
+        seenIds.add(enc.id);
+        list.push(enc);
       }
     });
-  }, [encounters, selectedDate]);
 
-  // Filtered encounters for list view
+    // Add any today appointments from dashboardStorage
+    try {
+      const todayAppts = getTodayAppointments();
+      todayAppts.forEach(appt => {
+        if (!seenIds.has(appt.id)) {
+          seenIds.add(appt.id);
+          list.push({
+            id: appt.id,
+            date: todayStr,
+            time: appt.time,
+            patientId: appt.patientId,
+            patientName: appt.patientName,
+            practitionerName: appt.practitionerName || 'Dr. Alejandro Morales',
+            reason: appt.reason,
+            status: appt.status,
+            statusLabel: appt.statusLabel,
+            room: appt.room,
+            subject: { display: appt.patientName, reference: `Patient/${appt.patientId}` },
+            participant: [{ individual: { display: appt.practitionerName || 'Dr. Alejandro Morales' } }],
+            reasonCode: [{ text: appt.reason }],
+            type: [{ text: appt.reason }]
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Error loading today appointments into agenda:', e);
+    }
+
+    return list;
+  }, [storedAppointments, encounters, todayStr]);
+
+  // Filtered encounters for list view & stats
   const filteredEncounters = useMemo(() => {
-    return encounters.filter(enc => {
+    return allEncounters.filter(enc => {
       // Status filter
       if (statusFilter !== 'all' && enc.status !== statusFilter) {
         return false;
       }
-      // Search query
+      // Patient filter
+      if (filterPatient.trim()) {
+        const pQuery = filterPatient.toLowerCase().trim();
+        const pName = (enc.patientName || enc.subject?.display || '').toLowerCase();
+        if (!pName.includes(pQuery)) return false;
+      }
+      // Doctor filter
+      if (filterDoctor.trim()) {
+        const dQuery = filterDoctor.toLowerCase().trim();
+        const docName = (enc.practitionerName || enc.participant?.[0]?.individual?.display || '').toLowerCase();
+        if (!docName.includes(dQuery)) return false;
+      }
+      // Reason filter
+      if (filterReason.trim()) {
+        const rQuery = filterReason.toLowerCase().trim();
+        const reason = (enc.reason || enc.reasonCode?.[0]?.text || enc.type?.[0]?.text || '').toLowerCase();
+        if (!reason.includes(rQuery)) return false;
+      }
+      // General search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const subjectDisplay = enc.subject?.display?.toLowerCase() || '';
@@ -124,15 +210,15 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
       }
       return true;
     });
-  }, [encounters, statusFilter, searchQuery]);
+  }, [allEncounters, statusFilter, filterPatient, filterDoctor, filterReason, searchQuery]);
 
   // Statistics
   const stats = useMemo(() => {
-    const planned = encounters.filter(e => e.status === 'planned').length;
-    const inProgress = encounters.filter(e => e.status === 'in-progress').length;
-    const finished = encounters.filter(e => e.status === 'finished').length;
-    return { total: encounters.length, planned, inProgress, finished };
-  }, [encounters]);
+    const planned = allEncounters.filter(e => e.status === 'planned').length;
+    const inProgress = allEncounters.filter(e => e.status === 'in-progress' || e.status === 'in_consultation' || e.status === 'in_room').length;
+    const finished = allEncounters.filter(e => e.status === 'finished' || e.status === 'completed').length;
+    return { total: allEncounters.length, planned, inProgress, finished };
+  }, [allEncounters]);
 
   const formatEncounterDate = (isoString) => {
     if (!isoString) return { dateStr: t('unrecordedDate'), timeStr: '' };
@@ -343,182 +429,213 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
         <TableSkeleton rows={6} />
       ) : viewMode === 'calendar' ? (
         /* =========================================================================
-           CALENDAR VIEW: Interactive Month Grid + Selected Day Schedule
+           WEEKLY CALENDAR VIEW: Monday to Sunday (08:00 - 22:00, 30 min intervals)
+           With direct filtering by: Paciente, Doctor, and Motivo
            ========================================================================= */
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(360px, 1.1fr)', gap: '1.5rem', alignItems: 'start' }}>
-          {/* Left Column: Interactive Month Calendar Grid */}
-          <div>
-            <ClinicalCalendar
-              encounters={encounters}
-              selectedDate={selectedDate}
-              onSelectDate={(dateStr) => setSelectedDate(dateStr)}
-              onScheduleDate={(dateStr) => handleOpenScheduleForDate(dateStr)}
-              onEncounterClick={(enc) => {
-                const patientId = enc.subject?.reference?.replace('Patient/', '');
-                if (patientId) navigate(`/patient/${patientId}`);
-              }}
-            />
-          </div>
-
-          {/* Right Column: Selected Day Schedule Card */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Top Filter Bar: Paciente, Doctor, Motivo */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '0.875rem',
               border: '1px solid #e2e8f0',
-              padding: '1.5rem',
+              padding: '1.25rem',
               boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1.25rem'
+              gap: '0.875rem'
             }}
           >
-            {/* Header of selected date */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {t('selectedDate')}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f766e' }}>
+                  <Filter size={16} />
                 </div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize', marginTop: '0.2rem' }}>
-                  {formattedSelectedDate}
-                </h3>
-                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-                  {selectedDateEncounters.length === 1 ? t('singleEncounterCount') : t('encountersCount', { count: selectedDateEncounters.length })}
-                </span>
+                <div>
+                  <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Filtros de Agenda
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Filtre citas por paciente, doctor o motivo clínico
+                  </span>
+                </div>
+                {(filterPatient || filterDoctor || filterReason) && (
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #99f6e4' }}>
+                    Filtros activos
+                  </span>
+                )}
               </div>
 
-              <button
-                onClick={() => handleOpenScheduleForDate(selectedDate)}
-                className="btn btn-primary btn-sm"
-                style={{ backgroundColor: '#0f766e', borderRadius: '9999px', fontSize: '0.75rem', gap: '0.35rem' }}
-              >
-                <Plus size={14} strokeWidth={2.5} />
-                <span>{t('btnNewAppointment')}</span>
-              </button>
-            </div>
-
-            {/* List of encounters on selected date */}
-            {selectedDateEncounters.length === 0 ? (
-              <div style={{ padding: '2.5rem 1rem', textAlign: 'center' }}>
-                <div
+              {(filterPatient || filterDoctor || filterReason) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterPatient('');
+                    setFilterDoctor('');
+                    setFilterReason('');
+                  }}
                   style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '50%',
-                    backgroundColor: '#f8fafc',
+                    border: '1px solid #fecaca',
+                    background: '#fef2f2',
+                    color: '#b91c1c',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '0.35rem 0.8rem',
+                    borderRadius: '9999px',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem auto',
-                    color: '#94a3b8'
+                    gap: '0.35rem',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <CalendarDays size={24} />
-                </div>
-                <h4 style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>
-                  {t('noAppointmentsOnDate')}
-                </h4>
-                <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
-                  {t('scheduleOnThisDate')}
-                </p>
-                <button
-                  onClick={() => handleOpenScheduleForDate(selectedDate)}
-                  className="btn btn-secondary btn-sm"
-                  style={{ borderRadius: '9999px', margin: '0 auto', gap: '0.35rem', color: 'var(--color-primary-700)', borderColor: 'var(--color-primary-300)', backgroundColor: '#ecfdf5' }}
-                >
-                  <Plus size={14} strokeWidth={2.5} />
-                  <span>{t('btnNewAppointment')}</span>
+                  <X size={13} />
+                  <span>Limpiar filtros</span>
                 </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '560px', overflowY: 'auto' }}>
-                {selectedDateEncounters.map((enc) => {
-                  const { timeStr } = formatEncounterDate(enc.period?.start);
-                  const patientRef = enc.subject?.reference || '';
-                  const patientId = patientRef.replace('Patient/', '');
-                  const patientName = enc.subject?.display || patientRef || t('unnamedPatient');
-                  const practitionerName = enc.participant?.[0]?.individual?.display || t('unassignedPractitioner');
-                  const encounterType = enc.type?.[0]?.text || enc.type?.[0]?.coding?.[0]?.display || 'Consulta General';
-                  const reason = enc.reasonCode?.[0]?.text || enc.reasonCode?.[0]?.coding?.[0]?.display;
+              )}
+            </div>
 
-                  return (
-                    <div
-                      key={enc.id}
-                      style={{
-                        padding: '1rem',
-                        borderRadius: '0.75rem',
-                        border: '1px solid #e2e8f0',
-                        backgroundColor: '#f8fafc',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.65rem',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover:border-teal-300 hover:bg-teal-50/20"
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.875rem' }}>
+              {/* 1. FILTRAR POR PACIENTE */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <User size={13} color="#0f766e" />
+                  <span>Paciente</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={filterPatient}
+                    onChange={(e) => setFilterPatient(e.target.value)}
+                    placeholder="Escriba el nombre del paciente..."
+                    style={{
+                      paddingRight: filterPatient ? '2rem' : '0.75rem',
+                      height: '38px',
+                      fontSize: '0.8125rem',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '0.5rem',
+                      width: '100%'
+                    }}
+                  />
+                  {filterPatient && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterPatient('')}
+                      style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
+                      title="Limpiar paciente"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Clock size={14} color="#0f766e" />
-                            {timeStr}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>•</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', backgroundColor: '#ffffff', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                            {encounterType}
-                          </span>
-                        </div>
-
-                        {getStatusBadge(enc.status)}
-                      </div>
-
-                      {/* Patient and Doctor */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div
-                          onClick={() => patientId && navigate(`/patient/${patientId}`)}
-                          style={{
-                            fontSize: '0.9375rem',
-                            fontWeight: 700,
-                            color: patientId ? 'var(--color-primary-700)' : '#0f172a',
-                            cursor: patientId ? 'pointer' : 'default',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem'
-                          }}
-                        >
-                          <User size={15} color="var(--color-primary-600)" />
-                          <span>{patientName}</span>
-                        </div>
-
-                        <div style={{ fontSize: '0.8125rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Stethoscope size={13} color="#0d9488" />
-                          <span>{practitionerName}</span>
-                        </div>
-                      </div>
-
-                      {reason && (
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', backgroundColor: '#ffffff', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-                          "{reason}"
-                        </div>
-                      )}
-
-                      {patientId && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
-                          <button
-                            onClick={() => navigate(`/patient/${patientId}`)}
-                            className="btn btn-secondary btn-sm"
-                            style={{ borderRadius: '9999px', fontSize: '0.72rem', padding: '0.25rem 0.65rem', gap: '0.3rem' }}
-                          >
-                            <span>{t('viewProfile')}</span>
-                            <ArrowRight size={12} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* 2. FILTRAR POR DOCTOR */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Stethoscope size={13} color="#0284c7" />
+                  <span>Doctor / Terapeuta</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    className="form-input"
+                    value={filterDoctor}
+                    onChange={(e) => setFilterDoctor(e.target.value)}
+                    style={{
+                      height: '38px',
+                      fontSize: '0.8125rem',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '0.5rem',
+                      width: '100%',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Todos los doctores / terapeutas</option>
+                    {doctorsList.map((doc) => (
+                      <option key={doc.id || doc.name} value={doc.name}>
+                        {doc.name} {doc.specialty ? `— ${doc.specialty}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 3. FILTRAR POR MOTIVO */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <FileText size={13} color="#d97706" />
+                  <span>Motivo de Consulta</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={filterReason}
+                    onChange={(e) => setFilterReason(e.target.value)}
+                    placeholder="Filtrar por motivo, diagnóstico o tipo..."
+                    style={{
+                      paddingRight: filterReason ? '2rem' : '0.75rem',
+                      height: '38px',
+                      fontSize: '0.8125rem',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '0.5rem',
+                      width: '100%'
+                    }}
+                  />
+                  {filterReason && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterReason('')}
+                      style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
+                      title="Limpiar motivo"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Weekly Interactive Grid (Mon to Sun, 08:00 - 22:00, 30 min slots) */}
+          <ClinicalWeeklyCalendar
+            encounters={allEncounters}
+            filterPatient={filterPatient}
+            filterDoctor={filterDoctor}
+            filterReason={filterReason}
+            onSelectDate={(dateStr) => setSelectedDate(dateStr)}
+            onScheduleSlot={(dateStr, timeStr) => {
+              handleOpenScheduleForSlot(dateStr, timeStr);
+            }}
+            onEncounterClick={(enc) => {
+              setSelectedEncounterForManage(enc);
+              setIsManageOpen(true);
+            }}
+            onAppointmentMove={async (enc, targetDate, targetTime) => {
+              try {
+                const updated = await updateAppointment(enc.id, {
+                  date: targetDate,
+                  time: targetTime
+                });
+                setStoredAppointments(getStoredAppointments());
+                const patientName = enc.patientName || enc.subject?.display || 'Paciente';
+                if (addToast) {
+                  addToast(
+                    'success',
+                    `Cita de ${patientName} reprogramada al ${targetDate} a las ${targetTime} hrs`,
+                    'Agenda'
+                  );
+                }
+                return updated;
+              } catch (err) {
+                console.error('Error al reprogramar cita:', err);
+                if (addToast) {
+                  addToast('error', 'No se pudo mover la cita', 'Error');
+                }
+              }
+            }}
+          />
         </div>
       ) : (
         /* =========================================================================
@@ -735,6 +852,19 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       {getStatusBadge(enc.status)}
 
+                      <button
+                        onClick={() => {
+                          setSelectedEncounterForManage(enc);
+                          setIsManageOpen(true);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ borderRadius: '9999px', fontSize: '0.75rem', gap: '0.35rem' }}
+                        title="Ver o editar cita"
+                      >
+                        <CalendarIcon size={13} />
+                        <span>Detalles</span>
+                      </button>
+
                       {patientId && (
                         <button
                           onClick={() => navigate(`/patient/${patientId}`)}
@@ -763,9 +893,35 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
           setScheduleInitialDate(null);
         }}
         onEncounterScheduled={() => {
+          setStoredAppointments(getStoredAppointments());
           loadEncounters(true);
           if (addToast) {
             addToast('success', t('encounterScheduledToast'), t('toastCreatedTitle'));
+          }
+        }}
+      />
+
+      {/* Manage / Edit / Delete Appointment Modal */}
+      <AppointmentManageModal
+        isOpen={isManageOpen}
+        encounter={selectedEncounterForManage}
+        onClose={() => {
+          setIsManageOpen(false);
+          setSelectedEncounterForManage(null);
+        }}
+        onUpdated={(updated) => {
+          setStoredAppointments(getStoredAppointments());
+          setSelectedEncounterForManage(updated);
+          if (addToast) {
+            addToast('success', 'Cita médica actualizada correctamente', 'Agenda');
+          }
+        }}
+        onDeleted={() => {
+          setStoredAppointments(getStoredAppointments());
+          setIsManageOpen(false);
+          setSelectedEncounterForManage(null);
+          if (addToast) {
+            addToast('info', 'Cita eliminada de la agenda', 'Agenda');
           }
         }}
       />

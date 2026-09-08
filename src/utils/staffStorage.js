@@ -9,6 +9,13 @@
  * - LocalStorage persistence with fallback to initial seed
  */
 
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
+
 export const CLINICAL_ROLES = {
   doctor: {
     id: 'doctor',
@@ -725,6 +732,36 @@ export function saveStaffMember(staffMember) {
     updatedList = [staffMember, ...list];
   }
   saveStaffList(updatedList);
+
+  const saved = updatedList.find(s => s.id === staffMember.id) || staffMember;
+  upsertPayloadItem({
+    resourceType: 'Practitioner',
+    kind: 'practitioner',
+    item: saved,
+    buildBase: (p) => ({
+      active: p.status !== 'inactive',
+      name: [
+        {
+          use: 'official',
+          prefix: p.prefix ? [p.prefix] : undefined,
+          family: p.familyName || '',
+          given: p.givenName ? String(p.givenName).split(/\s+/).filter(Boolean) : []
+        }
+      ],
+      gender: p.gender || 'unknown',
+      telecom: [
+        ...(p.email ? [{ system: 'email', value: p.email, use: 'work' }] : []),
+        ...(p.phone ? [{ system: 'phone', value: p.phone, use: 'work' }] : [])
+      ],
+      qualification: p.specialty ? [{ code: { text: p.specialty } }] : undefined
+    })
+  }).then((remote) => {
+    if (remote?.fhirId) {
+      const next = getStaffList().map((s) => (s.id === remote.id ? { ...s, fhirId: remote.fhirId } : s));
+      saveStaffList(next);
+    }
+  }).catch((err) => console.info('FHIR Practitioner sync skipped:', err.message));
+
   return updatedList;
 }
 
@@ -812,9 +849,25 @@ export function removeCourseFromStaff(staffId, courseId) {
  */
 export function deleteStaffMember(staffId) {
   const list = getStaffList();
+  const target = list.find(s => s.id === staffId);
   const filtered = list.filter(s => s.id !== staffId);
   saveStaffList(filtered);
+  if (target?.fhirId) deletePayloadItem('Practitioner', target.fhirId);
   return filtered;
+}
+
+export async function loadStaffFromFhir() {
+  const remote = await loadPayloadCollection('Practitioner', 'practitioner');
+  const merged = preferRemote(remote, getStaffList());
+  const withPasswords = merged.map((remoteItem) => {
+    const local = getStaffList().find((s) => s.id === remoteItem.id || s.email === remoteItem.email);
+    return {
+      ...remoteItem,
+      password: remoteItem.password || local?.password || 'IntegraMed27'
+    };
+  });
+  saveStaffList(withPasswords);
+  return withPasswords;
 }
 
 /**

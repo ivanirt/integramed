@@ -13,6 +13,7 @@ import {
   deleteDocumentReference,
   INTEGRAMED_SOAP_NOTE_TYPE
 } from '../services/fhirApi.js';
+import { hasSoapContent, isEmptyEncounter } from './clinicalContent.js';
 
 function isLikelyFhirId(id) {
   if (!id) return false;
@@ -167,14 +168,11 @@ export const DEFAULT_PAST_ENCOUNTERS = [
 export function getAllPatientEncounters() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PAST_ENCOUNTERS));
-      return DEFAULT_PAST_ENCOUNTERS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_PAST_ENCOUNTERS;
+    return Array.isArray(parsed) ? parsed.filter((enc) => !isEmptyEncounter(enc, enc)) : [];
   } catch {
-    return DEFAULT_PAST_ENCOUNTERS;
+    return [];
   }
 }
 
@@ -284,14 +282,22 @@ export async function loadPatientPastEncounters(patientId, patientName = '') {
       }
     });
 
-    const fhirMapped = (fhirEncounters || []).map(enc => {
-      const localMatch = local.find(item => item.id === enc.id || item.fhirId === enc.id);
-      const soap = soapByEncounterId[enc.id] || localMatch || {};
-      return mapFhirEncounterToReview(enc, soap);
-    });
+    const fhirMapped = (fhirEncounters || [])
+      .map(enc => {
+        const localMatch = local.find(item => item.id === enc.id || item.fhirId === enc.id);
+        const soap = soapByEncounterId[enc.id] || localMatch || {};
+        return mapFhirEncounterToReview(enc, soap);
+      })
+      .filter((enc) => enc && !isEmptyEncounter(enc, enc));
 
     const fhirIds = new Set(fhirMapped.map(e => e.id));
-    const localOnly = local.filter(e => !fhirIds.has(e.id) && !fhirIds.has(e.fhirId));
+    const localOnly = local.filter(e =>
+      !isEmptyEncounter(e, e)
+      && !String(e.id || '').startsWith('enc-mariana')
+      && !String(e.id || '').startsWith('enc-carlos')
+      && !fhirIds.has(e.id)
+      && !fhirIds.has(e.fhirId)
+    );
 
     return [...fhirMapped, ...localOnly].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -329,6 +335,7 @@ export function savePatientEncounter(encounterData) {
 
 export async function syncEncounterSoapNote(encounter) {
   if (!encounter?.patientId || !encounter?.id) return encounter;
+  if (!hasSoapContent(encounter)) return encounter;
   try {
     const savedDoc = await saveEncounterSoapNote({
       documentId: encounter.documentId,
@@ -498,10 +505,10 @@ export function clearConsultationDraft(patientId) {
  */
 export function resetEncountersHistory() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PAST_ENCOUNTERS));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     window.dispatchEvent(new Event('integramed_encounters_updated'));
-    return DEFAULT_PAST_ENCOUNTERS;
+    return [];
   } catch {
-    return DEFAULT_PAST_ENCOUNTERS;
+    return [];
   }
 }

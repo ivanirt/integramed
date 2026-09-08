@@ -6,6 +6,14 @@
  * - Standardized CRUD: getLabPanels, saveLabPanel, deleteLabPanel, resetLabPanelsToDefault
  */
 
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
+import { isEmptyLabPanel } from './clinicalContent.js';
+
 export const INITIAL_LAB_PANELS = [
   {
     id: 'panel-quimica-6',
@@ -282,6 +290,30 @@ export function saveLabPanel(panelData) {
   }
 
   saveLabPanels(updated);
+
+  if (isEmptyLabPanel(cleanRecord)) {
+    if (cleanRecord.fhirId) deletePayloadItem('DiagnosticReport', cleanRecord.fhirId);
+    return cleanRecord;
+  }
+
+  upsertPayloadItem({
+    resourceType: 'DiagnosticReport',
+    kind: 'lab-panel',
+    item: cleanRecord,
+    buildBase: (p) => ({
+      status: 'final',
+      code: { text: p.name || p.nameEn || 'Laboratory panel' },
+      effectiveDateTime: p.date,
+      conclusion: p.laboratoryName,
+      subject: p.patientId && p.patientId !== 'all' ? { reference: `Patient/${p.patientId}` } : undefined
+    })
+  }).then((remote) => {
+    if (remote?.fhirId) {
+      const next = getLabPanels().map((panel) => (panel.id === remote.id ? { ...panel, fhirId: remote.fhirId } : panel));
+      saveLabPanels(next);
+    }
+  }).catch((err) => console.info('FHIR DiagnosticReport sync skipped:', err.message));
+
   return cleanRecord;
 }
 
@@ -290,9 +322,18 @@ export function saveLabPanel(panelData) {
  */
 export function deleteLabPanel(panelId) {
   const list = getLabPanels();
+  const target = list.find(p => p.id === panelId);
   const filtered = list.filter(p => p.id !== panelId);
   saveLabPanels(filtered);
+  if (target?.fhirId) deletePayloadItem('DiagnosticReport', target.fhirId);
   return filtered;
+}
+
+export async function loadLabPanelsFromFhir() {
+  const remote = await loadPayloadCollection('DiagnosticReport', 'lab-panel');
+  const merged = preferRemote(remote, getLabPanels()).filter((panel) => !isEmptyLabPanel(panel));
+  saveLabPanels(merged);
+  return merged;
 }
 
 /**

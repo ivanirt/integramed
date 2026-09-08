@@ -9,14 +9,10 @@ import {
   saveStaffList,
   deleteStaffMember,
   resetStaffToDefault,
+  loadStaffFromFhir,
   CLINICAL_ROLES
 } from '../utils/staffStorage';
 import { useLanguage } from '../i18n/LanguageContext';
-import {
-  createPractitioner,
-  updatePractitioner,
-  deletePractitionerResource
-} from '../services/fhirApi';
 
 const AuthContext = createContext();
 
@@ -70,6 +66,15 @@ export function AuthProvider({ children }) {
   });
 
   const { language, setLanguage } = useLanguage();
+
+  useEffect(() => {
+    loadStaffFromFhir()
+      .then((list) => {
+        setStaffList(list);
+        setCurrentUser((prev) => list.find((s) => s.id === prev?.id || s.email === prev?.email) || list[0] || prev);
+      })
+      .catch(() => {});
+  }, []);
 
   // Keep activeRole consistent if user changes
   useEffect(() => {
@@ -206,29 +211,6 @@ export function AuthProvider({ children }) {
       }
     }
 
-    const payload = {
-      prefix: practitionerData.prefix,
-      givenName: practitionerData.givenName,
-      familyName: practitionerData.familyName,
-      gender: practitionerData.gender,
-      email: practitionerData.email,
-      phone: practitionerData.phone,
-      qualification: practitionerData.specialty,
-      active: practitionerData.status !== 'inactive'
-    };
-    const fhirId = practitionerData.fhirId;
-    const sync = fhirId
-      ? updatePractitioner(fhirId, payload)
-      : createPractitioner(payload);
-    sync.then(saved => {
-      if (saved?.id && saved.id !== fhirId) {
-        saveStaffMember({ ...practitionerData, fhirId: saved.id });
-        refreshStaff();
-      }
-    }).catch(err => {
-      console.info('FHIR Practitioner catalog sync skipped or offline:', err.message);
-    });
-
     return updatedList;
   };
 
@@ -245,18 +227,11 @@ export function AuthProvider({ children }) {
 
   // Delete a practitioner record
   const deletePractitioner = (staffId) => {
-    const list = getStaffList();
-    const target = list.find(s => s.id === staffId);
     const remaining = deleteStaffMember(staffId);
     refreshStaff();
     if (currentUser && currentUser.id === staffId && remaining.length > 0) {
       setCurrentUser(remaining[0]);
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(remaining[0]));
-    }
-    if (target?.fhirId) {
-      deletePractitionerResource(target.fhirId).catch(err => {
-        console.info('FHIR Practitioner delete skipped or offline:', err.message);
-      });
     }
     return remaining;
   };

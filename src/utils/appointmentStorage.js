@@ -5,7 +5,12 @@
  */
 
 import { generateWeeklySampleEncounters } from './weeklyAgendaData.js';
-import { createEncounter, updateEncounter, deleteEncounter } from '../services/fhirApi.js';
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
 
 const STORAGE_KEY = 'integramed_weekly_appointments_v2';
 
@@ -57,6 +62,53 @@ export function saveStoredAppointments(appointments) {
     console.error('Failed to save appointments:', err);
     return false;
   }
+}
+
+function fhirAppointmentStatus(status) {
+  switch (status) {
+    case 'confirmed': return 'booked';
+    case 'waiting':
+    case 'in_room': return 'arrived';
+    case 'in_consultation': return 'checked-in';
+    case 'finished': return 'fulfilled';
+    case 'cancelled': return 'cancelled';
+    default: return 'proposed';
+  }
+}
+
+async function persistAppointmentResource(appt) {
+  const remote = await upsertPayloadItem({
+    resourceType: 'Appointment',
+    kind: 'appointment',
+    item: appt,
+    buildBase: (p) => ({
+      status: fhirAppointmentStatus(p.status),
+      description: p.reason,
+      start: p.period?.start,
+      end: p.period?.end,
+      participant: [
+        {
+          actor: {
+            reference: p.patientId ? `Patient/${p.patientId}` : undefined,
+            display: p.patientName
+          },
+          status: 'accepted'
+        },
+        {
+          actor: {
+            reference: p.practitionerId ? `Practitioner/${p.practitionerId}` : undefined,
+            display: p.practitionerName
+          },
+          status: 'accepted'
+        }
+      ]
+    })
+  });
+  if (remote?.fhirId) {
+    const all = getStoredAppointments().map((a) => (a.id === appt.id ? { ...a, fhirId: remote.fhirId } : a));
+    saveStoredAppointments(all);
+  }
+  return remote;
 }
 
 /**
@@ -127,20 +179,10 @@ export async function createAppointment(data) {
   const updated = [newAppt, ...all];
   saveStoredAppointments(updated);
 
-  // Sync with FHIR server if available
   try {
-    await createEncounter({
-      patientId: newAppt.patientId || 'temp-patient',
-      patientName: newAppt.patientName,
-      practitionerId: newAppt.practitionerId,
-      practitionerName: newAppt.practitionerName,
-      type: newAppt.type?.[0]?.text,
-      status: newAppt.status,
-      startTime: newAppt.period.start,
-      reason: newAppt.reason
-    });
+    await persistAppointmentResource(newAppt);
   } catch (fhirErr) {
-    console.info('FHIR background sync skipped or offline:', fhirErr.message);
+    console.info('FHIR Appointment sync skipped:', fhirErr.message);
   }
 
   return newAppt;
@@ -199,18 +241,9 @@ export async function updateAppointment(id, fields) {
 
     // Sync with FHIR server in background if possible
     try {
-      await updateEncounter(id, {
-        patientId: updatedItem.patientId,
-        patientName: updatedItem.patientName,
-        practitionerId: updatedItem.practitionerId,
-        practitionerName: updatedItem.practitionerName,
-        type: updatedItem.type?.[0]?.text,
-        status: updatedItem.status,
-        startTime: updatedItem.period?.start,
-        reason: updatedItem.reason
-      });
+      await persistAppointmentResource(updatedItem);
     } catch (fhirErr) {
-      console.info('FHIR background sync for update skipped or offline:', fhirErr.message);
+      console.info('FHIR Appointment update skipped:', fhirErr.message);
     }
   }
 
@@ -222,17 +255,25 @@ export async function updateAppointment(id, fields) {
  */
 export async function deleteAppointment(id) {
   const all = getStoredAppointments();
+  const target = all.find(a => a.id === id);
   const filtered = all.filter(a => a.id !== id);
   saveStoredAppointments(filtered);
 
-  // Sync with FHIR server in background
   try {
-    await deleteEncounter(id);
+    if (target?.fhirId) await deletePayloadItem('Appointment', target.fhirId);
   } catch (fhirErr) {
     console.info('FHIR background delete skipped or offline:', fhirErr.message);
   }
 
   return true;
+}
+
+export async function loadAppointmentsFromFhir() {
+  const remote = await loadPayloadCollection('Appointment', 'appointment');
+  const merged = preferRemote(remote, getStoredAppointments());
+  saveStoredAppointments(merged);
+  window.dispatchEvent(new CustomEvent('integramed_appointments_changed', { detail: merged }));
+  return merged;
 }
 
 /**

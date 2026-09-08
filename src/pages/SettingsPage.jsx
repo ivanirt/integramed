@@ -44,7 +44,8 @@ import {
   DEFAULT_HOLIDAYS,
   getDoctorLeaves,
   addDoctorLeave,
-  removeDoctorLeave
+  removeDoctorLeave,
+  loadScheduleFromFhir
 } from '../utils/scheduleStorage';
 import {
   getStaffList,
@@ -235,6 +236,14 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
         setPractitioners(docs || []);
       })
       .catch(console.error);
+    loadScheduleFromFhir()
+      .then((data) => {
+        if (data.schedule) setSchedule(data.schedule);
+        if (data.overrides) setDateOverrides(data.overrides);
+        if (data.holidays) setHolidays(data.holidays);
+        if (data.leaves) setDoctorLeaves(data.leaves);
+      })
+      .catch(() => {});
   }, []);
 
   // Update schedule day toggle

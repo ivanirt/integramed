@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, User, UserCheck, Stethoscope, Clock, Save, AlertCircle, Loader2 } from 'lucide-react';
-import { getPatients, getPractitioners, createEncounter } from '../../services/fhirApi';
+import { getPatients, getPractitioners } from '../../services/fhirApi';
 import { getPatientFullName } from '../../utils/fhirHelper';
 import { getStaffList } from '../../utils/staffStorage';
 import { createAppointment } from '../../utils/appointmentStorage';

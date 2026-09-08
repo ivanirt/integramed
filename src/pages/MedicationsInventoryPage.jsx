@@ -41,7 +41,8 @@ import {
   savePatientDispensation,
   deletePatientDispensation,
   resetMedicationsData,
-  loadMedicationsFromFhir
+  loadMedicationsFromFhir,
+  loadPharmacyFromFhir
 } from '../utils/medicationInventoryStorage';
 import MedicationModal from '../components/medications/MedicationModal';
 import StockIngressModal from '../components/medications/StockIngressModal';
@@ -60,8 +61,12 @@ export default function MedicationsInventoryPage({ addToast }) {
   const [dispensations, setDispensations] = useState(() => getPatientDispensations());
 
   useEffect(() => {
-    loadMedicationsFromFhir()
-      .then(list => setMedications(list))
+    loadPharmacyFromFhir()
+      .then((data) => {
+        setMedications(data.medications);
+        setIngresses(data.ingresses);
+        setDispensations(data.dispensations);
+      })
       .catch(() => {});
   }, []);
 

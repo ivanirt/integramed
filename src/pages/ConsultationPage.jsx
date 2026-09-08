@@ -54,6 +54,7 @@ import { updateAppointmentStatusByPatientId } from '../utils/dashboardStorage';
 import PreviousEncountersListCard from '../components/encounters/PreviousEncountersListCard';
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
 import { parseVitalObservations } from '../utils/vitalsParser';
+import { hasSoapContent } from '../utils/clinicalContent';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function ConsultationPage({ addToast }) {
@@ -353,9 +354,34 @@ export default function ConsultationPage({ addToast }) {
     try {
       const patientName = patient ? getPatientFullName(patient) : `Patient ${selectedPatientId}`;
       const reasonSummary = diagnoses.map(d => d.label).join(', ') || subjective.slice(0, 60);
+      const clinicalNote = {
+        reason: reasonSummary,
+        summary: assessmentText || subjective.slice(0, 100),
+        subjective,
+        physicalExam,
+        diagnoses,
+        assessment: assessmentText,
+        plan,
+        medications: medications.map(m => ({
+          name: m.medicationCodeableConcept?.text || 'Medicamento',
+          dosage: 'Según prescripción médica',
+          duration: 'Continuo'
+        })),
+        vitals: {
+          bloodPressure: bpStr,
+          heartRate: '72',
+          temperature: tempVal,
+          respiratoryRate: '16',
+          oxygenSaturation: spo2Val,
+          weight: weightVal,
+          height: heightVal,
+          bmi: bmiVal
+        }
+      };
+      const hasClinicalContent = hasSoapContent(clinicalNote);
 
       let fhirEncounter = null;
-      if (selectedPatientId) {
+      if (selectedPatientId && hasClinicalContent) {
         fhirEncounter = await createEncounter({
           patientId: selectedPatientId,
           patientName,
@@ -399,14 +425,12 @@ export default function ConsultationPage({ addToast }) {
         diagnoses,
         assessment: assessmentText,
         plan,
-        medications: medications.map(m => ({
-          name: m.medicationCodeableConcept?.text || 'Medicamento',
-          dosage: 'Según prescripción médica',
-          duration: 'Continuo'
-        }))
+        medications: clinicalNote.medications
       };
-      const stored = savePatientEncounter(finalizedEncounter);
-      await syncEncounterSoapNote(stored);
+      if (hasClinicalContent) {
+        const stored = savePatientEncounter(finalizedEncounter);
+        await syncEncounterSoapNote(stored);
+      }
 
       // Clear draft for this patient upon finalization
       if (selectedPatientId) {

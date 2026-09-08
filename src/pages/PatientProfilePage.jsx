@@ -30,7 +30,9 @@ import {
   getPatientConditions,
   getPatientMedications,
   getEncounters,
-  updatePatient
+  updatePatient,
+  getPatientAllergies,
+  purgeEmptyPatientClinicalRecords
 } from '../services/fhirApi';
 import {
   getPatientFullName,
@@ -61,6 +63,7 @@ export default function PatientProfilePage({ addToast }) {
   const [conditions, setConditions] = useState([]);
   const [medications, setMedications] = useState([]);
   const [encounters, setEncounters] = useState([]);
+  const [allergies, setAllergies] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -84,12 +87,14 @@ export default function PatientProfilePage({ addToast }) {
     setError(null);
 
     try {
-      const [patData, obsData, condData, medData, encData] = await Promise.all([
+      const cleaned = await purgeEmptyPatientClinicalRecords(id).catch(() => null);
+      const [patData, obsData, condData, medData, encData, allergyData] = await Promise.all([
         getPatientById(id),
-        getPatientObservations(id).catch(() => []),
+        cleaned ? Promise.resolve(cleaned.observations) : getPatientObservations(id).catch(() => []),
         getPatientConditions(id).catch(() => []),
-        getPatientMedications(id).catch(() => []),
-        getEncounters(id).catch(() => [])
+        cleaned ? Promise.resolve(cleaned.medications) : getPatientMedications(id).catch(() => []),
+        cleaned ? Promise.resolve(cleaned.encounters) : getEncounters(id).catch(() => []),
+        getPatientAllergies(id).catch(() => [])
       ]);
 
       setPatient(patData);
@@ -97,6 +102,7 @@ export default function PatientProfilePage({ addToast }) {
       setConditions(condData);
       setMedications(medData);
       setEncounters(encData);
+      setAllergies(allergyData);
     } catch (err) {
       console.error('Failed to load patient profile:', err);
       setError(err);
@@ -220,7 +226,7 @@ export default function PatientProfilePage({ addToast }) {
                 boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
               }}
             >
-              {patient?.gender === 'female' ? 'üë©' : 'üë®'}
+              {patient?.gender === 'female' ? '??' : '??'}
             </div>
 
             <div>
@@ -250,16 +256,16 @@ export default function PatientProfilePage({ addToast }) {
                   <Calendar size={14} color="#94a3b8" />
                   {age !== null ? `${age} ${t('yearsOld', { age: '' }).trim()}` : formattedDate}
                 </span>
-                <span>‚Ä¢</span>
+                <span>ù</span>
                 <span style={{ textTransform: 'capitalize' }}>
                   {patient?.gender === 'male' ? t('genderMale') : patient?.gender === 'female' ? t('genderFemale') : t('genderOther')}
                 </span>
-                <span>‚Ä¢</span>
+                <span>ù</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Phone size={13} color="#94a3b8" />
                   {phone}
                 </span>
-                <span>‚Ä¢</span>
+                <span>ù</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Droplet size={13} color="#e11d48" />
                   {t('bloodType')}: O+
@@ -268,7 +274,14 @@ export default function PatientProfilePage({ addToast }) {
 
               {/* Clinical Alert Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                {allergies.map((allergy) => {
+                  const label = allergy.code?.text
+                    || allergy.code?.coding?.[0]?.display
+                    || allergy.reaction?.[0]?.manifestation?.[0]?.text
+                    || 'Alergia';
+                  return (
                 <span
+                  key={allergy.id}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -283,8 +296,10 @@ export default function PatientProfilePage({ addToast }) {
                   }}
                 >
                   <AlertTriangle size={12} />
-                  {t('allergyPill')}
+                  {locale?.startsWith('en') ? `Allergy: ${label}` : `Alergia: ${label}`}
                 </span>
+                  );
+                })}
 
                 <span
                   style={{
@@ -497,7 +512,7 @@ export default function PatientProfilePage({ addToast }) {
                     </div>
                   </div>
 
-                  {/* Presi√≥n Arterial / BP KPI Tile */}
+                  {/* Presiùn Arterial / BP KPI Tile */}
                   <div
                     style={{
                       padding: '1.1rem 1.25rem',
@@ -521,7 +536,7 @@ export default function PatientProfilePage({ addToast }) {
                     </div>
                   </div>
 
-                  {/* Heart Rate / Ritmo Card√≠aco KPI Tile */}
+                  {/* Heart Rate / Ritmo Cardùaco KPI Tile */}
                   <div
                     style={{
                       padding: '1.1rem 1.25rem',
@@ -579,7 +594,7 @@ export default function PatientProfilePage({ addToast }) {
                     loincCode={LOINC_CODES.BMI}
                     data={parsedVitals.bmi}
                     color="#6366f1"
-                    unit="kg/m¬≤"
+                    unit="kg/mù"
                   />
                 </div>
               )}
@@ -589,7 +604,7 @@ export default function PatientProfilePage({ addToast }) {
               )}
             </div>
 
-            {/* 2. DIAGN√ìSTICOS ACTIVOS CARD (Matching the attached design image) */}
+            {/* 2. DIAGNùSTICOS ACTIVOS CARD (Matching the attached design image) */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -614,7 +629,7 @@ export default function PatientProfilePage({ addToast }) {
               {conditions.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {conditions.slice(0, 4).map((c, idx) => {
-                    const name = c.code?.text || c.code?.coding?.[0]?.display || 'Diagn√≥stico';
+                    const name = c.code?.text || c.code?.coding?.[0]?.display || 'Diagnùstico';
                     const onset = c.onsetDateTime?.slice(0, 4) || '2021';
                     const code = c.code?.coding?.[0]?.code || `CIE-11: BA0${idx}`;
 
@@ -787,7 +802,7 @@ export default function PatientProfilePage({ addToast }) {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: L√çNEA DE TIEMPO (Clinical Timeline matching image) */}
+          {/* RIGHT COLUMN: LùNEA DE TIEMPO (Clinical Timeline matching image) */}
           <div>
             <ClinicalTimeline
               encounters={encounters}
@@ -842,7 +857,7 @@ export default function PatientProfilePage({ addToast }) {
                         {enc.type?.[0]?.text || enc.type?.[0]?.coding?.[0]?.display || 'Consulta'}
                       </td>
                       <td>{formatBirthDate(enc.period?.start?.slice(0, 10), locale)}</td>
-                      <td>{enc.participant?.[0]?.individual?.display || 'Personal M√©dico'}</td>
+                      <td>{enc.participant?.[0]?.individual?.display || 'Personal Mùdico'}</td>
                       <td style={{ color: '#64748b' }}>{enc.reasonCode?.[0]?.text || '-'}</td>
                       <td style={{ textAlign: 'right' }}>
                         <span className="badge-gender badge-gender-male">

@@ -31,7 +31,7 @@ import {
 import { getPatients, getPatientById, createLabObservation, getPatientLabObservations } from '../services/fhirApi';
 import { getPatientFullName, calculateAge, getPatientIdentifier } from '../utils/fhirHelper';
 import { useLanguage } from '../i18n/LanguageContext';
-import { getLabPanels, saveLabPanel, deleteLabPanel, resetLabPanelsToDefault } from '../utils/labsStorage';
+import { getLabPanels, saveLabPanel, deleteLabPanel, resetLabPanelsToDefault, loadLabPanelsFromFhir } from '../utils/labsStorage';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LabPanelModal from '../components/labs/LabPanelModal';
 
@@ -98,6 +98,12 @@ export default function LabsPage({ addToast }) {
       .finally(() => {
         if (isMounted) setIsLoadingPatients(false);
       });
+
+    loadLabPanelsFromFhir()
+      .then((list) => {
+        if (isMounted) setPanels(list);
+      })
+      .catch(() => {});
 
     return () => {
       isMounted = false;

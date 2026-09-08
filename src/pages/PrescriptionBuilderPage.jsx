@@ -293,6 +293,7 @@ export default function PrescriptionBuilderPage({ addToast }) {
 
       // Submit FHIR MedicationRequest for each item
       for (const item of prescriptionItems) {
+        if (!String(item.name || '').trim()) continue;
         await createMedicationRequest({
           patientId: selectedPatientId || 'temp-patient',
           patientName,

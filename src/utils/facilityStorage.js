@@ -3,6 +3,15 @@
  * Aligned with HL7 FHIR R4 Organization & Location resources
  */
 
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  loadConfigBlob,
+  saveConfigBlob,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
+
 export const INITIAL_ORGANIZATIONS = [
   {
     id: 'org-integramed-central',
@@ -242,6 +251,9 @@ const LOCS_STORAGE_KEY = 'integramed_locations_data';
 const RESOURCE_TYPES_STORAGE_KEY = 'integramed_facility_resource_types';
 const SERVICES_CATALOG_STORAGE_KEY = 'integramed_facility_services_catalog';
 
+let resourceTypesFhirId = null;
+let servicesCatalogFhirId = null;
+
 export function getOrganizations() {
   try {
     const raw = localStorage.getItem(ORGS_STORAGE_KEY);
@@ -277,13 +289,38 @@ export function saveOrganization(orgData) {
     updated = [orgData, ...list];
   }
   saveOrganizations(updated);
+
+  const saved = updated.find(o => o.id === orgData.id) || orgData;
+  upsertPayloadItem({
+    resourceType: 'Organization',
+    kind: 'organization',
+    item: saved,
+    buildBase: (p) => ({
+      name: p.name,
+      alias: p.alias ? [p.alias] : undefined,
+      active: p.status !== 'inactive',
+      telecom: [
+        ...(p.phone ? [{ system: 'phone', value: p.phone }] : []),
+        ...(p.email ? [{ system: 'email', value: p.email }] : []),
+        ...(p.website ? [{ system: 'url', value: p.website }] : [])
+      ]
+    })
+  }).then((remote) => {
+    if (remote?.fhirId) {
+      const next = getOrganizations().map((o) => (o.id === remote.id ? { ...o, fhirId: remote.fhirId } : o));
+      saveOrganizations(next);
+    }
+  }).catch((err) => console.info('FHIR Organization sync skipped:', err.message));
+
   return updated;
 }
 
 export function deleteOrganization(orgId) {
   const list = getOrganizations();
+  const target = list.find(o => o.id === orgId);
   const updated = list.filter(o => o.id !== orgId);
   saveOrganizations(updated);
+  if (target?.fhirId) deletePayloadItem('Organization', target.fhirId);
   return updated;
 }
 
@@ -322,13 +359,51 @@ export function saveLocation(locData) {
     updated = [locData, ...list];
   }
   saveLocations(updated);
+
+  const saved = updated.find(l => l.id === locData.id) || locData;
+  const org = getOrganizations().find(o => o.id === saved.organizationId);
+  upsertPayloadItem({
+    resourceType: 'Location',
+    kind: 'location',
+    item: saved,
+    buildBase: (p) => ({
+      name: p.name,
+      status: p.status === 'inactive' ? 'inactive' : 'active',
+      description: p.description,
+      telecom: [
+        ...(p.phone ? [{ system: 'phone', value: p.phone }] : []),
+        ...(p.email ? [{ system: 'email', value: p.email }] : [])
+      ],
+      address: p.address
+        ? {
+            line: p.address.line ? [p.address.line] : undefined,
+            city: p.address.city,
+            district: p.address.district,
+            state: p.address.state,
+            postalCode: p.address.postalCode,
+            country: p.address.country
+          }
+        : undefined,
+      managingOrganization: org?.fhirId
+        ? { reference: `Organization/${org.fhirId}`, display: org.name }
+        : undefined
+    })
+  }).then((remote) => {
+    if (remote?.fhirId) {
+      const next = getLocations().map((l) => (l.id === remote.id ? { ...l, fhirId: remote.fhirId } : l));
+      saveLocations(next);
+    }
+  }).catch((err) => console.info('FHIR Location sync skipped:', err.message));
+
   return updated;
 }
 
 export function deleteLocation(locId) {
   const list = getLocations();
+  const target = list.find(l => l.id === locId);
   const updated = list.filter(l => l.id !== locId);
   saveLocations(updated);
+  if (target?.fhirId) deletePayloadItem('Location', target.fhirId);
   return updated;
 }
 
@@ -357,6 +432,9 @@ export function saveFacilityResourceTypes(typesList) {
   } catch (e) {
     console.error('Failed to save facility resource types', e);
   }
+  saveConfigBlob('facility-resource-types', typesList, resourceTypesFhirId)
+    .then((id) => { resourceTypesFhirId = id; })
+    .catch((err) => console.info('FHIR resource types sync skipped:', err.message));
 }
 
 export function saveFacilityResourceType(resourceType) {
@@ -410,6 +488,9 @@ export function saveFacilityServicesCatalog(servicesList) {
   } catch (e) {
     console.error('Failed to save facility services catalog', e);
   }
+  saveConfigBlob('facility-services-catalog', servicesList, servicesCatalogFhirId)
+    .then((id) => { servicesCatalogFhirId = id; })
+    .catch((err) => console.info('FHIR facility services catalog sync skipped:', err.message));
 }
 
 export function saveFacilityServiceCatalogItem(serviceName) {
@@ -490,5 +571,35 @@ export function resetFacilitiesData() {
     locations: INITIAL_LOCATIONS,
     resourceTypes: DEFAULT_FACILITY_RESOURCE_TYPES,
     servicesCatalog: DEFAULT_FACILITY_SERVICES_CATALOG
+  };
+}
+
+export async function loadFacilitiesFromFhir() {
+  const [orgs, locs, resourceBlob, servicesBlob] = await Promise.all([
+    loadPayloadCollection('Organization', 'organization'),
+    loadPayloadCollection('Location', 'location'),
+    loadConfigBlob('facility-resource-types'),
+    loadConfigBlob('facility-services-catalog')
+  ]);
+
+  const organizations = preferRemote(orgs, getOrganizations());
+  const locations = preferRemote(locs, getLocations());
+  saveOrganizations(organizations);
+  saveLocations(locations);
+
+  if (resourceBlob && resourceBlob.data) {
+    resourceTypesFhirId = resourceBlob.fhirId;
+    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(resourceBlob.data));
+  }
+  if (servicesBlob && servicesBlob.data) {
+    servicesCatalogFhirId = servicesBlob.fhirId;
+    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(servicesBlob.data));
+  }
+
+  return {
+    organizations,
+    locations,
+    resourceTypes: getFacilityResourceTypes(),
+    servicesCatalog: getFacilityServicesCatalog()
   };
 }

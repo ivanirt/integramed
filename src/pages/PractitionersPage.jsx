@@ -44,7 +44,8 @@ import {
   getCoverages,
   saveCoverage,
   deleteCoverage,
-  resetShiftGuardData
+  resetShiftGuardData,
+  loadShiftGuardFromFhir
 } from '../utils/shiftGuardStorage';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
@@ -89,6 +90,15 @@ export default function PractitionersPage({ addToast, onOpenScheduleModal, defau
   // Shifts & Guards storage state
   const [guards, setGuards] = useState(() => getGuards());
   const [coverages, setCoverages] = useState(() => getCoverages());
+
+  useEffect(() => {
+    loadShiftGuardFromFhir()
+      .then((data) => {
+        setGuards(data.guards);
+        setCoverages(data.coverages);
+      })
+      .catch(() => {});
+  }, []);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');

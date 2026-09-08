@@ -33,6 +33,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   getTodayAppointments,
   updateAppointmentStatus,
+  loadDashboardFromFhir,
   getPendingTasks,
   toggleTaskCompleted,
   addPendingTask,
@@ -77,6 +78,12 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
     const handleTaskUpdate = () => setTasks(getPendingTasks());
     window.addEventListener('integramed_appointments_updated', handleApptUpdate);
     window.addEventListener('integramed_tasks_updated', handleTaskUpdate);
+    loadDashboardFromFhir()
+      .then((data) => {
+        if (data?.appointments) setAppointments(data.appointments);
+        if (data?.tasks) setTasks(data.tasks);
+      })
+      .catch(() => {});
     return () => {
       window.removeEventListener('integramed_appointments_updated', handleApptUpdate);
       window.removeEventListener('integramed_tasks_updated', handleTaskUpdate);

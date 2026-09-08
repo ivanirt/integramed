@@ -3,6 +3,14 @@
  * Provides live appointments, clinical to-dos, AI suggestions, and role queues.
  */
 
+import { loadAppointmentsFromFhir } from './appointmentStorage.js';
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
+
 const STORAGE_KEYS = {
   TODAY_APPOINTMENTS: 'integramed_today_appointments',
   PENDING_TASKS: 'integramed_pending_tasks',
@@ -362,12 +370,55 @@ export function addPendingTask(title, patient = null, urgent = false) {
   const updated = [newTask, ...tasks];
   const sorted = sortTasksByCompletion(updated);
   savePendingTasks(sorted);
+  upsertPayloadItem({
+    resourceType: 'Task',
+    kind: 'task',
+    item: newTask,
+    buildBase: (p) => ({
+      status: p.completed ? 'completed' : 'requested',
+      description: p.title,
+      intent: 'order',
+      for: p.patient ? { display: p.patient } : undefined,
+      priority: p.urgent ? 'urgent' : 'routine'
+    })
+  }).catch((err) => console.info('FHIR Task sync skipped:', err.message));
   return sorted;
 }
 
 export function deleteTask(taskId) {
   const tasks = getPendingTasks();
+  const target = tasks.find(t => t.id === taskId);
   const filtered = tasks.filter(t => t.id !== taskId);
   savePendingTasks(filtered);
+  if (target?.fhirId) deletePayloadItem('Task', target.fhirId);
   return filtered;
+}
+
+export async function loadDashboardFromFhir() {
+  const appts = await loadAppointmentsFromFhir();
+  const today = new Date().toISOString().slice(0, 10);
+  const todayAppts = (appts || [])
+    .filter((a) => a.date === today || String(a.period?.start || '').startsWith(today))
+    .map((a) => ({
+      id: a.id,
+      fhirId: a.fhirId,
+      time: a.time || String(a.period?.start || '').slice(11, 16),
+      period: Number((a.time || '09').slice(0, 2)) >= 12 ? 'PM' : 'AM',
+      patientId: a.patientId,
+      patientName: a.patientName,
+      status: a.status,
+      statusLabel: a.statusLabel,
+      reason: a.reason,
+      room: a.room,
+      practitionerName: a.practitionerName,
+      vitalSigns: a.vitalSigns || {}
+    }));
+  if (todayAppts.length > 0) {
+    saveTodayAppointments(todayAppts);
+  }
+
+  const remoteTasks = await loadPayloadCollection('Task', 'task');
+  const tasks = preferRemote(remoteTasks, getPendingTasks());
+  savePendingTasks(tasks);
+  return { appointments: getTodayAppointments(), tasks };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Building2,
   MapPin,
@@ -32,7 +32,8 @@ import {
   deleteLocation,
   resetFacilitiesData,
   getFacilityResourceTypes,
-  getFacilityServicesCatalog
+  getFacilityServicesCatalog,
+  loadFacilitiesFromFhir
 } from '../utils/facilityStorage';
 import OrganizationModal from '../components/facilities/OrganizationModal';
 import LocationModal from '../components/facilities/LocationModal';
@@ -55,6 +56,16 @@ export default function FacilitiesPage({ addToast, embedded = false }) {
   const [orgModal, setOrgModal] = useState({ isOpen: false, organization: null });
   const [locModal, setLocModal] = useState({ isOpen: false, location: null });
   const [catalogModal, setCatalogModal] = useState({ isOpen: false });
+
+  useEffect(() => {
+    loadFacilitiesFromFhir()
+      .then((data) => {
+        setOrganizations(data.organizations);
+        setLocations(data.locations);
+        setResourceTypes(data.resourceTypes);
+      })
+      .catch(() => {});
+  }, []);
 
   // Filtered Locations
   const filteredLocations = useMemo(() => {

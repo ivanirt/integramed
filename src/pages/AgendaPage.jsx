@@ -30,7 +30,7 @@ import ErrorAlert from '../components/ErrorAlert';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { useLanguage } from '../i18n/LanguageContext';
 import { getStaffList } from '../utils/staffStorage';
-import { getStoredAppointments, updateAppointment } from '../utils/appointmentStorage';
+import { getStoredAppointments, updateAppointment, loadAppointmentsFromFhir } from '../utils/appointmentStorage';
 import { generateWeeklySampleEncounters } from '../utils/weeklyAgendaData';
 
 export default function AgendaPage({ addToast, onOpenScheduleModal }) {
@@ -88,8 +88,12 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
     setError(null);
 
     try {
-      const data = await getEncounters();
+      const [data, stored] = await Promise.all([
+        getEncounters(),
+        loadAppointmentsFromFhir()
+      ]);
       setEncounters(data || []);
+      setStoredAppointments(stored || getStoredAppointments());
     } catch (err) {
       console.error('Failed to load encounters:', err);
       setError(err);

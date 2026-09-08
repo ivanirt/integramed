@@ -2,6 +2,13 @@
  * Shift, On-Call Guards & Substitute Coverages Storage for IntegraMed
  */
 
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
+
 export const GUARD_TYPES = {
   presential_24h: {
     id: 'presential_24h',
@@ -201,13 +208,27 @@ export function saveGuard(guardData) {
     updated = [guardData, ...list];
   }
   saveGuards(updated);
+  const saved = updated.find(g => g.id === guardData.id) || guardData;
+  upsertPayloadItem({
+    resourceType: 'Appointment',
+    kind: 'guard',
+    item: saved,
+    buildBase: (p) => ({
+      status: p.status === 'cancelled' ? 'cancelled' : 'booked',
+      description: p.notes || p.department,
+      start: p.date ? `${p.date}T08:00:00` : undefined,
+      participant: [{ actor: { display: p.practitionerName }, status: 'accepted' }]
+    })
+  }).catch((err) => console.info('FHIR guard Appointment sync skipped:', err.message));
   return updated;
 }
 
 export function deleteGuard(guardId) {
   const list = getGuards();
+  const target = list.find(g => g.id === guardId);
   const updated = list.filter(g => g.id !== guardId);
   saveGuards(updated);
+  if (target?.fhirId) deletePayloadItem('Appointment', target.fhirId);
   return updated;
 }
 
@@ -246,14 +267,40 @@ export function saveCoverage(coverageData) {
     updated = [coverageData, ...list];
   }
   saveCoverages(updated);
+  const saved = updated.find(c => c.id === coverageData.id) || coverageData;
+  upsertPayloadItem({
+    resourceType: 'Appointment',
+    kind: 'coverage',
+    item: saved,
+    buildBase: (p) => ({
+      status: 'booked',
+      description: p.reason || 'Cobertura / suplencia',
+      start: p.date ? `${p.date}T08:00:00` : undefined,
+      participant: [{ actor: { display: p.substituteName || p.practitionerName }, status: 'accepted' }]
+    })
+  }).catch((err) => console.info('FHIR coverage Appointment sync skipped:', err.message));
   return updated;
 }
 
 export function deleteCoverage(coverageId) {
   const list = getCoverages();
+  const target = list.find(c => c.id === coverageId);
   const updated = list.filter(c => c.id !== coverageId);
   saveCoverages(updated);
+  if (target?.fhirId) deletePayloadItem('Appointment', target.fhirId);
   return updated;
+}
+
+export async function loadShiftGuardFromFhir() {
+  const [guards, coverages] = await Promise.all([
+    loadPayloadCollection('Appointment', 'guard'),
+    loadPayloadCollection('Appointment', 'coverage')
+  ]);
+  const g = preferRemote(guards, getGuards());
+  const c = preferRemote(coverages, getCoverages());
+  saveGuards(g);
+  saveCoverages(c);
+  return { guards: g, coverages: c };
 }
 
 export function resetShiftGuardData() {

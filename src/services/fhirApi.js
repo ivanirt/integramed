@@ -2,6 +2,13 @@
  * Client-side FHIR API service that interacts with the backend FHIR Proxy.
  */
 import { buildFhirPatientResource } from '../utils/fhirHelper.js';
+import {
+  hasSoapContent,
+  isEmptyEncounter,
+  isEmptyMedicationRequest,
+  isEmptyDiagnosticReport,
+  isEmptyObservation
+} from '../utils/clinicalContent.js';
 
 const API_BASE = '/api';
 
@@ -221,6 +228,9 @@ export async function createMedicationRequest({
   instructions = ''
 }) {
   if (!patientId) throw new Error('Patient ID is required');
+  if (!String(medicationName || '').trim()) {
+    throw new Error('Empty prescriptions are not sent to the FHIR server');
+  }
 
   const medicationResource = {
     resourceType: 'MedicationRequest',
@@ -807,6 +817,30 @@ export async function fhirRequest(path, { method = 'GET', body } = {}) {
   }
 }
 
+export async function getPatientAllergies(patientId) {
+  if (!patientId) return [];
+  try {
+    const data = await fhirRequest(
+      `AllergyIntolerance?patient=${encodeURIComponent(patientId)}&_count=50`
+    );
+    return bundleResources(data, 'AllergyIntolerance');
+  } catch {
+    return [];
+  }
+}
+
+export async function getPatientDiagnosticReports(patientId) {
+  if (!patientId) return [];
+  try {
+    const data = await fhirRequest(
+      `DiagnosticReport?patient=${encodeURIComponent(patientId)}&_count=100&_sort=-issued`
+    );
+    return bundleResources(data, 'DiagnosticReport');
+  } catch {
+    return [];
+  }
+}
+
 export async function getEncounterById(id) {
   if (!id) throw new Error('Encounter ID is required');
   return fhirRequest(`Encounter/${encodeURIComponent(id)}`);
@@ -911,6 +945,90 @@ export function buildSoapDocumentReference({
   };
 }
 
+export async function deleteMedicationRequest(id) {
+  if (!id) return true;
+  return fhirRequest(`MedicationRequest/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function deleteDiagnosticReport(id) {
+  if (!id) return true;
+  return fhirRequest(`DiagnosticReport/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function purgeEmptyPatientClinicalRecords(patientId) {
+  if (!patientId) {
+    return { encounters: [], medications: [], observations: [], reports: [] };
+  }
+
+  const [encounters, documents, medications, observations, reports] = await Promise.all([
+    getEncounters(patientId).catch(() => []),
+    getPatientDocumentReferences(patientId).catch(() => []),
+    getPatientMedications(patientId).catch(() => []),
+    getPatientObservations(patientId).catch(() => []),
+    getPatientDiagnosticReports(patientId).catch(() => [])
+  ]);
+
+  const soapByEncounterId = {};
+  documents.forEach((doc) => {
+    const ref = doc?.context?.encounter?.[0]?.reference || '';
+    const encId = String(ref).split('/').pop();
+    if (!encId) return;
+    soapByEncounterId[encId] = extractSoapNoteFromDocument(doc) || {};
+  });
+
+  const keptEncounters = [];
+  await Promise.all((encounters || []).map(async (enc) => {
+    const soap = soapByEncounterId[enc.id] || {};
+    if (isEmptyEncounter(enc, soap)) {
+      try {
+        await deleteEncounter(enc.id);
+      } catch (err) {
+        console.info('Empty Encounter delete skipped:', err.message);
+        keptEncounters.push(enc);
+      }
+      return;
+    }
+    keptEncounters.push(enc);
+  }));
+
+  const keptMedications = [];
+  await Promise.all((medications || []).map(async (med) => {
+    if (isEmptyMedicationRequest(med)) {
+      try {
+        await deleteMedicationRequest(med.id);
+      } catch (err) {
+        console.info('Empty MedicationRequest delete skipped:', err.message);
+        keptMedications.push(med);
+      }
+      return;
+    }
+    keptMedications.push(med);
+  }));
+
+  const keptReports = [];
+  await Promise.all((reports || []).map(async (report) => {
+    if (isEmptyDiagnosticReport(report)) {
+      try {
+        await deleteDiagnosticReport(report.id);
+      } catch (err) {
+        console.info('Empty DiagnosticReport delete skipped:', err.message);
+        keptReports.push(report);
+      }
+      return;
+    }
+    keptReports.push(report);
+  }));
+
+  const keptObservations = (observations || []).filter((obs) => !isEmptyObservation(obs));
+
+  return {
+    encounters: keptEncounters,
+    medications: keptMedications,
+    observations: keptObservations,
+    reports: keptReports
+  };
+}
+
 export async function saveEncounterSoapNote({
   documentId,
   patientId,
@@ -919,6 +1037,7 @@ export async function saveEncounterSoapNote({
   date,
   soap
 }) {
+  if (!hasSoapContent(soap)) return null;
   const resource = buildSoapDocumentReference({
     id: documentId,
     patientId,

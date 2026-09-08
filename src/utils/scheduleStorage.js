@@ -3,6 +3,8 @@
  * Persists locally and synchronizes across the application.
  */
 
+import { loadConfigBlob, saveConfigBlob } from '../services/fhirPayloadStore.js';
+
 const STORAGE_KEYS = {
   SCHEDULE: 'integramed_clinic_schedule',
   DATE_OVERRIDES: 'integramed_date_overrides',
@@ -99,6 +101,7 @@ export function saveClinicSchedule(schedule) {
   try {
     localStorage.setItem(STORAGE_KEYS.SCHEDULE, JSON.stringify(schedule));
     window.dispatchEvent(new Event('clinic_schedule_updated'));
+    saveConfigBlob('clinic-schedule', schedule).catch((err) => console.info('FHIR schedule sync skipped:', err.message));
     return true;
   } catch (err) {
     console.error('Failed to save clinic schedule:', err);
@@ -124,6 +127,7 @@ export function saveDateOverrides(overrides) {
   try {
     localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(overrides));
     window.dispatchEvent(new Event('clinic_date_overrides_updated'));
+    saveConfigBlob('clinic-date-overrides', overrides).catch((err) => console.info('FHIR date overrides sync skipped:', err.message));
     return true;
   } catch (err) {
     console.error('Failed to save date overrides:', err);
@@ -180,6 +184,7 @@ export function saveClinicHolidays(holidays) {
   try {
     localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
     window.dispatchEvent(new Event('clinic_holidays_updated'));
+    saveConfigBlob('clinic-holidays', holidays).catch((err) => console.info('FHIR holidays sync skipped:', err.message));
     return true;
   } catch (err) {
     console.error('Failed to save clinic holidays:', err);
@@ -226,6 +231,7 @@ export function saveDoctorLeaves(leaves) {
   try {
     localStorage.setItem(STORAGE_KEYS.DOCTOR_LEAVES, JSON.stringify(leaves));
     window.dispatchEvent(new Event('doctor_leaves_updated'));
+    saveConfigBlob('doctor-leaves', leaves).catch((err) => console.info('FHIR doctor leaves sync skipped:', err.message));
     return true;
   } catch (err) {
     console.error('Failed to save doctor leaves:', err);
@@ -322,5 +328,32 @@ export function getWorkingHoursForDate(dateStr, practitionerId = null) {
     startAfternoon: dayConfig.startAfternoon || '',
     endAfternoon: dayConfig.endAfternoon || '',
     reason: dayConfig.enabled ? 'Horario estándar de trabajo' : 'Día cerrado'
+  };
+}
+
+export async function loadScheduleFromFhir() {
+  const [scheduleBlob, overridesBlob, holidaysBlob, leavesBlob] = await Promise.all([
+    loadConfigBlob('clinic-schedule'),
+    loadConfigBlob('clinic-date-overrides'),
+    loadConfigBlob('clinic-holidays'),
+    loadConfigBlob('doctor-leaves')
+  ]);
+  if (scheduleBlob?.data) {
+    localStorage.setItem(STORAGE_KEYS.SCHEDULE, JSON.stringify(scheduleBlob.data));
+  }
+  if (overridesBlob?.data) {
+    localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(overridesBlob.data));
+  }
+  if (holidaysBlob?.data) {
+    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidaysBlob.data));
+  }
+  if (leavesBlob?.data) {
+    localStorage.setItem(STORAGE_KEYS.DOCTOR_LEAVES, JSON.stringify(leavesBlob.data));
+  }
+  return {
+    schedule: getClinicSchedule(),
+    overrides: getDateOverrides(),
+    holidays: getClinicHolidays(),
+    leaves: getDoctorLeaves()
   };
 }

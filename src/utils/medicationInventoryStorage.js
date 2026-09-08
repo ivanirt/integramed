@@ -10,6 +10,12 @@ import {
   getFhirMedications,
   fhirMedicationToCatalog
 } from '../services/fhirApi.js';
+import {
+  loadPayloadCollection,
+  upsertPayloadItem,
+  deletePayloadItem,
+  preferRemote
+} from '../services/fhirPayloadStore.js';
 
 export const INITIAL_MEDICATIONS = [
   {
@@ -531,6 +537,20 @@ export function saveStockIngress(ingressData) {
   }
   saveStockIngresses(updatedIngresses);
 
+  upsertPayloadItem({
+    resourceType: 'SupplyDelivery',
+    kind: 'stock-ingress',
+    item: cleanRecord,
+    buildBase: (p) => ({
+      status: 'completed',
+      occurrenceDateTime: p.receiptDate,
+      suppliedItem: {
+        quantity: { value: p.quantity },
+        itemCodeableConcept: { text: p.medicationName || p.medicationId || 'Medication' }
+      }
+    })
+  }).catch((err) => console.info('FHIR SupplyDelivery sync skipped:', err.message));
+
   // If newly registered, automatically add stock to the medication and log movement
   if (isNew && cleanRecord.medicationId && qty > 0) {
     const meds = getMedications();
@@ -565,6 +585,8 @@ export function deleteStockIngress(ingressId) {
   const target = ingresses.find(i => i.id === ingressId);
   const filtered = ingresses.filter(i => i.id !== ingressId);
   saveStockIngresses(filtered);
+
+  if (target?.fhirId) deletePayloadItem('SupplyDelivery', target.fhirId);
 
   // If deleting an ingress, reverse the stock addition if possible
   if (target && target.medicationId && target.quantity) {
@@ -639,6 +661,19 @@ export function savePatientDispensation(dispenseData) {
   }
   savePatientDispensations(updatedDispensations);
 
+  upsertPayloadItem({
+    resourceType: 'MedicationDispense',
+    kind: 'patient-dispense',
+    item: cleanRecord,
+    buildBase: (p) => ({
+      status: p.status === 'completed' ? 'completed' : 'in-progress',
+      medicationCodeableConcept: { text: p.medicationName || p.medicationId || 'Medication' },
+      subject: p.patientId ? { reference: `Patient/${p.patientId}`, display: p.patientName } : { display: p.patientName },
+      quantity: { value: p.quantity },
+      whenHandedOver: p.dispenseDate
+    })
+  }).catch((err) => console.info('FHIR MedicationDispense sync skipped:', err.message));
+
   // If newly dispensed, deduct stock from medication and log movement
   if (isNew && cleanRecord.medicationId && qty > 0) {
     const meds = getMedications();
@@ -670,6 +705,8 @@ export function deletePatientDispensation(dispenseId) {
   const filtered = dispensations.filter(d => d.id !== dispenseId);
   savePatientDispensations(filtered);
 
+  if (target?.fhirId) deletePayloadItem('MedicationDispense', target.fhirId);
+
   // If deleting/cancelling a dispensation, restore the stock
   if (target && target.medicationId && target.quantity) {
     const meds = getMedications();
@@ -688,6 +725,19 @@ export function deletePatientDispensation(dispenseId) {
 // ==========================================
 // 4. RESET ALL PHARMACY DATA
 // ==========================================
+
+export async function loadPharmacyFromFhir() {
+  const meds = await loadMedicationsFromFhir();
+  const [ingresses, dispensations] = await Promise.all([
+    loadPayloadCollection('SupplyDelivery', 'stock-ingress'),
+    loadPayloadCollection('MedicationDispense', 'patient-dispense')
+  ]);
+  const ing = preferRemote(ingresses, getStockIngresses());
+  const disp = preferRemote(dispensations, getPatientDispensations());
+  saveStockIngresses(ing);
+  savePatientDispensations(disp);
+  return { medications: meds, ingresses: ing, dispensations: disp };
+}
 
 export function resetMedicationsData() {
   saveMedications(INITIAL_MEDICATIONS);

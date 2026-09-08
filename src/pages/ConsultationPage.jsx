@@ -32,7 +32,8 @@ import {
   getPatientObservations,
   getPatientConditions,
   getPatientMedications,
-  createEncounter
+  createEncounter,
+  createVitalObservation
 } from '../services/fhirApi';
 import {
   getPatientFullName,
@@ -51,12 +52,51 @@ import {
 import { updateAppointmentStatusByPatientId } from '../utils/dashboardStorage';
 import PreviousEncountersListCard from '../components/encounters/PreviousEncountersListCard';
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
-import { parseVitalObservations } from '../utils/vitalsParser';
+import { parseVitalObservations, LOINC_CODES } from '../utils/vitalsParser';
 import { hasSoapContent } from '../utils/clinicalContent';
 import { getStaffAiSecrets } from '../utils/integrativeMedicine';
 import { consultClinicalAi } from '../services/aiApi';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+
+const EMPTY_VITALS = {
+  weight: '',
+  height: '',
+  systolic: '',
+  diastolic: '',
+  spo2: '',
+  temp: ''
+};
+
+const VITAL_INPUT_STYLE = {
+  width: '3.4rem',
+  border: 'none',
+  background: 'transparent',
+  fontSize: '0.9375rem',
+  fontWeight: 800,
+  color: '#0f172a',
+  textAlign: 'center',
+  padding: 0,
+  outline: 'none'
+};
+
+function computeBmi(weight, height) {
+  const w = Number(weight);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return '';
+  return (w / ((h / 100) ** 2)).toFixed(2);
+}
+
+function bmiCategory(bmi) {
+  const n = Number(bmi);
+  if (!Number.isFinite(n) || n <= 0) {
+    return { label: '—', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
+  }
+  if (n < 18.5) return { label: 'BAJO PESO', color: '#0369a1', bg: '#e0f2fe', border: '#7dd3fc' };
+  if (n < 25) return { label: 'NORMAL', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' };
+  if (n < 30) return { label: 'SOBREPESO', color: '#d97706', bg: '#fffbeb', border: '#fcd34d' };
+  return { label: 'OBESIDAD', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' };
+}
 
 export default function ConsultationPage({ addToast }) {
   const [searchParams] = useSearchParams();
@@ -84,7 +124,7 @@ export default function ConsultationPage({ addToast }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Consultation Timer
-  const [secondsElapsed, setSecondsElapsed] = useState(872); // starts around 14:32 for realism
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
 
   // Voice recording simulation states
@@ -94,15 +134,13 @@ export default function ConsultationPage({ addToast }) {
   const [isRecordingPlan, setIsRecordingPlan] = useState(false);
 
   // SOAP Note State
-  const [subjective, setSubjective] = useState('Refiere cefalea de 3 días de evolución, de tipo opresivo, intensidad 6/10, acompañada de fatiga.');
-  const [physicalExam, setPhysicalExam] = useState('Paciente consciente, orientado, ruidos cardíacos rítmicos sin soplos, campos pulmonares con adecuado murmullo vesicular.');
-  const [diagnoses, setDiagnoses] = useState([
-    { code: 'BA00', label: 'Hipertensión esencial' },
-    { code: '8A80', label: 'Asma' }
-  ]);
+  const [subjective, setSubjective] = useState('');
+  const [physicalExam, setPhysicalExam] = useState('');
+  const [diagnoses, setDiagnoses] = useState([]);
   const [diagnosisInput, setDiagnosisInput] = useState('');
-  const [assessmentText, setAssessmentText] = useState('Cefalea tensional primaria probablemente desencadenada por estrés laboral. Hipertensión arterial sistémica estadio I en adecuado control farmacológico.');
-  const [plan, setPlan] = useState('Continuar con losartán. Solicitar perfil lipídico de control. Cita de seguimiento en 3 meses.');
+  const [assessmentText, setAssessmentText] = useState('');
+  const [plan, setPlan] = useState('');
+  const [vitalsDraft, setVitalsDraft] = useState(EMPTY_VITALS);
 
   // AI Assistant Chat & Suggestions State
   const [aiInput, setAiInput] = useState('');
@@ -170,9 +208,22 @@ export default function ConsultationPage({ addToast }) {
           if (savedDraft.diagnoses !== undefined) setDiagnoses(savedDraft.diagnoses);
           if (savedDraft.assessmentText !== undefined) setAssessmentText(savedDraft.assessmentText);
           if (savedDraft.plan !== undefined) setPlan(savedDraft.plan);
+          if (savedDraft.vitals) {
+            setVitalsDraft({ ...EMPTY_VITALS, ...savedDraft.vitals });
+          } else {
+            setVitalsDraft({ ...EMPTY_VITALS });
+          }
           if (savedDraft.savedAt) setLastDraftSavedAt(savedDraft.savedAt);
           if (savedDraft.secondsElapsed) setSecondsElapsed(savedDraft.secondsElapsed);
         } else {
+          setSubjective('');
+          setPhysicalExam('');
+          setDiagnoses([]);
+          setDiagnosisInput('');
+          setAssessmentText('');
+          setPlan('');
+          setVitalsDraft({ ...EMPTY_VITALS });
+          setSecondsElapsed(0);
           setLastDraftSavedAt(null);
         }
 
@@ -199,18 +250,32 @@ export default function ConsultationPage({ addToast }) {
     return () => window.removeEventListener('integramed_encounters_updated', handleUpdate);
   }, [selectedPatientId, patient]);
 
-  // Vitals summary
+  // Last FHIR vitals used only as placeholders, not as filled values for a new consult
   const parsedVitals = useMemo(() => {
     return parseVitalObservations(observations);
   }, [observations]);
 
-  const weightVal = parsedVitals.weight[parsedVitals.weight.length - 1]?.value || '62.4';
-  const heightVal = parsedVitals.height[parsedVitals.height.length - 1]?.value || '165';
-  const bmiVal = parsedVitals.bmi[parsedVitals.bmi.length - 1]?.value || '22.9';
-  const bpObj = parsedVitals.bloodPressure[parsedVitals.bloodPressure.length - 1];
-  const bpStr = bpObj ? `${bpObj.systolic ?? 120}/${bpObj.diastolic ?? 80}` : '120/80';
-  const spo2Val = parsedVitals.oxygenSaturation[parsedVitals.oxygenSaturation.length - 1]?.value || '98';
-  const tempVal = parsedVitals.temperature[parsedVitals.temperature.length - 1]?.value || '36.6';
+  const lastWeight = parsedVitals.weight[parsedVitals.weight.length - 1]?.value;
+  const lastHeight = parsedVitals.height[parsedVitals.height.length - 1]?.value;
+  const lastBp = parsedVitals.bloodPressure[parsedVitals.bloodPressure.length - 1];
+  const lastSpo2 = parsedVitals.oxygenSaturation[parsedVitals.oxygenSaturation.length - 1]?.value;
+  const lastTemp = parsedVitals.temperature[parsedVitals.temperature.length - 1]?.value;
+
+  const weightVal = vitalsDraft.weight;
+  const heightVal = vitalsDraft.height;
+  const bmiVal = computeBmi(vitalsDraft.weight, vitalsDraft.height);
+  const bmiStyle = bmiCategory(bmiVal);
+  const bpStr = [vitalsDraft.systolic, vitalsDraft.diastolic].every((v) => String(v).trim())
+    ? `${vitalsDraft.systolic}/${vitalsDraft.diastolic}`
+    : '';
+  const spo2Val = vitalsDraft.spo2;
+  const tempVal = vitalsDraft.temp;
+  const hasVitalsContent = Object.values(vitalsDraft).some((v) => String(v).trim() !== '');
+
+  const handleVitalChange = (field) => (e) => {
+    const value = e.target.value.replace(',', '.');
+    setVitalsDraft((prev) => ({ ...prev, [field]: value }));
+  };
 
   // Handle Diagnosis tag remove
   const handleRemoveDiagnosis = (code) => {
@@ -292,6 +357,7 @@ export default function ConsultationPage({ addToast }) {
       diagnoses,
       assessmentText,
       plan,
+      vitals: vitalsDraft,
       secondsElapsed
     };
     saveConsultationDraft(selectedPatientId, draftData);
@@ -309,6 +375,7 @@ export default function ConsultationPage({ addToast }) {
     setDiagnosisInput('');
     setAssessmentText('');
     setPlan('');
+    setVitalsDraft({ ...EMPTY_VITALS });
     setSecondsElapsed(0);
     setLastDraftSavedAt(null);
     if (selectedPatientId) {
@@ -357,16 +424,16 @@ export default function ConsultationPage({ addToast }) {
         })),
         vitals: {
           bloodPressure: bpStr,
-          heartRate: '72',
+          heartRate: '',
           temperature: tempVal,
-          respiratoryRate: '16',
+          respiratoryRate: '',
           oxygenSaturation: spo2Val,
           weight: weightVal,
           height: heightVal,
           bmi: bmiVal
         }
       };
-      const hasClinicalContent = hasSoapContent(clinicalNote);
+      const hasClinicalContent = hasSoapContent(clinicalNote) || hasVitalsContent;
 
       let fhirEncounter = null;
       if (selectedPatientId && hasClinicalContent) {
@@ -382,6 +449,69 @@ export default function ConsultationPage({ addToast }) {
           console.warn(err);
           return null;
         });
+      }
+
+      const encounterId = fhirEncounter?.id || null;
+      if (selectedPatientId && hasVitalsContent) {
+        const vitalPosts = [
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.WEIGHT,
+            display: 'Body weight',
+            value: vitalsDraft.weight,
+            unit: 'kg',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.HEIGHT,
+            display: 'Body height',
+            value: vitalsDraft.height,
+            unit: 'cm',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.BMI,
+            display: 'Body mass index',
+            value: bmiVal,
+            unit: 'kg/m2',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.BP_SYSTOLIC,
+            display: 'Systolic blood pressure',
+            value: vitalsDraft.systolic,
+            unit: 'mmHg',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.BP_DIASTOLIC,
+            display: 'Diastolic blood pressure',
+            value: vitalsDraft.diastolic,
+            unit: 'mmHg',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.OXYGEN_SATURATION,
+            display: 'Oxygen saturation',
+            value: vitalsDraft.spo2,
+            unit: '%',
+            encounterId
+          }),
+          createVitalObservation({
+            patientId: selectedPatientId,
+            loinc: LOINC_CODES.TEMPERATURE,
+            display: 'Body temperature',
+            value: vitalsDraft.temp,
+            unit: 'Cel',
+            encounterId
+          })
+        ];
+        await Promise.allSettled(vitalPosts);
       }
 
       // Save complete clinical note to past encounters history and FHIR DocumentReference
@@ -400,9 +530,9 @@ export default function ConsultationPage({ addToast }) {
         summary: assessmentText || subjective.slice(0, 100),
         vitals: {
           bloodPressure: bpStr,
-          heartRate: '72',
+          heartRate: '',
           temperature: tempVal,
-          respiratoryRate: '16',
+          respiratoryRate: '',
           oxygenSaturation: spo2Val,
           weight: weightVal,
           height: heightVal,
@@ -880,25 +1010,62 @@ export default function ConsultationPage({ addToast }) {
               {/* Peso / Talla */}
               <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>PESO / TALLA</div>
-                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-                  {weightVal} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>kg /</span> {heightVal} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>cm</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.15rem', marginTop: '0.2rem' }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="Peso en kg"
+                    value={vitalsDraft.weight}
+                    onChange={handleVitalChange('weight')}
+                    placeholder={lastWeight != null ? String(lastWeight) : '—'}
+                    style={VITAL_INPUT_STYLE}
+                  />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>kg /</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="Talla en cm"
+                    value={vitalsDraft.height}
+                    onChange={handleVitalChange('height')}
+                    placeholder={lastHeight != null ? String(lastHeight) : '—'}
+                    style={VITAL_INPUT_STYLE}
+                  />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>cm</span>
                 </div>
               </div>
 
               {/* IMC */}
-              <div style={{ padding: '0.75rem', backgroundColor: '#ecfdf5', borderRadius: '0.625rem', border: '1px solid #a7f3d0', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.68rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase' }}>IMC</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#059669', marginTop: '0.1rem' }}>
-                  {bmiVal}
+              <div style={{ padding: '0.75rem', backgroundColor: bmiStyle.bg, borderRadius: '0.625rem', border: `1px solid ${bmiStyle.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: '0.68rem', color: bmiStyle.color, fontWeight: 700, textTransform: 'uppercase' }}>IMC</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: bmiStyle.color, marginTop: '0.1rem' }}>
+                  {bmiVal || '—'}
                 </div>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>NORMAL</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: bmiStyle.color, textTransform: 'uppercase' }}>{bmiStyle.label}</span>
               </div>
 
               {/* Presión Arterial */}
               <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>PRESIÓN A.</div>
-                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-                  {bpStr}
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.1rem', marginTop: '0.2rem' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Presión sistólica"
+                    value={vitalsDraft.systolic}
+                    onChange={handleVitalChange('systolic')}
+                    placeholder={lastBp?.systolic != null ? String(lastBp.systolic) : '—'}
+                    style={{ ...VITAL_INPUT_STYLE, width: '2.6rem' }}
+                  />
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#64748b' }}>/</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Presión diastólica"
+                    value={vitalsDraft.diastolic}
+                    onChange={handleVitalChange('diastolic')}
+                    placeholder={lastBp?.diastolic != null ? String(lastBp.diastolic) : '—'}
+                    style={{ ...VITAL_INPUT_STYLE, width: '2.6rem' }}
+                  />
                 </div>
                 <span style={{ fontSize: '0.65rem', color: '#64748b' }}>mmHg</span>
               </div>
@@ -906,8 +1073,28 @@ export default function ConsultationPage({ addToast }) {
               {/* SpO2 / Temp */}
               <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>SPO2 / TEMP</div>
-                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-                  {spo2Val}% <span style={{ fontSize: '0.75rem', color: '#64748b' }}>/</span> {tempVal}°
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.1rem', marginTop: '0.2rem' }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="Saturación de oxígeno"
+                    value={vitalsDraft.spo2}
+                    onChange={handleVitalChange('spo2')}
+                    placeholder={lastSpo2 != null ? String(lastSpo2) : '—'}
+                    style={{ ...VITAL_INPUT_STYLE, width: '2.4rem' }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>%</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>/</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="Temperatura"
+                    value={vitalsDraft.temp}
+                    onChange={handleVitalChange('temp')}
+                    placeholder={lastTemp != null ? String(lastTemp) : '—'}
+                    style={{ ...VITAL_INPUT_STYLE, width: '2.6rem' }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>°</span>
                 </div>
               </div>
             </div>

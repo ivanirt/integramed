@@ -771,6 +771,71 @@ export async function createLabObservation({
   return await response.json();
 }
 
+export async function createVitalObservation({
+  patientId,
+  loinc,
+  display,
+  value,
+  unit,
+  encounterId
+}) {
+  if (!patientId || value === '' || value == null) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+
+  const observationResource = {
+    resourceType: 'Observation',
+    status: 'final',
+    category: [
+      {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+            code: 'vital-signs',
+            display: 'Vital Signs'
+          }
+        ]
+      }
+    ],
+    code: {
+      coding: [
+        {
+          system: 'http://loinc.org',
+          code: loinc,
+          display
+        }
+      ],
+      text: display
+    },
+    subject: { reference: `Patient/${patientId}` },
+    effectiveDateTime: new Date().toISOString(),
+    valueQuantity: {
+      value: numeric,
+      unit,
+      system: 'http://unitsofmeasure.org',
+      code: unit
+    },
+    ...(encounterId
+      ? { encounter: { reference: `Encounter/${encounterId}` } }
+      : {})
+  };
+
+  const response = await fetch(`${API_BASE}/fhir/Observation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/fhir+json',
+      Accept: 'application/fhir+json, application/json'
+    },
+    body: JSON.stringify(observationResource)
+  });
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response);
+  }
+
+  return await response.json();
+}
+
 export const INTEGRAMED_SERVICE_SYSTEM = 'https://integramed.app/fhir/catalog/healthcare-service';
 export const INTEGRAMED_MEDICATION_SYSTEM = 'https://integramed.app/fhir/catalog/medication';
 export const INTEGRAMED_SOAP_NOTE_TYPE = 'integramed-soap-note';

@@ -2,12 +2,35 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import tls from 'node:tls';
 import { fileURLToPath } from 'url';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+function applySystemCaStore() {
+  try {
+    if (typeof tls.setDefaultCACertificates === 'function' && typeof tls.getCACertificates === 'function') {
+      tls.setDefaultCACertificates([
+        ...tls.getCACertificates('default'),
+        ...tls.getCACertificates('system')
+      ]);
+      console.log('[FHIR Proxy] TLS: using Node default CAs plus the OS certificate store');
+    }
+  } catch (err) {
+    console.warn('[FHIR Proxy] Could not load OS certificate store:', err.message);
+  }
+}
+
+applySystemCaStore();
+
+function describeFetchError(err) {
+  const cause = err?.cause;
+  const parts = [err?.message, cause?.code, cause?.message].filter(Boolean);
+  return [...new Set(parts)].join(' — ');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,7 +76,8 @@ app.get('/api/health', async (req, res) => {
       }
     } catch (err) {
       liveStatus = 'unreachable';
-      message = err.message || 'Failed to reach FHIR Server';
+      message = describeFetchError(err) || 'Failed to reach FHIR Server';
+      console.error('[FHIR Proxy] Health check failed:', message);
     }
   } else {
     message = 'FHIR Base URL or Bearer Token missing in environment';
@@ -146,7 +170,7 @@ app.all('/api/fhir/*', async (req, res) => {
       res.send(responseData);
     }
   } catch (error) {
-    console.error(`[FHIR Proxy Error] ${req.method} ${targetUrl}:`, error);
+    console.error(`[FHIR Proxy Error] ${req.method} ${targetUrl}:`, describeFetchError(error), error);
     res.status(502).json({
       resourceType: 'OperationOutcome',
       issue: [{

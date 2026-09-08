@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev:server": "node server/index.js",
+    "dev:server": "node --use-system-ca server/index.js",
     "dev:client": "vite",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "vite build",
-    "start": "node server/index.js"
+    "start": "node --use-system-ca server/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

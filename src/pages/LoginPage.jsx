@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Mail,
@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { CLINICAL_ROLES, getStaffFullName } from '../utils/staffStorage';
+import { checkProxyHealth } from '../services/fhirApi';
 
 export default function LoginPage({ addToast }) {
   const navigate = useNavigate();
@@ -40,6 +41,13 @@ export default function LoginPage({ addToast }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [fhirHealth, setFhirHealth] = useState({ status: 'checking', message: '' });
+
+  useEffect(() => {
+    checkProxyHealth()
+      .then(info => setFhirHealth(info))
+      .catch(err => setFhirHealth({ status: 'unreachable', message: err.message }));
+  }, []);
 
   // Role icon helper
   const renderRoleIcon = (roleId, size = 16) => {
@@ -256,7 +264,7 @@ export default function LoginPage({ addToast }) {
               : 'Plataforma clínica para médicos, terapeutas, enfermería y recepción con asistencia basada en evidencia.'}
           </p>
 
-          {/* Server Connection Status (Parte inferior de la pantalla) */}
+          {/* Server Connection Status */}
           <div
             style={{
               display: 'inline-flex',
@@ -275,12 +283,22 @@ export default function LoginPage({ addToast }) {
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                backgroundColor: '#10b981',
-                boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.3)'
+                backgroundColor: fhirHealth.status === 'connected'
+                  ? '#10b981'
+                  : fhirHealth.status === 'checking'
+                    ? '#fbbf24'
+                    : '#f87171',
+                boxShadow: fhirHealth.status === 'connected'
+                  ? '0 0 0 3px rgba(16, 185, 129, 0.3)'
+                  : '0 0 0 3px rgba(248, 113, 113, 0.25)'
               }}
             />
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#ffffff', letterSpacing: '0.01em' }}>
-              {language === 'en' ? 'FHIR R4 Server Connected' : 'Servidor FHIR R4 Conectado'}
+              {fhirHealth.status === 'connected'
+                ? (language === 'en' ? 'FHIR R4 Server Connected' : 'Servidor FHIR R4 Conectado')
+                : fhirHealth.status === 'checking'
+                  ? (language === 'en' ? 'Checking FHIR server…' : 'Verificando servidor FHIR…')
+                  : (language === 'en' ? 'FHIR server unreachable' : 'Servidor FHIR no disponible')}
             </span>
           </div>
         </div>

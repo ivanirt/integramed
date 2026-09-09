@@ -52,7 +52,7 @@ import { isTerminalAppointmentStatus, pickActiveAppointment, decorateAppointment
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
 import { parseVitalObservations, LOINC_CODES } from '../utils/vitalsParser';
 import { hasSoapContent } from '../utils/clinicalContent';
-import { getStaffAiSecrets } from '../utils/integrativeMedicine';
+import { getStaffAiSecrets, resolveSearchModalities, modalitySpecsFromIds } from '../utils/integrativeMedicine';
 import { consultClinicalAi } from '../services/aiApi';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -385,7 +385,7 @@ export default function ConsultationPage({ addToast }) {
     try {
       const result = await consultClinicalAi({
         diagnosis: diagnoses.length ? diagnoses : diagnosisQuery,
-        modalities: currentUser?.integrativeModalities || [],
+        modalities: modalitySpecsFromIds(resolveSearchModalities(currentUser?.integrativeModalities)),
         question,
         apiKey: aiSecrets.aiApiKey,
         baseUrl: currentUser?.aiBaseUrl || aiSecrets.aiBaseUrl,

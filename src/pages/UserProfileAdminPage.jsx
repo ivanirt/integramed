@@ -47,7 +47,7 @@ import {
   getStaffFullName,
   getStaffList
 } from '../utils/staffStorage';
-import { INTEGRATIVE_MODALITIES, getStaffAiSecrets, saveStaffAiSecrets } from '../utils/integrativeMedicine';
+import { INTEGRATIVE_MODALITIES, getStaffAiSecrets, saveStaffAiSecrets, getEnabledClinicModalityIds } from '../utils/integrativeMedicine';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -1209,7 +1209,8 @@ export default function UserProfileAdminPage({ addToast }) {
                         : 'La IA busca notas del vault. Si eliges modalidades, filtra por esas etiquetas (p. ej. mtc). Si no eliges ninguna, busca en todo el vault.'}
                     </p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      {INTEGRATIVE_MODALITIES.map((mod) => {
+                      {INTEGRATIVE_MODALITIES.filter((mod) => getEnabledClinicModalityIds().includes(mod.id)
+                        || (profileForm.integrativeModalities || []).includes(mod.id)).map((mod) => {
                         const selected = (profileForm.integrativeModalities || []).includes(mod.id);
                         return (
                           <button

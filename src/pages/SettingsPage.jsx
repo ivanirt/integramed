@@ -69,6 +69,12 @@ import {
   setMenuCapabilityVisible,
   MENU_CAPABILITY_ITEMS
 } from '../utils/menuCapabilitiesStorage';
+import {
+  getClinicIntegrativeModalities,
+  setClinicIntegrativeModalityEnabled,
+  CLINIC_SEARCH_MODALITIES,
+  INTEGRATIVE_MODALITIES
+} from '../utils/integrativeMedicine';
 
 export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, defaultTab }) {
   const { t, locale, language } = useLanguage();
@@ -88,6 +94,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [menuCapabilities, setMenuCapabilities] = useState(() => getMenuCapabilities());
+  const [clinicModalities, setClinicModalities] = useState(() => getClinicIntegrativeModalities());
 
   useEffect(() => {
     try {
@@ -2034,6 +2041,97 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                         position: 'absolute',
                         top: '3px',
                         left: visible ? '23px' : '3px',
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.25)',
+                        transition: 'left 0.15s ease'
+                      }}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
+              {t('integrativeMedicineGroupTitle')}
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '640px', lineHeight: 1.5 }}>
+              {t('integrativeMedicineGroupSubtitle')}
+            </p>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.875rem',
+              overflow: 'hidden',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+            }}
+          >
+            {CLINIC_SEARCH_MODALITIES.map((id, idx) => {
+              const mod = INTEGRATIVE_MODALITIES.find((item) => item.id === id);
+              if (!mod) return null;
+              const enabled = clinicModalities[id] !== false;
+              const aliases = (mod.aliases || []).join(', ');
+              return (
+                <div
+                  key={id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.95rem 1.25rem',
+                    borderBottom: idx === CLINIC_SEARCH_MODALITIES.length - 1 ? 'none' : '1px solid #f1f5f9'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
+                      {language === 'en' ? mod.labelEn : mod.labelEs}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
+                      {aliases}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    onClick={() => {
+                      const next = setClinicIntegrativeModalityEnabled(id, !enabled);
+                      setClinicModalities(next);
+                      if (addToast) {
+                        addToast(
+                          'success',
+                          t('integrativeMedicineSavedToast'),
+                          language === 'en' ? mod.labelEn : mod.labelEs
+                        );
+                      }
+                    }}
+                    style={{
+                      width: '48px',
+                      height: '28px',
+                      borderRadius: '9999px',
+                      border: 'none',
+                      backgroundColor: enabled ? '#0f766e' : '#cbd5e1',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'background-color 0.15s ease'
+                    }}
+                    title={enabled ? t('menuCapabilityVisible') : t('menuCapabilityHidden')}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: enabled ? '23px' : '3px',
                         width: '22px',
                         height: '22px',
                         borderRadius: '50%',

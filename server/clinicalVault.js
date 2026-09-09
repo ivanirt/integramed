@@ -80,6 +80,8 @@ const MODALITY_ALIASES = {
   acupuncture: ['acupuncture', 'acupuntura', 'mtc', 'tcm'],
   stem_cells: ['stem_cells', 'celulas_madre', 'stem-cells'],
   homeopathy: ['homeopathy', 'homeopatia'],
+  iridology: ['iridology', 'iridologia'],
+  biodescodification: ['biodescodification', 'biodescodificacion', 'biodecoding', 'biodecodificacion'],
   ayurveda: ['ayurveda'],
   functional: ['functional', 'medicina_funcional']
 };

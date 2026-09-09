@@ -24,6 +24,18 @@ export const INTEGRATIVE_MODALITIES = [
     aliases: ['homeopathy', 'homeopatia']
   },
   {
+    id: 'iridology',
+    labelEs: 'Iridología',
+    labelEn: 'Iridology',
+    aliases: ['iridology', 'iridologia']
+  },
+  {
+    id: 'biodescodification',
+    labelEs: 'Biodescodificación',
+    labelEn: 'Biodescodification',
+    aliases: ['biodescodification', 'biodescodificacion', 'biodecoding', 'biodecodificacion']
+  },
+  {
     id: 'ayurveda',
     labelEs: 'Ayurveda',
     labelEn: 'Ayurveda',
@@ -36,6 +48,63 @@ export const INTEGRATIVE_MODALITIES = [
     aliases: ['functional', 'medicina_funcional']
   }
 ];
+
+export const CLINIC_SEARCH_MODALITIES = [
+  'tcm',
+  'homeopathy',
+  'stem_cells',
+  'iridology',
+  'biodescodification'
+];
+
+const CLINIC_MODALITIES_KEY = 'integramed_clinic_integrative_modalities';
+export const CLINIC_MODALITIES_EVENT = 'integramed_clinic_modalities_updated';
+
+function defaultClinicModalities() {
+  return CLINIC_SEARCH_MODALITIES.reduce((acc, id) => {
+    acc[id] = true;
+    return acc;
+  }, {});
+}
+
+export function getClinicIntegrativeModalities() {
+  try {
+    const raw = localStorage.getItem(CLINIC_MODALITIES_KEY);
+    if (!raw) return defaultClinicModalities();
+    return { ...defaultClinicModalities(), ...JSON.parse(raw) };
+  } catch {
+    return defaultClinicModalities();
+  }
+}
+
+export function isClinicIntegrativeModalityEnabled(id) {
+  return getClinicIntegrativeModalities()[id] !== false;
+}
+
+export function saveClinicIntegrativeModalities(next) {
+  const merged = { ...defaultClinicModalities(), ...next };
+  localStorage.setItem(CLINIC_MODALITIES_KEY, JSON.stringify(merged));
+  window.dispatchEvent(new Event(CLINIC_MODALITIES_EVENT));
+  return merged;
+}
+
+export function setClinicIntegrativeModalityEnabled(id, enabled) {
+  const current = getClinicIntegrativeModalities();
+  return saveClinicIntegrativeModalities({ ...current, [id]: Boolean(enabled) });
+}
+
+export function getEnabledClinicModalityIds() {
+  const flags = getClinicIntegrativeModalities();
+  return CLINIC_SEARCH_MODALITIES.filter((id) => flags[id] !== false);
+}
+
+export function resolveSearchModalities(doctorModalityIds) {
+  const clinicEnabled = getEnabledClinicModalityIds();
+  const doctorSelected = Array.isArray(doctorModalityIds)
+    ? doctorModalityIds.filter((id) => clinicEnabled.includes(id))
+    : [];
+  return doctorSelected.length > 0 ? doctorSelected : clinicEnabled;
+}
 
 const AI_SECRETS_KEY = 'integramed_ai_secrets';
 

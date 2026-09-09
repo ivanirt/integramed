@@ -9,7 +9,6 @@ import {
   FileText,
   CheckCircle2,
   ChevronDown,
-  Sparkles,
   Stethoscope,
   Activity,
   Plus,
@@ -1275,106 +1274,11 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
               </span>
             </div>
           </div>
-
-          {/* 2. SUGERENCIAS AI WIDGET (Directly matching attached mockup with sparkling AI header) */}
-          <div
-            style={{
-              backgroundColor: '#f0fdfa',
-              borderRadius: '0.875rem',
-              border: '1px solid #ccfbf1',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.05)'
-            }}
-          >
-            {/* AI Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <span>Sugerencias AI</span>
-              </h3>
-              <Sparkles size={18} color="#0d9488" />
-            </div>
-
-            {/* AI Suggestion Card 1 (Revisión sugerida con botón Ver historial) */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '0.75rem',
-                border: '1px solid #e2e8f0',
-                padding: '0.85rem 1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}
-            >
-              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45 }}>
-                <strong style={{ color: '#0f766e' }}>Revisión sugerida:</strong> Carlos Mendoza tiene niveles altos de presión en sus últimos 3 controles. Considere ajustar dosis medicación.
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => handleOpenAiHistory('carlos-mendoza', 'Carlos Mendoza Ruiz')}
-                  className="btn btn-secondary btn-sm"
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '0.25rem 0.65rem',
-                    fontWeight: 700,
-                    color: '#0f766e',
-                    borderColor: '#a7f3d0'
-                  }}
-                >
-                  <Eye size={12} />
-                  <span>Ver historial</span>
-                </button>
-              </div>
-            </div>
-
-            {/* AI Suggestion Card 2 (Hueco de agenda con botón de acción) */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '0.75rem',
-                border: '1px solid #e2e8f0',
-                padding: '0.85rem 1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}
-            >
-              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45 }}>
-                Tienes un hueco de 45 min a las 11:30 AM. ¿Deseas adelantar la cita de Roberto Silva?
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (addToast) addToast('success', 'Se ha notificado a recepción para confirmar con Roberto Silva', 'Agenda AI');
-                  }}
-                  className="btn btn-secondary btn-sm"
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '0.25rem 0.65rem',
-                    fontWeight: 700,
-                    color: '#0284c7',
-                    borderColor: '#bae6fd'
-                  }}
-                >
-                  <span>Adelantar cita</span>
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* =========================================================================
-          PREVIOUS ENCOUNTER REVIEW MODAL (Triggered by AI "Ver historial" button)
+          PREVIOUS ENCOUNTER REVIEW MODAL (from agenda "Ver historial")
           ========================================================================= */}
       <PreviousEncounterReviewModal
         isOpen={isAiReviewModalOpen}

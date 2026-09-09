@@ -19,9 +19,10 @@ export function LanguageProvider({ children }) {
   });
 
   const setLanguage = (lang) => {
-    setLanguageState(lang);
+    const next = lang === 'en' ? 'en' : 'es';
+    setLanguageState(next);
     try {
-      localStorage.setItem('integramed_lang', lang);
+      localStorage.setItem('integramed_lang', next);
     } catch {
       // ignore
     }

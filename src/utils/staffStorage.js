@@ -680,8 +680,8 @@ export function getStaffList() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map(item => ({
-          preferredLanguage: item.preferredLanguage || 'es',
-          ...item
+          ...item,
+          preferredLanguage: item.preferredLanguage === 'en' ? 'en' : 'es'
         }));
       }
     }
@@ -866,6 +866,9 @@ export async function loadStaffFromFhir() {
     return {
       ...remoteItem,
       password: remoteItem.password || local?.password || 'IntegraMed27',
+      preferredLanguage: (local?.preferredLanguage === 'en' || local?.preferredLanguage === 'es')
+        ? local.preferredLanguage
+        : (remoteItem.preferredLanguage === 'en' ? 'en' : 'es'),
       aiApiKey: local?.aiApiKey || '',
       aiBaseUrl: remoteItem.aiBaseUrl || local?.aiBaseUrl,
       aiModel: remoteItem.aiModel || local?.aiModel

@@ -71,7 +71,14 @@ export function AuthProvider({ children }) {
     loadStaffFromFhir()
       .then((list) => {
         setStaffList(list);
-        setCurrentUser((prev) => list.find((s) => s.id === prev?.id || s.email === prev?.email) || list[0] || prev);
+        setCurrentUser((prev) => {
+          const match = list.find((s) => s.id === prev?.id || s.email === prev?.email) || list[0] || prev;
+          if (!match) return prev;
+          return {
+            ...match,
+            preferredLanguage: match.preferredLanguage === 'en' || prev?.preferredLanguage === 'en' ? 'en' : (match.preferredLanguage || prev?.preferredLanguage || 'es')
+          };
+        });
       })
       .catch(() => {});
   }, []);
@@ -83,12 +90,14 @@ export function AuthProvider({ children }) {
     }
   }, [currentUser, activeRole]);
 
-  // Keep application language synchronized with currentUser's preferred language
+  // Apply the logged-in user's language only (do not use the default staff record while logged out)
   useEffect(() => {
-    if (currentUser?.preferredLanguage && currentUser.preferredLanguage !== language) {
-      setLanguage(currentUser.preferredLanguage);
+    if (!isAuthenticated || !currentUser) return;
+    const preferred = currentUser.preferredLanguage === 'en' ? 'en' : 'es';
+    if (preferred !== language) {
+      setLanguage(preferred);
     }
-  }, [currentUser?.id, currentUser?.preferredLanguage]);
+  }, [isAuthenticated, currentUser?.id, currentUser?.preferredLanguage, language, setLanguage]);
 
   // Method to update preferred language directly on current user profile
   const updateUserLanguage = (newLang) => {
@@ -108,7 +117,7 @@ export function AuthProvider({ children }) {
     const currentDirectory = getStaffList();
     
     // Find staff member
-    const user = currentDirectory.find(s => 
+    let user = currentDirectory.find(s => 
       s.email?.toLowerCase() === trimmed ||
       (s.secondaryEmail && s.secondaryEmail.toLowerCase() === trimmed) ||
       s.id === emailOrId
@@ -133,8 +142,14 @@ export function AuthProvider({ children }) {
     setActiveRole(chosenRole);
     setIsAuthenticated(true);
 
-    if (user.preferredLanguage) {
-      setLanguage(user.preferredLanguage);
+    const preferred = user.preferredLanguage === 'en' || user.preferredLanguage === 'es'
+      ? user.preferredLanguage
+      : language;
+    setLanguage(preferred);
+    if (user.preferredLanguage !== preferred) {
+      updateStaffLanguage(user.id, preferred);
+      user = { ...user, preferredLanguage: preferred };
+      setCurrentUser(user);
     }
 
     if (rememberMe) {
@@ -176,9 +191,7 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       setActiveRole(role);
       setIsAuthenticated(true);
-      if (user.preferredLanguage) {
-        setLanguage(user.preferredLanguage);
-      }
+      setLanguage(user.preferredLanguage === 'en' ? 'en' : 'es');
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
       localStorage.setItem(STORAGE_KEY_ROLE, role);
       localStorage.setItem(STORAGE_KEY_IS_AUTH, 'true');

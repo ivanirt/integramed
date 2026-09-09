@@ -789,6 +789,74 @@ export default function UserProfileAdminPage({ addToast }) {
           {/* Columna Izquierda: Datos Personales, Clínicos y Preferencias */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', gridColumn: 'span 2' }}>
             <form onSubmit={handleSaveMyProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '0.875rem',
+                  border: '1px solid #e2e8f0',
+                  padding: '1.5rem',
+                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+                  <Globe size={18} color="#0f766e" />
+                  <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    {language === 'en' ? 'Language' : 'Idioma'}
+                  </h2>
+                </div>
+                <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0 0 0.85rem', lineHeight: 1.45 }}>
+                  {language === 'en'
+                    ? 'This language is saved on your user profile and applied every time you sign in.'
+                    : 'Este idioma se guarda en tu perfil y se aplica cada vez que inicias sesión.'}
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', maxWidth: '420px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange('es')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      padding: '0.7rem 1rem',
+                      borderRadius: '0.6rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 700,
+                      border: profileForm.preferredLanguage === 'es' ? '2px solid #0f766e' : '1px solid #e2e8f0',
+                      backgroundColor: profileForm.preferredLanguage === 'es' ? '#ecfdf5' : '#ffffff',
+                      color: profileForm.preferredLanguage === 'es' ? '#065f46' : '#64748b',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>🇲🇽</span>
+                    <span>Español</span>
+                    {profileForm.preferredLanguage === 'es' && <Check size={16} color="#0f766e" strokeWidth={3} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange('en')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      padding: '0.7rem 1rem',
+                      borderRadius: '0.6rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 700,
+                      border: profileForm.preferredLanguage === 'en' ? '2px solid #0f766e' : '1px solid #e2e8f0',
+                      backgroundColor: profileForm.preferredLanguage === 'en' ? '#ecfdf5' : '#ffffff',
+                      color: profileForm.preferredLanguage === 'en' ? '#065f46' : '#64748b',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>🇺🇸</span>
+                    <span>English</span>
+                    {profileForm.preferredLanguage === 'en' && <Check size={16} color="#0f766e" strokeWidth={3} />}
+                  </button>
+                </div>
+              </div>
               
               {/* Sección 1: Datos Personales & Contacto */}
               <div

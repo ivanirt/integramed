@@ -14,7 +14,8 @@ tags: [mtc, tcm]
 ---
 ```
 
-- `tags`: deben cruzarse con las modalidades del doctor (`mtc` / `tcm`, `acupuntura`, `stem_cells`, etc.) o incluir `general`.
+- `tags`: deben cruzarse con las modalidades del doctor (`mtc` / `tcm`, `homeopathy` / `homeopatia`, `stem_cells`, etc.) o incluir `general`.
+- Materia médica de Boericke: `vault/homeopathy/boericke/` (se indexa automáticamente como homeopatía).
 - El título o `condition` ayudan a localizar la nota cuando el diagnóstico coincide.
 
 Las notas de este directorio son material de apoyo educativo. No sustituyen el criterio clínico.

@@ -53,6 +53,7 @@ function walkMarkdownFiles(dir, acc = []) {
       return;
     }
     if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
+      if (entry.name.startsWith('_')) return;
       acc.push(full);
     }
   });
@@ -75,11 +76,32 @@ function noteTags(meta) {
   return [];
 }
 
+function inferPathTags(relativePath) {
+  const p = String(relativePath || '').replace(/\\/g, '/').toLowerCase();
+  const tags = [];
+  if (p.includes('boericke') || p.includes('homeopath') || p.includes('homeopat')) {
+    tags.push('homeopathy', 'homeopatia', 'boericke');
+  }
+  return tags;
+}
+
+function yamlSearchText(meta = {}) {
+  const parts = [];
+  ['name', 'common', 'abbreviation', 'title', 'description', 'condition', 'dose_boericke'].forEach((key) => {
+    if (meta[key]) parts.push(String(meta[key]));
+  });
+  ['sphere', 'modalities_worse', 'modalities_better', 'compare', 'complementary', 'antidotes', 'tags'].forEach((key) => {
+    const value = meta[key];
+    if (Array.isArray(value)) parts.push(value.join(' '));
+  });
+  return parts.join('\n');
+}
+
 const MODALITY_ALIASES = {
   tcm: ['tcm', 'mtc'],
   acupuncture: ['acupuncture', 'acupuntura', 'mtc', 'tcm'],
   stem_cells: ['stem_cells', 'celulas_madre', 'stem-cells'],
-  homeopathy: ['homeopathy', 'homeopatia'],
+  homeopathy: ['homeopathy', 'homeopatia', 'boericke', 'homoeopathic', 'materia_medica'],
   iridology: ['iridology', 'iridologia'],
   biodescodification: ['biodescodification', 'biodescodificacion', 'biodecoding', 'biodecodificacion'],
   ayurveda: ['ayurveda'],
@@ -110,14 +132,15 @@ export function loadVaultNotes(vaultPath) {
     const raw = fs.readFileSync(filePath, 'utf8');
     const { meta, body } = parseFrontmatter(raw);
     const relative = path.relative(vaultPath, filePath).replace(/\\/g, '/');
-    const title = meta.title || body.match(/^#\s+(.+)$/m)?.[1] || relative;
+    const title = meta.title || meta.name || body.match(/^#\s+(.+)$/m)?.[1] || relative;
+    const tags = [...new Set([...noteTags(meta), ...inferPathTags(relative)])];
     return {
       file: relative,
       title,
-      condition: meta.condition || '',
-      tags: noteTags(meta),
+      condition: meta.condition || meta.common || '',
+      tags,
       body,
-      text: `${title}\n${meta.description || ''}\n${meta.condition || ''}\n${body}`
+      text: `${title}\n${yamlSearchText(meta)}\n${body}`
     };
   });
 }
@@ -135,10 +158,28 @@ export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5) {
     const titleBoost = tokenize(`${note.title} ${note.condition}`).some((t) => queryTokens.includes(t)) ? 3 : 0;
     return { ...note, score: overlap + titleBoost };
   });
-  return scored
+  const ranked = scored
     .filter((note) => note.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+  if (ranked.length > 0) return ranked;
+
+  const fallback = filtered
+    .slice()
+    .sort((a, b) => {
+      const rank = (file) => {
+        const f = file.toLowerCase();
+        if (f.includes('keynotes')) return 0;
+        if (f.includes('playbook')) return 1;
+        if (f.includes('by-system')) return 2;
+        if (f.includes('/remedies/')) return 3;
+        return 4;
+      };
+      return rank(a.file) - rank(b.file);
+    })
+    .slice(0, limit)
+    .map((note) => ({ ...note, score: 1 }));
+  return fallback;
 }
 
 export function excerptForPrompt(note, maxChars = 1800) {

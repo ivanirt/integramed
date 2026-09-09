@@ -21,7 +21,7 @@ export const INTEGRATIVE_MODALITIES = [
     id: 'homeopathy',
     labelEs: 'Homeopatía',
     labelEn: 'Homeopathy',
-    aliases: ['homeopathy', 'homeopatia']
+    aliases: ['homeopathy', 'homeopatia', 'boericke', 'homoeopathic', 'materia_medica']
   },
   {
     id: 'iridology',

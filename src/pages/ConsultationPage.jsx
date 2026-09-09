@@ -199,6 +199,9 @@ export default function ConsultationPage({ addToast }) {
   const navigate = useNavigate();
   const { t, locale, language } = useLanguage();
   const { currentUser } = useAuth();
+  const doctorLanguage = currentUser?.preferredLanguage === 'en' || currentUser?.preferredLanguage === 'es'
+    ? currentUser.preferredLanguage
+    : (language === 'en' ? 'en' : 'es');
 
   // Patients list for selector
   const [patientsList, setPatientsList] = useState([]);
@@ -513,7 +516,7 @@ export default function ConsultationPage({ addToast }) {
         apiKey: aiSecrets.aiApiKey,
         baseUrl: aiSecrets.aiBaseUrl,
         model: aiSecrets.aiModel,
-        language
+        language: doctorLanguage
       });
       setAiAnswer(result.answer || '');
       setAiSources(result.sources || []);
@@ -1347,7 +1350,7 @@ export default function ConsultationPage({ addToast }) {
                 <button
                   type="button"
                   onClick={() => handleConsultAi()}
-                  title="Buscar en el vault con el diagnóstico (código CIE o texto libre)"
+                  title={t('vaultSearchTitle')}
                   style={{
                     border: 'none',
                     background: isAiPanelOpen ? '#ccfbf1' : '#ecfdf5',
@@ -1564,25 +1567,25 @@ export default function ConsultationPage({ addToast }) {
                   <Sparkles size={18} />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                  IA del vault
+                  {t('vaultAiTitle')}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAiPanelOpen(false)}
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}
-                title="Cerrar panel"
+                title={t('vaultAiClose')}
               >
                 <X size={16} />
               </button>
             </div>
 
             <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45, margin: 0 }}>
-              Material de apoyo del vault. Verificar antes de indicar.
+              {t('vaultAiDisclaimer')}
             </p>
 
             {isAiLoading && (
-              <div style={{ fontSize: '0.8125rem', color: '#0f766e', fontWeight: 600 }}>Buscando en el vault…</div>
+              <div style={{ fontSize: '0.8125rem', color: '#0f766e', fontWeight: 600 }}>{t('vaultAiSearching')}</div>
             )}
 
             {!isAiLoading && aiAnswer && (
@@ -1593,7 +1596,7 @@ export default function ConsultationPage({ addToast }) {
 
             {!isAiLoading && aiSources.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Fuentes</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{t('vaultAiSources')}</div>
                 {aiSources.map((src) => (
                   <div key={src.file} style={{ fontSize: '0.72rem', color: '#475569', background: '#f8fafc', borderRadius: '0.5rem', padding: '0.5rem 0.65rem' }}>
                     <div style={{ fontWeight: 700, color: '#0f766e' }}>{src.title || src.file}</div>

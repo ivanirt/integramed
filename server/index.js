@@ -158,7 +158,7 @@ app.post('/api/ai/consult', async (req, res) => {
     : String(diagnosis || '');
   const freeTextDiagnosis = String(req.body?.diagnosisFreeText || '').trim();
   const diagnosisText = [codedDiagnosis, freeTextDiagnosis].filter((part) => String(part).trim()).join('\n');
-  const language = normalizeVaultLanguage(req.body?.language);
+  const language = normalizeVaultLanguage(req.body?.language || req.headers['x-ui-language']);
   const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
   const question = String(req.body?.question || '').trim();
   const modalities = req.body?.modalities || [];
@@ -198,16 +198,18 @@ app.post('/api/ai/consult', async (req, res) => {
   const systemPrompt = language === 'en'
     ? [
       'You are a clinical support assistant for a physician. You are not a prescriber.',
+      'The physician’s configured language is English. Write the ENTIRE answer in English: recommendations, explanations, headings, and caveats.',
+      'Do not switch to Spanish even if the diagnosis, ICD labels, physician question, or vault excerpts are in Spanish. Translate those ideas into English.',
       'Use ONLY the vault context. If the context has no evidence, say so clearly and do not invent treatments.',
       'Cite source files by name. This is not a medical order; the physician must verify before acting.',
-      'Answer in English.',
       'Structure: (1) what the vault says about the condition, (2) supports or approaches the notes recommend, (3) limits / not a treatment.'
     ].join(' ')
     : [
       'Eres un asistente clínico de apoyo para un médico. No eres un prescriptor.',
+      'El idioma configurado del médico es español. Escribe TODA la respuesta en español: recomendaciones, explicaciones, títulos y advertencias.',
+      'No respondas en inglés aunque el diagnóstico, las etiquetas CIE, la pregunta o los extractos del vault estén en inglés. Traduce esas ideas al español.',
       'Usa SOLO el contexto del vault. Si no hay evidencia en el contexto, dilo claramente y no inventes tratamientos.',
       'Cita los archivos de origen por nombre. No es una orden médica; el médico debe verificar antes de indicar.',
-      'Responde en español.',
       'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
     ].join(' ');
 

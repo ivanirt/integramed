@@ -17,7 +17,8 @@ export async function consultClinicalAi({
       Accept: 'application/json',
       'x-ai-key': apiKey || '',
       'x-ai-base-url': baseUrl || 'https://openrouter.ai/api/v1',
-      'x-ai-model': model || 'openai/gpt-4o'
+      'x-ai-model': model || 'openai/gpt-4o',
+      'x-ui-language': language === 'en' ? 'en' : 'es'
     },
     body: JSON.stringify({
       diagnosis,

@@ -25,11 +25,21 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { CLINICAL_ROLES, getStaffFullName } from '../../utils/staffStorage';
+import {
+  getMenuCapabilities,
+  MENU_CAPABILITIES_EVENT
+} from '../../utils/menuCapabilitiesStorage';
 
 export default function Sidebar({ onOpenSettings }) {
   const { language, t } = useLanguage();
   const { currentUser, activeRole } = useAuth();
-  const location = useLocation();
+  const [menuCaps, setMenuCaps] = useState(() => getMenuCapabilities());
+
+  useEffect(() => {
+    const refresh = () => setMenuCaps(getMenuCapabilities());
+    window.addEventListener(MENU_CAPABILITIES_EVENT, refresh);
+    return () => window.removeEventListener(MENU_CAPABILITIES_EVENT, refresh);
+  }, []);
 
   // Sidebar collapsed state (defaults to true for icon-only mode)
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -54,15 +64,15 @@ export default function Sidebar({ onOpenSettings }) {
   };
 
   const navItems = [
-    { to: '/', label: t('navHome'), icon: Home, exact: true },
-    { to: '/agenda', label: t('navAgenda'), icon: Calendar },
-    { to: '/patients', label: t('navPatients'), icon: Users, aliases: ['/patient/'] },
-    { to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
-    { to: '/practitioners', label: t('navPractitioners'), icon: UserCheck, aliases: ['/practitioners', '/medicos', '/turnos', '/guardias', '/shifts', '/personal'] },
-    { to: '/inventario', label: t('navInventory'), icon: Pill, aliases: ['/inventario', '/medicamentos', '/pharmacy'] },
-    { to: '/laboratorios', label: t('navLabs'), icon: Microscope, aliases: ['/labs', '/laboratorios'] },
-    { to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] }
-  ];
+    { id: 'home', to: '/', label: t('navHome'), icon: Home, exact: true },
+    { id: 'agenda', to: '/agenda', label: t('navAgenda'), icon: Calendar },
+    { id: 'patients', to: '/patients', label: t('navPatients'), icon: Users, aliases: ['/patient/'] },
+    { id: 'consulta', to: '/consulta', label: t('navEncounters'), icon: Stethoscope, aliases: ['/encounters', '/consulta'] },
+    { id: 'practitioners', to: '/practitioners', label: t('navPractitioners'), icon: UserCheck, aliases: ['/practitioners', '/medicos', '/turnos', '/guardias', '/shifts', '/personal'] },
+    { id: 'inventory', to: '/inventario', label: t('navInventory'), icon: Pill, aliases: ['/inventario', '/medicamentos', '/pharmacy'] },
+    { id: 'labs', to: '/laboratorios', label: t('navLabs'), icon: Microscope, aliases: ['/labs', '/laboratorios'] },
+    { id: 'prescriptions', to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] }
+  ].filter((item) => menuCaps[item.id] !== false);
 
   const isItemActive = (item) => {
     if (item.exact) {

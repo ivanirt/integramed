@@ -11,18 +11,15 @@ import {
   deletePayloadItem,
   preferRemote
 } from '../services/fhirPayloadStore.js';
+import {
+  APPOINTMENT_STATUS_OPTIONS,
+  decorateAppointmentStatus,
+  fhirAppointmentStatus
+} from './appointmentStatus.js';
 
 const STORAGE_KEY = 'integramed_weekly_appointments_v2';
 
-export const APPOINTMENT_STATUS_OPTIONS = [
-  { id: 'planned', label: 'Programada', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
-  { id: 'confirmed', label: 'Confirmada', color: '#0284c7', bg: '#e0f2fe', border: '#bae6fd' },
-  { id: 'waiting', label: 'En espera', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' },
-  { id: 'in_room', label: 'En sala', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-  { id: 'in_consultation', label: 'En consulta', color: '#e11d48', bg: '#fff1f2', border: '#fecdd3' },
-  { id: 'finished', label: 'Finalizada', color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
-  { id: 'cancelled', label: 'Cancelada', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' }
-];
+export { APPOINTMENT_STATUS_OPTIONS };
 
 /**
  * Retrieve all appointments from persistent storage
@@ -64,16 +61,8 @@ export function saveStoredAppointments(appointments) {
   }
 }
 
-function fhirAppointmentStatus(status) {
-  switch (status) {
-    case 'confirmed': return 'booked';
-    case 'waiting':
-    case 'in_room': return 'arrived';
-    case 'in_consultation': return 'checked-in';
-    case 'finished': return 'fulfilled';
-    case 'cancelled': return 'cancelled';
-    default: return 'proposed';
-  }
+function weeklyFhirStatus(status) {
+  return fhirAppointmentStatus(status);
 }
 
 async function persistAppointmentResource(appt) {
@@ -82,7 +71,7 @@ async function persistAppointmentResource(appt) {
     kind: 'appointment',
     item: appt,
     buildBase: (p) => ({
-      status: fhirAppointmentStatus(p.status),
+      status: weeklyFhirStatus(p.status),
       description: p.reason,
       start: p.period?.start,
       end: p.period?.end,
@@ -140,7 +129,7 @@ export async function createAppointment(data) {
     } catch {}
   }
 
-  const statusCfg = APPOINTMENT_STATUS_OPTIONS.find(s => s.id === data.status) || APPOINTMENT_STATUS_OPTIONS[0];
+  const decorated = decorateAppointmentStatus(data.status || 'planned');
 
   const newAppt = {
     id,
@@ -156,8 +145,8 @@ export async function createAppointment(data) {
     practitionerName: data.practitionerName || 'Dr. Alejandro Morales',
     practitionerSpecialty: data.practitionerSpecialty || 'Medicina General',
     reason: data.reason || 'Consulta médica',
-    status: data.status || 'planned',
-    statusLabel: statusCfg.label,
+    status: decorated.status,
+    statusLabel: decorated.label,
     room: data.room || 'Consultorio 101',
     subject: {
       display: data.patientName || 'Paciente General',
@@ -199,7 +188,7 @@ export async function updateAppointment(id, fields) {
   const updated = all.map(appt => {
     if (appt.id === id) {
       found = true;
-      const statusCfg = APPOINTMENT_STATUS_OPTIONS.find(s => s.id === (fields.status || appt.status));
+      const decorated = decorateAppointmentStatus(fields.status || appt.status);
 
       // Recompute period if date or time changed
       const newDate = fields.date || appt.date;
@@ -215,7 +204,8 @@ export async function updateAppointment(id, fields) {
         date: newDate,
         time: newTime,
         period: newPeriod,
-        statusLabel: statusCfg ? statusCfg.label : appt.statusLabel,
+        status: decorated.status,
+        statusLabel: decorated.label,
         subject: {
           ...appt.subject,
           display: fields.patientName || appt.patientName

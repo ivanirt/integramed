@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import {
-  Clock,
   User,
   AlertTriangle,
   FileText,
@@ -22,8 +21,6 @@ import {
   CheckCircle2,
   ChevronDown,
   RefreshCw,
-  Heart,
-  Droplet,
   History
 } from 'lucide-react';
 import {
@@ -32,6 +29,7 @@ import {
   getPatientObservations,
   getPatientConditions,
   getPatientMedications,
+  getPatientAllergies,
   createEncounter,
   createVitalObservation
 } from '../services/fhirApi';
@@ -49,8 +47,8 @@ import {
   getConsultationDraft,
   clearConsultationDraft
 } from '../utils/encounterHistoryStorage';
-import { updateAppointmentStatusByPatientId } from '../utils/dashboardStorage';
-import PreviousEncountersListCard from '../components/encounters/PreviousEncountersListCard';
+import { updateAppointmentStatusByPatientId, getTodayAppointments } from '../utils/dashboardStorage';
+import { isTerminalAppointmentStatus, pickActiveAppointment, decorateAppointmentStatus } from '../utils/appointmentStatus';
 import PreviousEncounterReviewModal from '../components/encounters/PreviousEncounterReviewModal';
 import { parseVitalObservations, LOINC_CODES } from '../utils/vitalsParser';
 import { hasSoapContent } from '../utils/clinicalContent';
@@ -98,6 +96,52 @@ function bmiCategory(bmi) {
   return { label: 'OBESIDAD', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' };
 }
 
+function allergyLabel(allergy) {
+  return (
+    allergy.code?.text
+    || allergy.code?.coding?.[0]?.display
+    || allergy.reaction?.[0]?.manifestation?.[0]?.text
+    || 'Alergia'
+  );
+}
+
+function conditionLabel(condition) {
+  return condition.code?.text || condition.code?.coding?.[0]?.display || 'Diagnóstico';
+}
+
+function isActiveCondition(condition) {
+  const status = condition.clinicalStatus?.coding?.[0]?.code;
+  return !status || status === 'active' || status === 'recurrence' || status === 'relapse';
+}
+
+function medicationName(medication) {
+  return (
+    medication.medicationCodeableConcept?.text
+    || medication.medicationCodeableConcept?.coding?.[0]?.display
+    || 'Medicamento'
+  );
+}
+
+function medicationDose(medication) {
+  return medication.dosageInstruction?.[0]?.text || '';
+}
+
+function isCurrentMedication(medication) {
+  return !medication.status || medication.status === 'active' || medication.status === 'on-hold';
+}
+
+const BANNER_CHIP = {
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  padding: '0.2rem 0.55rem',
+  borderRadius: '6px',
+  backgroundColor: '#ffffff',
+  maxWidth: '100%',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+};
+
 export default function ConsultationPage({ addToast }) {
   const [searchParams] = useSearchParams();
   const { id: paramId } = useParams();
@@ -114,18 +158,18 @@ export default function ConsultationPage({ addToast }) {
   const [observations, setObservations] = useState([]);
   const [conditions, setConditions] = useState([]);
   const [medications, setMedications] = useState([]);
+  const [allergies, setAllergies] = useState([]);
 
   // Previous Encounters History State
   const [pastEncounters, setPastEncounters] = useState([]);
   const [selectedPastEncounter, setSelectedPastEncounter] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isPastMenuOpen, setIsPastMenuOpen] = useState(false);
+  const pastMenuRef = useRef(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Consultation Timer
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [consultStartedAt, setConsultStartedAt] = useState(() => Date.now());
 
   // Voice recording simulation states
   const [isRecordingSubjective, setIsRecordingSubjective] = useState(false);
@@ -150,23 +194,6 @@ export default function ConsultationPage({ addToast }) {
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // Timer interval
-  useEffect(() => {
-    let interval = null;
-    if (isTimerRunning) {
-      interval = setInterval(() => {
-        setSecondsElapsed(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning]);
-
-  const formattedTimer = useMemo(() => {
-    const mins = Math.floor(secondsElapsed / 60);
-    const secs = secondsElapsed % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }, [secondsElapsed]);
-
   // Load initial patients and selected patient data
   useEffect(() => {
     getPatients('')
@@ -183,18 +210,21 @@ export default function ConsultationPage({ addToast }) {
   useEffect(() => {
     if (!selectedPatientId) return;
     setIsLoading(true);
+    setIsPastMenuOpen(false);
 
     Promise.all([
       getPatientById(selectedPatientId),
       getPatientObservations(selectedPatientId).catch(() => []),
       getPatientConditions(selectedPatientId).catch(() => []),
-      getPatientMedications(selectedPatientId).catch(() => [])
+      getPatientMedications(selectedPatientId).catch(() => []),
+      getPatientAllergies(selectedPatientId).catch(() => [])
     ])
-      .then(async ([patData, obsData, condData, medData]) => {
+      .then(async ([patData, obsData, condData, medData, allergyData]) => {
         setPatient(patData);
         setObservations(obsData);
         setConditions(condData);
         setMedications(medData);
+        setAllergies(allergyData);
 
         const patName = patData ? getPatientFullName(patData) : '';
         const history = await loadPatientPastEncounters(selectedPatientId, patName);
@@ -214,7 +244,13 @@ export default function ConsultationPage({ addToast }) {
             setVitalsDraft({ ...EMPTY_VITALS });
           }
           if (savedDraft.savedAt) setLastDraftSavedAt(savedDraft.savedAt);
-          if (savedDraft.secondsElapsed) setSecondsElapsed(savedDraft.secondsElapsed);
+          if (savedDraft.consultStartedAt) {
+            setConsultStartedAt(savedDraft.consultStartedAt);
+          } else if (savedDraft.secondsElapsed) {
+            setConsultStartedAt(Date.now() - savedDraft.secondsElapsed * 1000);
+          } else {
+            setConsultStartedAt(Date.now());
+          }
         } else {
           setSubjective('');
           setPhysicalExam('');
@@ -223,12 +259,14 @@ export default function ConsultationPage({ addToast }) {
           setAssessmentText('');
           setPlan('');
           setVitalsDraft({ ...EMPTY_VITALS });
-          setSecondsElapsed(0);
+          setConsultStartedAt(Date.now());
           setLastDraftSavedAt(null);
         }
 
-        // Mark appointment status as in_consultation
-        updateAppointmentStatusByPatientId(selectedPatientId, 'in_consultation');
+        const openAppt = pickActiveAppointment(getTodayAppointments(), selectedPatientId);
+        if (!openAppt || !isTerminalAppointmentStatus(openAppt.status)) {
+          updateAppointmentStatusByPatientId(selectedPatientId, 'in_consultation');
+        }
       })
       .catch(err => {
         console.error('Error loading consultation patient:', err);
@@ -249,6 +287,30 @@ export default function ConsultationPage({ addToast }) {
     window.addEventListener('integramed_encounters_updated', handleUpdate);
     return () => window.removeEventListener('integramed_encounters_updated', handleUpdate);
   }, [selectedPatientId, patient]);
+
+  useEffect(() => {
+    if (!isPastMenuOpen) return undefined;
+    const onDocClick = (event) => {
+      if (pastMenuRef.current && !pastMenuRef.current.contains(event.target)) {
+        setIsPastMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [isPastMenuOpen]);
+
+  const formatPastEncounterDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }).format(new Date(dateStr));
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Last FHIR vitals used only as placeholders, not as filled values for a new consult
   const parsedVitals = useMemo(() => {
@@ -358,7 +420,7 @@ export default function ConsultationPage({ addToast }) {
       assessmentText,
       plan,
       vitals: vitalsDraft,
-      secondsElapsed
+      consultStartedAt
     };
     saveConsultationDraft(selectedPatientId, draftData);
     setLastDraftSavedAt(new Date().toISOString());
@@ -376,7 +438,7 @@ export default function ConsultationPage({ addToast }) {
     setAssessmentText('');
     setPlan('');
     setVitalsDraft({ ...EMPTY_VITALS });
-    setSecondsElapsed(0);
+    setConsultStartedAt(Date.now());
     setLastDraftSavedAt(null);
     if (selectedPatientId) {
       clearConsultationDraft(selectedPatientId);
@@ -442,7 +504,7 @@ export default function ConsultationPage({ addToast }) {
           patientName,
           type: diagnoses[0]?.label ? `Consulta: ${diagnoses[0].label}` : 'Consulta de Medicina General',
           status: 'finished',
-          startTime: new Date(Date.now() - secondsElapsed * 1000).toISOString(),
+          startTime: new Date(consultStartedAt).toISOString(),
           endTime: new Date().toISOString(),
           reason: reasonSummary
         }).catch(err => {
@@ -559,7 +621,6 @@ export default function ConsultationPage({ addToast }) {
       if (addToast) {
         addToast('success', t('consultationFinalizedToast') || 'Consulta finalizada con éxito. Regresando al inicio...', t('toastCreatedTitle') || 'Consulta');
       }
-      setIsTimerRunning(false);
       setTimeout(() => {
         navigate('/');
       }, 1000);
@@ -576,6 +637,11 @@ export default function ConsultationPage({ addToast }) {
   const fullName = patient ? getPatientFullName(patient) : 'Mariana Silva Ruiz';
   const age = calculateAge(patient?.birthDate) ?? 34;
   const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '84920';
+  const liveAppointment = pickActiveAppointment(getTodayAppointments(), selectedPatientId)
+    || getTodayAppointments().find((a) => String(a.patientId) === String(selectedPatientId));
+  const liveStatus = liveAppointment
+    ? decorateAppointmentStatus(liveAppointment.status)
+    : decorateAppointmentStatus('in_consultation');
 
   return (
     <div style={{ padding: '1.25rem 1.75rem', maxWidth: '1600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -592,61 +658,119 @@ export default function ConsultationPage({ addToast }) {
               gap: '0.45rem',
               padding: '0.35rem 0.85rem',
               borderRadius: '9999px',
-              backgroundColor: '#fff1f2',
-              color: '#e11d48',
-              border: '1px solid #fecdd3',
+              backgroundColor: liveStatus.bg,
+              color: liveStatus.color,
+              border: `1px solid ${liveStatus.border}`,
               fontSize: '0.8125rem',
               fontWeight: 800,
               letterSpacing: '0.05em',
               textTransform: 'uppercase'
             }}
           >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e11d48', animation: 'pulse 1.5s infinite' }} />
-            <span>{t('activeConsultationBadge')}</span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: liveStatus.color }} />
+            <span>{liveStatus.label}</span>
           </div>
 
           {/* Previous Encounters Quick Trigger Button in Header */}
-          <button
-            type="button"
-            onClick={() => {
-              if (pastEncounters.length > 0) {
-                setSelectedPastEncounter(pastEncounters[0]);
-                setIsReviewModalOpen(true);
-              } else if (addToast) {
-                addToast('info', t('noPastEncounters'), t('previousEncountersTitle'));
-              }
-            }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.35rem 0.85rem',
-              borderRadius: '9999px',
-              backgroundColor: '#f0fdfa',
-              color: '#0f766e',
-              border: '1px solid #99f6e4',
-              fontSize: '0.8125rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-            title={t('previousEncountersSubtitle')}
-          >
-            <History size={14} strokeWidth={2.5} />
-            <span>{t('previousEncountersTitle')}</span>
-            <span
+          <div ref={pastMenuRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setIsPastMenuOpen((open) => !open)}
               style={{
-                backgroundColor: '#0f766e',
-                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.35rem 0.85rem',
                 borderRadius: '9999px',
-                padding: '1px 6px',
-                fontSize: '0.7rem',
-                fontWeight: 800
+                backgroundColor: isPastMenuOpen ? '#ccfbf1' : '#f0fdfa',
+                color: '#0f766e',
+                border: '1px solid #99f6e4',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
               }}
+              title={t('previousEncountersSubtitle')}
+              aria-expanded={isPastMenuOpen}
+              aria-haspopup="menu"
             >
-              {pastEncounters.length}
-            </span>
-          </button>
+              <History size={14} strokeWidth={2.5} />
+              <span>{t('previousEncountersTitle')}</span>
+              <span
+                style={{
+                  backgroundColor: '#0f766e',
+                  color: '#ffffff',
+                  borderRadius: '9999px',
+                  padding: '1px 6px',
+                  fontSize: '0.7rem',
+                  fontWeight: 800
+                }}
+              >
+                {pastEncounters.length}
+              </span>
+              <ChevronDown size={14} strokeWidth={2.5} />
+            </button>
+
+            {isPastMenuOpen && (
+              <div
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 0.4rem)',
+                  left: 0,
+                  zIndex: 40,
+                  minWidth: '280px',
+                  maxWidth: '360px',
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.75rem',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.12)',
+                  padding: '0.4rem'
+                }}
+              >
+                {pastEncounters.length === 0 ? (
+                  <div style={{ padding: '0.75rem 0.85rem', fontSize: '0.8125rem', color: '#64748b' }}>
+                    {t('noPastEncounters')}
+                  </div>
+                ) : (
+                  pastEncounters.map((enc) => {
+                    const title = enc.diagnoses?.[0]?.label || enc.type || 'Consulta';
+                    return (
+                      <button
+                        key={enc.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setSelectedPastEncounter(enc);
+                          setIsReviewModalOpen(true);
+                          setIsPastMenuOpen(false);
+                        }}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: 'transparent',
+                          borderRadius: '0.5rem',
+                          padding: '0.55rem 0.7rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>
+                          {title}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.1rem' }}>
+                          {formatPastEncounterDate(enc.date)}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Patient Quick Selector */}
           {patientsList.length > 1 && (
@@ -686,31 +810,7 @@ export default function ConsultationPage({ addToast }) {
             COLUMN 1: PATIENT CLINICAL SUMMARY (Left, ~260px)
             ========================================================================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* 1. Timer Card */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '0.875rem',
-              border: '1px solid #e2e8f0',
-              padding: '1rem 1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#0f766e' }}>
-              <Clock size={20} strokeWidth={2.5} />
-              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155', lineHeight: 1.2 }}>
-                {t('consultationTimeLabel')}
-              </div>
-            </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
-              {formattedTimer}
-            </div>
-          </div>
-
-          {/* 2. Patient Identity Card */}
+          {/* Patient Identity Card */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -854,16 +954,6 @@ export default function ConsultationPage({ addToast }) {
               </div>
             </div>
           </div>
-
-          {/* 6. Consultas Anteriores Card */}
-          <PreviousEncountersListCard
-            encounters={pastEncounters}
-            onNewNote={handleNewNote}
-            onSelectEncounter={(enc) => {
-              setSelectedPastEncounter(enc);
-              setIsReviewModalOpen(true);
-            }}
-          />
         </div>
 
         {/* =========================================================================
@@ -1165,15 +1255,15 @@ export default function ConsultationPage({ addToast }) {
                     background: isAiPanelOpen ? '#ccfbf1' : '#ecfdf5',
                     color: '#0f766e',
                     borderRadius: '50%',
-                    width: '24px',
-                    height: '24px',
+                    width: '38px',
+                    height: '38px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer'
                   }}
                 >
-                  <Sparkles size={13} />
+                  <Sparkles size={20} strokeWidth={2.25} />
                 </button>
                 <button
                 onClick={() => setIsRecordingAssessment(!isRecordingAssessment)}
@@ -1396,8 +1486,8 @@ export default function ConsultationPage({ addToast }) {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#5eead4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857' }}>
-                  <Sparkles size={15} />
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#5eead4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857' }}>
+                  <Sparkles size={18} />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                   IA del vault

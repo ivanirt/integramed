@@ -314,10 +314,13 @@ export default function ScheduleEncounterModal({
                   onChange={(e) => setStatus(e.target.value)}
                   required
                 >
-                  <option value="planned">{t('statusPlanned')}</option>
-                  <option value="arrived">{t('statusArrived')}</option>
-                  <option value="in-progress">{t('statusInProgress')}</option>
-                  <option value="finished">{t('statusFinished')}</option>
+                  <option value="planned">{t('statusPlanned') || 'Programada'}</option>
+                  <option value="confirmed">Confirmada</option>
+                  <option value="waiting">En espera</option>
+                  <option value="in_room">En sala</option>
+                  <option value="in_consultation">En consulta</option>
+                  <option value="finished">{t('statusFinished') || 'Finalizada'}</option>
+                  <option value="cancelled">Cancelada</option>
                 </select>
               </div>
             </div>

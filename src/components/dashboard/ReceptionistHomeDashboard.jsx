@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -12,11 +12,12 @@ import {
   Clock,
   MapPin,
   ArrowRight,
-  Phone
+  Ban
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { getTodayAppointments, updateAppointmentStatus } from '../../utils/dashboardStorage';
+import { isTerminalAppointmentStatus, normalizeAppointmentStatus } from '../../utils/appointmentStatus';
 
 export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToast }) {
   const navigate = useNavigate();
@@ -26,18 +27,26 @@ export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToas
   const [appointments, setAppointments] = useState(() => getTodayAppointments());
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleCheckIn = (id, patientName) => {
-    const updated = updateAppointmentStatus(id, 'in_room');
+  useEffect(() => {
+    const refresh = () => setAppointments(getTodayAppointments());
+    window.addEventListener('integramed_appointments_updated', refresh);
+    return () => window.removeEventListener('integramed_appointments_updated', refresh);
+  }, []);
+
+  const setStatus = (id, status, toastMsg) => {
+    const updated = updateAppointmentStatus(id, status);
     setAppointments(updated);
-    if (addToast) {
-      addToast('success', `${patientName} ha sido registrado como "En sala de espera"`, 'Recepción');
-    }
+    if (addToast && toastMsg) addToast('success', toastMsg, 'Recepción');
   };
 
-  const filtered = appointments.filter(a =>
-    a.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.documentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.reason.toLowerCase().includes(searchQuery.toLowerCase())
+  const queue = appointments.filter((a) => !isTerminalAppointmentStatus(a.status));
+  const waitingCount = appointments.filter((a) => normalizeAppointmentStatus(a.status) === 'waiting').length;
+  const inRoomCount = appointments.filter((a) => normalizeAppointmentStatus(a.status) === 'in_room').length;
+
+  const filtered = queue.filter((a) =>
+    (a.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.documentId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.reason || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -84,7 +93,7 @@ export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToas
           </div>
           <div>
             <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>Citas Estimadas Hoy</div>
-            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a' }}>28</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a' }}>{appointments.length}</div>
           </div>
         </div>
 
@@ -93,8 +102,8 @@ export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToas
             <UserCheck size={24} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>En Sala de Espera</div>
-            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a' }}>5</div>
+            <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>En espera / En sala</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a' }}>{waitingCount} / {inRoomCount}</div>
           </div>
         </div>
 
@@ -142,7 +151,7 @@ export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToas
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {filtered.map((appt) => (
-              <div key={appt.id} style={{ padding: '0.85rem 1rem', backgroundColor: appt.status === 'in_room' ? '#f0fdf4' : '#f8fafc', borderRadius: '0.625rem', border: appt.status === 'in_room' ? '1px solid #bbf7d0' : '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div key={appt.id} style={{ padding: '0.85rem 1rem', backgroundColor: normalizeAppointmentStatus(appt.status) === 'in_room' ? '#f0fdf4' : '#f8fafc', borderRadius: '0.625rem', border: normalizeAppointmentStatus(appt.status) === 'in_room' ? '1px solid #bbf7d0' : '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontWeight: 800, color: '#0f172a' }}>{appt.time} {appt.period}</span>
@@ -157,22 +166,37 @@ export default function ReceptionistHomeDashboard({ onOpenScheduleModal, addToas
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  {appt.status !== 'in_room' ? (
-                    <button
-                      type="button"
-                      onClick={() => handleCheckIn(appt.id, appt.patientName)}
-                      className="btn btn-primary btn-sm"
-                      style={{ backgroundColor: '#059669', fontSize: '0.75rem', gap: '0.25rem' }}
-                    >
-                      <UserCheck size={13} />
-                      <span>Registrar Llegada</span>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {normalizeAppointmentStatus(appt.status) === 'planned' && (
+                    <button type="button" onClick={() => setStatus(appt.id, 'confirmed', `${appt.patientName} confirmó su cita`)} className="btn btn-primary btn-sm" style={{ backgroundColor: '#0284c7', fontSize: '0.75rem' }}>
+                      Confirmar
                     </button>
-                  ) : (
+                  )}
+                  {normalizeAppointmentStatus(appt.status) === 'confirmed' && (
+                    <button type="button" onClick={() => setStatus(appt.id, 'waiting', `${appt.patientName} está en espera`)} className="btn btn-primary btn-sm" style={{ backgroundColor: '#475569', fontSize: '0.75rem', gap: '0.25rem' }}>
+                      <UserCheck size={13} />
+                      <span>Registrar llegada</span>
+                    </button>
+                  )}
+                  {normalizeAppointmentStatus(appt.status) === 'waiting' && (
+                    <button type="button" onClick={() => setStatus(appt.id, 'in_room', `${appt.patientName} pasó a sala`)} className="btn btn-primary btn-sm" style={{ backgroundColor: '#059669', fontSize: '0.75rem' }}>
+                      Pasar a sala
+                    </button>
+                  )}
+                  {normalizeAppointmentStatus(appt.status) === 'in_room' && (
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <CheckCircle2 size={15} />
                       <span>En sala</span>
                     </span>
+                  )}
+                  {normalizeAppointmentStatus(appt.status) === 'in_consultation' && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#e11d48' }}>En consulta</span>
+                  )}
+                  {!isTerminalAppointmentStatus(appt.status) && normalizeAppointmentStatus(appt.status) !== 'in_consultation' && (
+                    <button type="button" onClick={() => setStatus(appt.id, 'cancelled', `${appt.patientName}: cita cancelada`)} className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem', color: '#991b1b', gap: '0.25rem' }}>
+                      <Ban size={13} />
+                      <span>Cancelar</span>
+                    </button>
                   )}
                 </div>
               </div>

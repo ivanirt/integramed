@@ -26,7 +26,8 @@ import {
   SlidersHorizontal,
   ChevronRight,
   GripVertical,
-  Trash2
+  Trash2,
+  Ban
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -43,6 +44,7 @@ import {
   INITIAL_AI_SUGGESTIONS
 } from '../../utils/dashboardStorage';
 import { loadPatientPastEncounters } from '../../utils/encounterHistoryStorage';
+import { isTerminalAppointmentStatus, normalizeAppointmentStatus } from '../../utils/appointmentStatus';
 import PreviousEncounterReviewModal from '../encounters/PreviousEncounterReviewModal';
 
 export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
@@ -722,8 +724,14 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
               </div>
             ) : (
               activeAppointments.map((appt) => {
-                const isInRoom = appt.status === 'in_room' || appt.status === 'in_consultation';
-                const isCurrentlyConsulting = appt.status === 'in_consultation';
+                const status = normalizeAppointmentStatus(appt.status);
+                const isInRoom = status === 'in_room' || status === 'in_consultation';
+                const isCurrentlyConsulting = status === 'in_consultation';
+
+                const applyStatus = (nextStatus) => {
+                  const updated = updateAppointmentStatus(appt.id, nextStatus);
+                  setAppointments(updated);
+                };
 
                 return (
                   <div
@@ -807,12 +815,53 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     </div>
 
                     {/* Right: Action Buttons */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
-                      {isInRoom ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0, flexWrap: 'wrap' }}>
+                      {status === 'planned' && (
                         <button
                           type="button"
                           onClick={() => {
-                            updateAppointmentStatus(appt.id, 'in_consultation');
+                            applyStatus('confirmed');
+                            if (addToast) addToast('success', `${appt.patientName}: cita confirmada`, 'Consulta');
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', color: '#0284c7' }}
+                        >
+                          Confirmar
+                        </button>
+                      )}
+                      {status === 'confirmed' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyStatus('waiting');
+                            if (addToast) addToast('success', `${appt.patientName} está en espera`, 'Recepción');
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '0.4rem 0.65rem', color: '#475569' }}
+                        >
+                          <UserCheck size={13} />
+                          <span>Llegó</span>
+                        </button>
+                      )}
+                      {status === 'waiting' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyStatus('in_room');
+                            if (addToast) addToast('success', `${appt.patientName} pasó a sala`, 'Consulta');
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', color: '#047857' }}
+                        >
+                          <UserCheck size={13} />
+                          <span>En sala</span>
+                        </button>
+                      )}
+                      {(status === 'in_room' || status === 'in_consultation') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyStatus('in_consultation');
                             navigate(`/consulta?patientId=${appt.patientId}`);
                           }}
                           className="btn btn-primary"
@@ -832,38 +881,33 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           <Stethoscope size={15} />
                           <span>{isCurrentlyConsulting ? 'Continuar consulta' : 'Iniciar consulta'}</span>
                         </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateAppointmentStatus(appt.id, 'in_room');
-                              if (addToast) {
-                                addToast('success', `${appt.patientName} ha pasado a sala de espera`, 'Recepción');
-                              }
-                            }}
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '0.75rem', padding: '0.4rem 0.65rem', color: '#047857' }}
-                            title="Marcar como listo en sala"
-                          >
-                            <UserCheck size={13} />
-                            <span>Llegó</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/pacientes/${appt.patientId}`)}
-                            className="btn btn-secondary"
-                            style={{
-                              fontSize: '0.8125rem',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.625rem',
-                              color: '#334155'
-                            }}
-                          >
-                            <span>Ver ficha</span>
-                          </button>
-                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/pacientes/${appt.patientId}`)}
+                        className="btn btn-secondary"
+                        style={{
+                          fontSize: '0.8125rem',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.625rem',
+                          color: '#334155'
+                        }}
+                      >
+                        <span>Ver ficha</span>
+                      </button>
+                      {!isTerminalAppointmentStatus(status) && status !== 'in_consultation' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyStatus('cancelled');
+                            if (addToast) addToast('info', `${appt.patientName}: cita cancelada`, 'Consulta');
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', color: '#991b1b' }}
+                          title="Cancelar cita"
+                        >
+                          <Ban size={13} />
+                        </button>
                       )}
                     </div>
                   </div>

@@ -3,7 +3,16 @@
  * Provides live appointments, clinical to-dos, AI suggestions, and role queues.
  */
 
-import { loadAppointmentsFromFhir } from './appointmentStorage.js';
+import { getStoredAppointments, loadAppointmentsFromFhir, updateAppointment } from './appointmentStorage.js';
+import {
+  APPOINTMENT_STATUS_CONFIG,
+  decorateAppointmentStatus,
+  isTerminalAppointmentStatus,
+  localTodayDate,
+  isAppointmentOnDate,
+  pickActiveAppointment,
+  normalizeAppointmentStatus
+} from './appointmentStatus.js';
 import {
   loadPayloadCollection,
   upsertPayloadItem,
@@ -29,7 +38,7 @@ export const INITIAL_TODAY_APPOINTMENTS = [
     genderLabel: 'Masculino',
     age: 54,
     documentId: 'CC: 123456789',
-    status: 'in_room', // 'in_room' (En sala) | 'waiting' (En espera) | 'confirmed' (Confirmada) | 'in_consultation' | 'finished'
+    status: 'in_room',
     statusLabel: 'En sala',
     statusColor: '#059669',
     statusBg: '#ecfdf5',
@@ -206,9 +215,29 @@ export function getTodayAppointments() {
     const raw = localStorage.getItem(STORAGE_KEYS.TODAY_APPOINTMENTS);
     if (!raw) {
       localStorage.setItem(STORAGE_KEYS.TODAY_APPOINTMENTS, JSON.stringify(INITIAL_TODAY_APPOINTMENTS));
-      return INITIAL_TODAY_APPOINTMENTS;
+      return INITIAL_TODAY_APPOINTMENTS.map((appt) => {
+        const decorated = decorateAppointmentStatus(appt.status);
+        return {
+          ...appt,
+          status: decorated.status,
+          statusLabel: decorated.label,
+          statusColor: decorated.color,
+          statusBg: decorated.bg,
+          statusBorder: decorated.border
+        };
+      });
     }
-    return JSON.parse(raw);
+    return JSON.parse(raw).map((appt) => {
+      const decorated = decorateAppointmentStatus(appt.status);
+      return {
+        ...appt,
+        status: decorated.status,
+        statusLabel: decorated.label,
+        statusColor: decorated.color,
+        statusBg: decorated.bg,
+        statusBorder: decorated.border
+      };
+    });
   } catch {
     return INITIAL_TODAY_APPOINTMENTS;
   }
@@ -225,76 +254,113 @@ export function saveTodayAppointments(appointments) {
   }
 }
 
-export const APPOINTMENT_STATUS_CONFIG = {
-  planned: { label: 'Programada', color: '#6b7280', bg: '#f3f4f6', border: '#e5e7eb' },
-  waiting: { label: 'En espera', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' },
-  in_room: { label: 'En sala', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-  confirmed: { label: 'Confirmada', color: '#0284c7', bg: '#e0f2fe', border: '#bae6fd' },
-  in_consultation: { label: 'En consulta', color: '#e11d48', bg: '#fff1f2', border: '#fecdd3' },
-  finished: { label: 'Finalizada', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-  completed: { label: 'Completada', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-  cancelled: { label: 'Cancelada', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' }
-};
+export { APPOINTMENT_STATUS_CONFIG };
+
+function applyStatusFields(appt, newStatus) {
+  const decorated = decorateAppointmentStatus(newStatus);
+  return {
+    ...appt,
+    status: decorated.status,
+    statusLabel: decorated.label,
+    statusColor: decorated.color,
+    statusBg: decorated.bg,
+    statusBorder: decorated.border,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function toTodayAppointment(weeklyAppt) {
+  const decorated = decorateAppointmentStatus(weeklyAppt.status);
+  const hour = Number(String(weeklyAppt.time || weeklyAppt.period?.start || '09').slice(0, 2));
+  return {
+    id: weeklyAppt.id,
+    fhirId: weeklyAppt.fhirId,
+    time: weeklyAppt.time || String(weeklyAppt.period?.start || '').slice(11, 16) || '09:00',
+    period: hour >= 12 ? 'PM' : 'AM',
+    patientId: weeklyAppt.patientId,
+    patientName: weeklyAppt.patientName,
+    gender: weeklyAppt.gender || '',
+    age: weeklyAppt.age || '',
+    documentId: weeklyAppt.documentId || '',
+    status: decorated.status,
+    statusLabel: decorated.label,
+    statusColor: decorated.color,
+    statusBg: decorated.bg,
+    statusBorder: decorated.border,
+    reason: weeklyAppt.reason,
+    room: weeklyAppt.room,
+    practitionerName: weeklyAppt.practitionerName,
+    vitalSigns: weeklyAppt.vitalSigns || null
+  };
+}
+
+function syncStatusToWeekly(appt, newStatus) {
+  if (!appt?.id) return;
+  updateAppointment(appt.id, { status: newStatus }).catch((err) => {
+    console.info('Weekly appointment status sync skipped:', err?.message);
+  });
+}
 
 export function getActiveTodayAppointments() {
   const all = getTodayAppointments();
-  return all.filter(a => a.status !== 'finished' && a.status !== 'completed' && a.status !== 'cancelled');
+  return all.filter((a) => !isTerminalAppointmentStatus(a.status));
 }
 
 export function updateAppointmentStatus(id, newStatus) {
+  const decorated = decorateAppointmentStatus(newStatus);
   const list = getTodayAppointments();
-  const cfg = APPOINTMENT_STATUS_CONFIG[newStatus] || APPOINTMENT_STATUS_CONFIG.waiting;
+  let matched = null;
 
-  const updated = list.map(appt => {
+  const updated = list.map((appt) => {
     if (appt.id === id) {
-      return {
-        ...appt,
-        status: newStatus,
-        statusLabel: cfg.label,
-        statusColor: cfg.color,
-        statusBg: cfg.bg,
-        statusBorder: cfg.border,
-        updatedAt: new Date().toISOString()
-      };
-    }
-    return appt;
-  });
-
-  saveTodayAppointments(updated);
-  return updated;
-}
-
-export function updateAppointmentStatusByPatientId(patientId, newStatus) {
-  if (!patientId) return getTodayAppointments();
-  const list = getTodayAppointments();
-  const cfg = APPOINTMENT_STATUS_CONFIG[newStatus] || APPOINTMENT_STATUS_CONFIG.waiting;
-  const pIdStr = String(patientId).toLowerCase().trim();
-
-  let matched = false;
-  const updated = list.map(appt => {
-    const matchesPatient = (appt.patientId && String(appt.patientId).toLowerCase().trim() === pIdStr) ||
-      (appt.id && String(appt.id).toLowerCase().trim() === pIdStr) ||
-      (appt.patientName && appt.patientName.toLowerCase().includes(pIdStr));
-
-    if (matchesPatient && !matched) {
-      matched = true;
-      return {
-        ...appt,
-        status: newStatus,
-        statusLabel: cfg.label,
-        statusColor: cfg.color,
-        statusBg: cfg.bg,
-        statusBorder: cfg.border,
-        updatedAt: new Date().toISOString()
-      };
+      matched = appt;
+      return applyStatusFields(appt, decorated.status);
     }
     return appt;
   });
 
   if (matched) {
     saveTodayAppointments(updated);
+    syncStatusToWeekly(matched, decorated.status);
+    return updated;
   }
+
+  const today = localTodayDate();
+  const weekly = getStoredAppointments().find((a) => a.id === id && isAppointmentOnDate(a, today));
+  if (weekly) {
+    const todayShape = applyStatusFields(toTodayAppointment(weekly), decorated.status);
+    const merged = [...updated, todayShape];
+    saveTodayAppointments(merged);
+    syncStatusToWeekly(weekly, decorated.status);
+    return merged;
+  }
+
   return updated;
+}
+
+export function updateAppointmentStatusByPatientId(patientId, newStatus) {
+  if (!patientId) return getTodayAppointments();
+  const decorated = decorateAppointmentStatus(newStatus);
+  const list = getTodayAppointments();
+  const target = pickActiveAppointment(list, patientId)
+    || (decorated.status === 'finished'
+      ? list.find((a) => String(a.patientId) === String(patientId) && normalizeAppointmentStatus(a.status) === 'in_consultation')
+      : null);
+
+  if (target) {
+    return updateAppointmentStatus(target.id, decorated.status);
+  }
+
+  const today = localTodayDate();
+  const weeklyMatch = pickActiveAppointment(
+    getStoredAppointments().filter((a) => isAppointmentOnDate(a, today)),
+    patientId
+  );
+  if (weeklyMatch) {
+    return updateAppointmentStatus(weeklyMatch.id, decorated.status);
+  }
+
+  return list;
 }
 
 /**
@@ -396,23 +462,9 @@ export function deleteTask(taskId) {
 
 export async function loadDashboardFromFhir() {
   const appts = await loadAppointmentsFromFhir();
-  const today = new Date().toISOString().slice(0, 10);
   const todayAppts = (appts || [])
-    .filter((a) => a.date === today || String(a.period?.start || '').startsWith(today))
-    .map((a) => ({
-      id: a.id,
-      fhirId: a.fhirId,
-      time: a.time || String(a.period?.start || '').slice(11, 16),
-      period: Number((a.time || '09').slice(0, 2)) >= 12 ? 'PM' : 'AM',
-      patientId: a.patientId,
-      patientName: a.patientName,
-      status: a.status,
-      statusLabel: a.statusLabel,
-      reason: a.reason,
-      room: a.room,
-      practitionerName: a.practitionerName,
-      vitalSigns: a.vitalSigns || {}
-    }));
+    .filter((a) => isAppointmentOnDate(a, localTodayDate()))
+    .map((a) => toTodayAppointment(a));
   if (todayAppts.length > 0) {
     saveTodayAppointments(todayAppts);
   }
@@ -421,4 +473,19 @@ export async function loadDashboardFromFhir() {
   const tasks = preferRemote(remoteTasks, getPendingTasks());
   savePendingTasks(tasks);
   return { appointments: getTodayAppointments(), tasks };
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('integramed_appointments_changed', (event) => {
+    const weekly = Array.isArray(event.detail) ? event.detail : getStoredAppointments();
+    const today = localTodayDate();
+    const fromWeekly = weekly.filter((a) => isAppointmentOnDate(a, today)).map(toTodayAppointment);
+    if (fromWeekly.length === 0) return;
+    const existing = getTodayAppointments();
+    const byId = new Map(existing.map((a) => [a.id, a]));
+    fromWeekly.forEach((appt) => {
+      byId.set(appt.id, { ...(byId.get(appt.id) || {}), ...appt });
+    });
+    saveTodayAppointments([...byId.values()]);
+  });
 }

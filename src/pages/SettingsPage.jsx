@@ -29,7 +29,8 @@ import {
   Timer,
   Zap,
   Edit3,
-  UserPlus
+  UserPlus,
+  LayoutGrid
 } from 'lucide-react';
 import {
   getClinicSchedule,
@@ -63,6 +64,11 @@ import ClinicalServicesAdmin from '../components/services/ClinicalServicesAdmin'
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { useLanguage } from '../i18n/LanguageContext';
+import {
+  getMenuCapabilities,
+  setMenuCapabilityVisible,
+  MENU_CAPABILITY_ITEMS
+} from '../utils/menuCapabilitiesStorage';
 
 export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, defaultTab }) {
   const { t, locale, language } = useLanguage();
@@ -73,7 +79,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     try {
       const params = new URLSearchParams(location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir', 'menu'].includes(tabParam)) {
         return tabParam;
       }
     } catch (e) {}
@@ -81,12 +87,13 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [menuCapabilities, setMenuCapabilities] = useState(() => getMenuCapabilities());
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir'].includes(tabParam)) {
+      if (tabParam && ['schedule', 'services', 'holidays', 'leaves', 'facilities', 'fhir', 'menu'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     } catch (e) {}
@@ -489,6 +496,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     { id: 'holidays', label: `${t('tabHolidays')} (${holidays.length})`, icon: PartyPopper },
     { id: 'leaves', label: `${t('tabDoctorLeaves')} (${doctorLeaves.length})`, icon: UserCheck },
     { id: 'facilities', label: t('tabFacilities') || 'Planteles & Sedes', icon: Building2 },
+    { id: 'menu', label: t('tabMenuCapabilities') || 'Menú y módulos', icon: LayoutGrid },
     { id: 'fhir', label: t('tabFhirConnection'), icon: Server }
   ];
 
@@ -1947,6 +1955,98 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
       {activeTab === 'facilities' && (
         <div>
           <FacilitiesPage addToast={addToast} embedded={true} />
+        </div>
+      )}
+
+      {activeTab === 'menu' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
+              {t('menuCapabilitiesTitle')}
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '640px', lineHeight: 1.5 }}>
+              {t('menuCapabilitiesSubtitle')}
+            </p>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.875rem',
+              overflow: 'hidden',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+            }}
+          >
+            {MENU_CAPABILITY_ITEMS.map((item, idx) => {
+              const visible = menuCapabilities[item.id] !== false;
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.95rem 1.25rem',
+                    borderBottom: idx === MENU_CAPABILITY_ITEMS.length - 1 ? 'none' : '1px solid #f1f5f9'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a' }}>
+                      {language === 'en' ? item.labelEn : item.labelEs}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
+                      {item.path}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={visible}
+                    onClick={() => {
+                      const next = setMenuCapabilityVisible(item.id, !visible);
+                      setMenuCapabilities(next);
+                      if (addToast) {
+                        addToast(
+                          'success',
+                          t('menuCapabilitiesSavedToast'),
+                          language === 'en' ? item.labelEn : item.labelEs
+                        );
+                      }
+                    }}
+                    style={{
+                      width: '48px',
+                      height: '28px',
+                      borderRadius: '9999px',
+                      border: 'none',
+                      backgroundColor: visible ? '#0f766e' : '#cbd5e1',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'background-color 0.15s ease'
+                    }}
+                    title={visible ? t('menuCapabilityVisible') : t('menuCapabilityHidden')}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: visible ? '23px' : '3px',
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.25)',
+                        transition: 'left 0.15s ease'
+                      }}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

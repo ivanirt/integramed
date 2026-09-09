@@ -87,7 +87,8 @@ const STATUS_COLORS = {
   in_consultation: { bg: '#fff1f2', border: '#fecdd3', text: '#e11d48', label: 'En consulta' },
   'in-progress': { bg: '#fff1f2', border: '#fecdd3', text: '#e11d48', label: 'En consulta' },
   finished: { bg: '#f8fafc', border: '#e2e8f0', text: '#64748b', label: 'Finalizada' },
-  planned: { bg: '#fef3c7', border: '#fde68a', text: '#d97706', label: 'Programada' }
+  planned: { bg: '#fef3c7', border: '#fde68a', text: '#d97706', label: 'Programada' },
+  cancelled: { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', label: 'Cancelada' }
 };
 
 export default function ClinicalWeeklyCalendar({

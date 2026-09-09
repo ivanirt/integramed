@@ -160,9 +160,28 @@ function modalityMatches(tags, modalities) {
   return aliases.some((alias) => set.has(alias));
 }
 
+const notesCache = new Map();
+
+export function normalizeVaultLanguage(lang) {
+  return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'es';
+}
+
+export function resolveVaultPath(lang, projectRoot) {
+  const normalized = normalizeVaultLanguage(lang);
+  const envKey = normalized === 'en' ? 'CLINICAL_VAULT_EN_PATH' : 'CLINICAL_VAULT_ES_PATH';
+  if (process.env[envKey]) return path.resolve(process.env[envKey]);
+
+  const named = path.resolve(projectRoot, `vault-${normalized}`);
+  if (fs.existsSync(named)) return named;
+
+  if (process.env.CLINICAL_VAULT_PATH) return path.resolve(process.env.CLINICAL_VAULT_PATH);
+  return path.resolve(projectRoot, 'vault');
+}
+
 export function loadVaultNotes(vaultPath) {
+  if (notesCache.has(vaultPath)) return notesCache.get(vaultPath);
   const files = walkMarkdownFiles(vaultPath);
-  return files.map((filePath) => {
+  const notes = files.map((filePath) => {
     const raw = fs.readFileSync(filePath, 'utf8');
     const { meta, body } = parseFrontmatter(raw);
     const relative = path.relative(vaultPath, filePath).replace(/\\/g, '/');
@@ -177,6 +196,8 @@ export function loadVaultNotes(vaultPath) {
       text: `${title}\n${relative}\n${yamlSearchText(meta)}\n${body}`
     };
   });
+  notesCache.set(vaultPath, notes);
+  return notes;
 }
 
 function normalizeSearchText(text) {

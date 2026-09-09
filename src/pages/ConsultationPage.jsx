@@ -197,7 +197,7 @@ export default function ConsultationPage({ addToast }) {
   const { id: paramId } = useParams();
   const patientIdFromQuery = searchParams.get('patientId') || paramId;
   const navigate = useNavigate();
-  const { t, locale } = useLanguage();
+  const { t, locale, language } = useLanguage();
   const { currentUser } = useAuth();
 
   // Patients list for selector
@@ -512,7 +512,8 @@ export default function ConsultationPage({ addToast }) {
         question,
         apiKey: aiSecrets.aiApiKey,
         baseUrl: aiSecrets.aiBaseUrl,
-        model: aiSecrets.aiModel
+        model: aiSecrets.aiModel,
+        language
       });
       setAiAnswer(result.answer || '');
       setAiSources(result.sources || []);

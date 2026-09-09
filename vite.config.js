@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    watch: {
+      ignored: ['**/vault-en/**', '**/vault-es/**', '**/vault/**']
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

@@ -21,7 +21,7 @@ import AdminHomeDashboard from '../components/dashboard/AdminHomeDashboard';
 import SettingsPage from './SettingsPage';
 
 export default function HomePage({ addToast, onOpenScheduleModal, serverInfo, onConfigUpdated }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { currentUser, activeRole, switchRole, rolesConfig } = useAuth();
 
   // Role pill definitions for fast navigation / testing
@@ -189,7 +189,15 @@ export default function HomePage({ addToast, onOpenScheduleModal, serverInfo, on
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)' }} />
           <span>
-            {currentUser?.prefix || 'Dr.'} {currentUser?.givenName || 'Alejandro'} ({currentUser?.specialty?.slice(0, 24) || 'Medicina Interna'})
+            {currentUser?.prefix || 'Dr.'} {currentUser?.givenName || 'Alejandro'} ({
+              !currentUser?.specialty
+                ? t('specialtyInternalMedicine')
+                : language === 'en' && /Direcci[oó]n M[eé]dica/i.test(currentUser.specialty)
+                  ? t('specialtyInternalMedDirector')
+                  : language === 'en' && /Medicina Interna/i.test(currentUser.specialty)
+                    ? t('specialtyInternalMedicine')
+                    : currentUser.specialty.slice(0, 24)
+            })
           </span>
         </div>
       </div>

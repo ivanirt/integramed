@@ -5,6 +5,7 @@ export async function consultClinicalAi({
   diagnosisFreeText,
   modalities,
   question,
+  language,
   apiKey,
   baseUrl,
   model
@@ -22,7 +23,8 @@ export async function consultClinicalAi({
       diagnosis,
       diagnosisFreeText: diagnosisFreeText || '',
       modalities,
-      question: question || ''
+      question: question || '',
+      language: language === 'en' ? 'en' : 'es'
     })
   });
 
@@ -37,8 +39,9 @@ export async function consultClinicalAi({
   return data;
 }
 
-export async function getClinicalVaultStatus() {
-  const response = await fetch(`${API_BASE}/ai/vault-status`);
-  if (!response.ok) return { exists: false, noteCount: 0, path: '' };
+export async function getClinicalVaultStatus(language = 'es') {
+  const lang = language === 'en' ? 'en' : 'es';
+  const response = await fetch(`${API_BASE}/ai/vault-status?language=${encodeURIComponent(lang)}`);
+  if (!response.ok) return { exists: false, noteCount: 0, path: '', language: lang };
   return response.json();
 }

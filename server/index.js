@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
-import { loadVaultNotes, rankVaultNotes, excerptForPrompt } from './clinicalVault.js';
+import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,14 +63,11 @@ app.use(express.json({
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
 let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
 
-const CLINICAL_VAULT_PATH = path.resolve(
-  process.env.CLINICAL_VAULT_PATH
-    ? process.env.CLINICAL_VAULT_PATH
-    : path.join(__dirname, '../vault')
-);
+const PROJECT_ROOT = path.join(__dirname, '..');
 
 console.log(`[FHIR Proxy] Initialized with Base URL: ${FHIR_BASE_URL ? FHIR_BASE_URL : '(NOT SET)'}`);
-console.log(`[Clinical AI] Vault path: ${CLINICAL_VAULT_PATH}`);
+console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);
+console.log(`[Clinical AI] Vault EN: ${resolveVaultPath('en', PROJECT_ROOT)}`);
 
 // Health check and status endpoint
 app.get('/api/health', async (req, res) => {
@@ -131,15 +128,18 @@ app.post('/api/config', (req, res) => {
 });
 
 app.get('/api/ai/vault-status', (req, res) => {
+  const language = normalizeVaultLanguage(req.query?.language);
+  const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
   try {
-    const notes = loadVaultNotes(CLINICAL_VAULT_PATH);
+    const notes = loadVaultNotes(vaultPath);
     res.json({
       exists: notes.length > 0,
       noteCount: notes.length,
-      path: CLINICAL_VAULT_PATH
+      path: vaultPath,
+      language
     });
   } catch (err) {
-    res.status(500).json({ exists: false, noteCount: 0, error: err.message, path: CLINICAL_VAULT_PATH });
+    res.status(500).json({ exists: false, noteCount: 0, error: err.message, path: vaultPath, language });
   }
 });
 
@@ -158,6 +158,8 @@ app.post('/api/ai/consult', async (req, res) => {
     : String(diagnosis || '');
   const freeTextDiagnosis = String(req.body?.diagnosisFreeText || '').trim();
   const diagnosisText = [codedDiagnosis, freeTextDiagnosis].filter((part) => String(part).trim()).join('\n');
+  const language = normalizeVaultLanguage(req.body?.language);
+  const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
   const question = String(req.body?.question || '').trim();
   const modalities = req.body?.modalities || [];
 
@@ -167,14 +169,16 @@ app.post('/api/ai/consult', async (req, res) => {
 
   let notes = [];
   try {
-    notes = loadVaultNotes(CLINICAL_VAULT_PATH);
+    notes = loadVaultNotes(vaultPath);
   } catch (err) {
     return res.status(500).json({ error: `No se pudo leer el vault: ${err.message}` });
   }
 
   if (!notes.length) {
     return res.status(404).json({
-      error: 'El vault está vacío. Copia notas .md a la carpeta vault/ (o CLINICAL_VAULT_PATH).'
+      error: language === 'en'
+        ? `The ${language} vault is empty. Copy notes into vault-${language}/ (or set CLINICAL_VAULT_EN_PATH / CLINICAL_VAULT_ES_PATH).`
+        : `El vault ${language} está vacío. Copia notas .md a vault-${language}/ (o define CLINICAL_VAULT_EN_PATH / CLINICAL_VAULT_ES_PATH).`
     });
   }
 
@@ -187,17 +191,33 @@ app.post('/api/ai/consult', async (req, res) => {
 
   const contextBlock = sources.length
     ? sources.map((src, idx) => `[${idx + 1}] ${src.file}\n${src.excerpt}`).join('\n\n')
-    : '(No hay notas del vault con coincidencia para este diagnóstico y las modalidades activas.)';
+    : (language === 'en'
+      ? '(No vault notes matched this diagnosis and the active modalities.)'
+      : '(No hay notas del vault con coincidencia para este diagnóstico y las modalidades activas.)');
 
-  const systemPrompt = [
-    'Eres un asistente clínico de apoyo para un médico. No eres un prescriptor.',
-    'Usa SOLO el contexto del vault. Si no hay evidencia en el contexto, dilo claramente y no inventes tratamientos.',
-    'Cita los archivos de origen por nombre. No es una orden médica; el médico debe verificar antes de indicar.',
-    'Responde en el idioma del diagnóstico (español si el texto está en español).',
-    'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
-  ].join(' ');
+  const systemPrompt = language === 'en'
+    ? [
+      'You are a clinical support assistant for a physician. You are not a prescriber.',
+      'Use ONLY the vault context. If the context has no evidence, say so clearly and do not invent treatments.',
+      'Cite source files by name. This is not a medical order; the physician must verify before acting.',
+      'Answer in English.',
+      'Structure: (1) what the vault says about the condition, (2) supports or approaches the notes recommend, (3) limits / not a treatment.'
+    ].join(' ')
+    : [
+      'Eres un asistente clínico de apoyo para un médico. No eres un prescriptor.',
+      'Usa SOLO el contexto del vault. Si no hay evidencia en el contexto, dilo claramente y no inventes tratamientos.',
+      'Cita los archivos de origen por nombre. No es una orden médica; el médico debe verificar antes de indicar.',
+      'Responde en español.',
+      'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
+    ].join(' ');
 
-  const userPrompt = `Diagnóstico del médico (código CIE y/o texto libre; cualquiera basta): ${diagnosisText}\nModalidades activas: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda para este diagnóstico?'}\n\nContexto del vault:\n${contextBlock}`;
+  const defaultQuestion = language === 'en'
+    ? 'What does the vault say, and what supports does it recommend for this diagnosis?'
+    : '¿Qué dice el vault y qué ayudas recomienda para este diagnóstico?';
+
+  const userPrompt = language === 'en'
+    ? `Physician diagnosis (ICD code and/or free text; either is enough): ${diagnosisText}\nActive modalities: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'all'}\nPhysician question: ${question || defaultQuestion}\n\nVault context:\n${contextBlock}`
+    : `Diagnóstico del médico (código CIE y/o texto libre; cualquiera basta): ${diagnosisText}\nModalidades activas: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'todas'}\nPregunta del médico: ${question || defaultQuestion}\n\nContexto del vault:\n${contextBlock}`;
 
   try {
     const llmHeaders = {

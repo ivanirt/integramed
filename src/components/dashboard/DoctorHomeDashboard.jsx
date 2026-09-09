@@ -46,9 +46,21 @@ import { loadPatientPastEncounters } from '../../utils/encounterHistoryStorage';
 import { isTerminalAppointmentStatus, normalizeAppointmentStatus } from '../../utils/appointmentStatus';
 import PreviousEncounterReviewModal from '../encounters/PreviousEncounterReviewModal';
 
+const DEFAULT_TASK_TITLE_KEYS = {
+  'task-1': 'homeTaskSignDischarge',
+  'task-2': 'homeTaskReviewUltrasound',
+  'task-3': 'homeTaskApproveRx',
+  'task-4': 'homeTaskValidateCbc'
+};
+
+const DEFAULT_TASK_BADGE_KEYS = {
+  'task-3': 'homeTwoPending',
+  'task-4': 'homeLabCategory'
+};
+
 export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
   const navigate = useNavigate();
-  const { t, locale, language } = useLanguage();
+  const { t, locale } = useLanguage();
   const { currentUser, activeRole } = useAuth();
 
   // Appointments & Tasks state
@@ -104,16 +116,16 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
       // Capitalize first letter
       return dateText.charAt(0).toUpperCase() + dateText.slice(1);
     } catch {
-      return 'Miércoles, 2 de Septiembre de 2026';
+      return new Date().toDateString();
     }
   })();
 
   // Salutation based on time of day
   const greetingText = (() => {
     const hour = new Date().getHours();
-    let salutation = 'Buenos días';
-    if (hour >= 12 && hour < 19) salutation = 'Buenas tardes';
-    else if (hour >= 19 || hour < 6) salutation = 'Buenas noches';
+    let salutation = t('goodMorning');
+    if (hour >= 12 && hour < 19) salutation = t('goodAfternoon');
+    else if (hour >= 19 || hour < 6) salutation = t('goodEvening');
 
     const prefix = currentUser?.prefix || (activeRole === 'therapist' ? 'Lic.' : 'Dr.');
     const name = currentUser?.givenName ? `${currentUser.givenName} ${currentUser.familyName || ''}`.trim() : 'Alejandro Morales';
@@ -133,9 +145,9 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
     if (addToast) {
       const task = updated.find(t => t.id === taskId);
       if (task?.completed) {
-        addToast('success', 'Tarea completada (movida al final)', 'Tareas');
+        addToast('success', t('homeTaskCompleted'), t('homeTasksLabel'));
       } else {
-        addToast('info', 'Tarea reabierta (movida a pendientes)', 'Tareas');
+        addToast('info', t('homeTaskReopened'), t('homeTasksLabel'));
       }
     }
   };
@@ -149,7 +161,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
     setNewTaskTitle('');
     setIsAddingTask(false);
     if (addToast) {
-      addToast('success', 'Nueva tarea agregada a pendientes', 'Tareas');
+      addToast('success', t('homeTaskAdded'), t('homeTasksLabel'));
     }
   };
 
@@ -159,7 +171,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
     const updated = deleteTask(taskId);
     setTasks(updated);
     if (addToast) {
-      addToast('info', 'Tarea eliminada de la lista', 'Tareas');
+      addToast('info', t('homeTaskDeleted'), t('homeTasksLabel'));
     }
   };
 
@@ -191,7 +203,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
     setDraggedTaskIndex(null);
     setDragOverTaskIndex(null);
     if (addToast) {
-      addToast('success', 'Orden de tareas actualizado con éxito', 'Tareas');
+      addToast('success', t('homeTaskOrderUpdated'), t('homeTasksLabel'));
     }
   };
 
@@ -209,17 +221,17 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
       setIsAiReviewModalOpen(true);
     } else {
       if (addToast) {
-        addToast('info', 'No se encontraron consultas previas registradas', 'Historial');
+        addToast('info', t('homeNoPastEncounters'), t('homeHistoryLabel'));
       }
     }
   };
 
   // Shift name badge
   const shiftText = currentUser?.shiftInfo?.shiftType === 'afternoon'
-    ? 'Turno Vespertino'
+    ? t('shiftAfternoon')
     : currentUser?.shiftInfo?.shiftType === 'night'
-    ? 'Turno Nocturno'
-    : 'Turno Matutino';
+    ? t('shiftNight')
+    : t('shiftMorning');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '1440px', margin: '0 auto' }}>
@@ -269,7 +281,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
               }}
             >
               <Calendar size={15} color="#0f766e" />
-              <span>{dateFilter === 'today' ? 'Hoy' : dateFilter === 'tomorrow' ? 'Mañana' : 'Esta Semana'}</span>
+              <span>{dateFilter === 'today' ? t('filterToday') : dateFilter === 'tomorrow' ? t('filterTomorrow') : t('filterThisWeek')}</span>
               <ChevronDown size={14} color="#64748b" />
             </button>
 
@@ -305,7 +317,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     cursor: 'pointer'
                   }}
                 >
-                  Hoy
+                  {t('filterToday')}
                 </button>
                 <button
                   type="button"
@@ -323,7 +335,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     cursor: 'pointer'
                   }}
                 >
-                  Mañana
+                  {t('filterTomorrow')}
                 </button>
                 <button
                   type="button"
@@ -341,7 +353,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     cursor: 'pointer'
                   }}
                 >
-                  Esta Semana
+                  {t('filterThisWeek')}
                 </button>
               </div>
             )}
@@ -361,7 +373,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
             }}
           >
             <Plus size={15} strokeWidth={2.5} />
-            <span>Nueva cita</span>
+            <span>{t('homeNewAppointment')}</span>
           </button>
         </div>
       </div>
@@ -420,7 +432,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
 
           <div>
             <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-              Citas de hoy
+              {t('homeTodayAppointments')}
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '2px' }}>
               <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>
@@ -428,7 +440,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
               </span>
               {finishedAppointments.length > 0 && (
                 <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '9999px', border: '1px solid #a7f3d0' }}>
-                  {finishedAppointments.length} finalizadas
+                  {t('homeFinishedCount', { count: finishedAppointments.length })}
                 </span>
               )}
             </div>
@@ -466,7 +478,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
 
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-              Pacientes en sala
+              {t('homePatientsInRoom')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '2px' }}>
               <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>
@@ -483,7 +495,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   borderRadius: '9999px'
                 }}
               >
-                Esperando
+                {t('homeWaiting')}
               </span>
             </div>
           </div>
@@ -533,7 +545,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
 
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-              Resultados lab.
+              {t('homeLabResults')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '2px' }}>
               <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>
@@ -550,7 +562,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   borderRadius: '9999px'
                 }}
               >
-                Nuevos
+                {t('homeNew')}
               </span>
             </div>
           </div>
@@ -600,7 +612,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
 
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-              Recetas pendientes
+              {t('homePendingRx')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '2px' }}>
               <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>
@@ -617,7 +629,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   borderRadius: '9999px'
                 }}
               >
-                Por firmar
+                {t('homeToSign')}
               </span>
             </div>
           </div>
@@ -643,10 +655,10 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                Agenda del Día
+                {t('homeDailyAgenda')}
               </h2>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 7px', borderRadius: '9999px' }}>
-                {activeAppointments.length} pendientes
+                {t('homePendingCount', { count: activeAppointments.length })}
               </span>
             </div>
 
@@ -665,7 +677,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                 gap: '0.3rem'
               }}
             >
-              <span>Ver agenda completa</span>
+              <span>{t('homeViewFullAgenda')}</span>
               <ChevronRight size={14} />
             </button>
           </div>
@@ -704,10 +716,10 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   <CheckCircle2 size={30} strokeWidth={2.2} />
                 </div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-                  ¡Agenda del día al día!
+                  {t('homeAgendaCaughtUp')}
                 </h3>
                 <p style={{ fontSize: '0.84rem', color: '#64748b', maxWidth: '440px', lineHeight: 1.45, margin: 0 }}>
-                  No tienes consultas pendientes en este momento. Todas las citas programadas han sido completadas o no hay pacientes en espera.
+                  {t('homeAgendaEmpty')}
                 </p>
                 {finishedAppointments.length > 0 && (
                   <button
@@ -717,7 +729,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     style={{ marginTop: '0.5rem', color: '#0f766e', borderColor: '#a7f3d0', gap: '0.4rem' }}
                   >
                     <Eye size={14} />
-                    <span>{showFinishedSection ? 'Ocultar' : 'Ver'} {finishedAppointments.length} consultas finalizadas hoy</span>
+                    <span>{t('homeViewFinishedTodayCount', { action: showFinishedSection ? t('homeHide') : t('homeView'), count: finishedAppointments.length })}</span>
                   </button>
                 )}
               </div>
@@ -792,7 +804,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                               border: `1px solid ${appt.statusBorder || '#cbd5e1'}`
                             }}
                           >
-                            {appt.statusLabel || 'Programada'}
+                            {t(`apptStatus_${status}`)}
                           </span>
                         </div>
 
@@ -800,7 +812,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                         <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                           <span>{appt.gender}</span>
                           <span>•</span>
-                          <span>{appt.age} años</span>
+                          <span>{t('homeYearsOld', { age: appt.age })}</span>
                           <span>•</span>
                           <span style={{ fontFamily: 'var(--font-mono)' }}>{appt.documentId}</span>
                         </div>
@@ -820,12 +832,12 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           type="button"
                           onClick={() => {
                             applyStatus('confirmed');
-                            if (addToast) addToast('success', `${appt.patientName}: cita confirmada`, 'Consulta');
+                            if (addToast) addToast('success', t('homeToastConfirmed', { name: appt.patientName }), t('homeConsultLabel'));
                           }}
                           className="btn btn-secondary btn-sm"
                           style={{ fontSize: '0.75rem', color: '#0284c7' }}
                         >
-                          Confirmar
+                          {t('homeConfirm')}
                         </button>
                       )}
                       {status === 'confirmed' && (
@@ -833,13 +845,13 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           type="button"
                           onClick={() => {
                             applyStatus('waiting');
-                            if (addToast) addToast('success', `${appt.patientName} está en espera`, 'Recepción');
+                            if (addToast) addToast('success', t('homeToastWaiting', { name: appt.patientName }), t('homeReceptionLabel'));
                           }}
                           className="btn btn-secondary btn-sm"
                           style={{ fontSize: '0.75rem', padding: '0.4rem 0.65rem', color: '#475569' }}
                         >
                           <UserCheck size={13} />
-                          <span>Llegó</span>
+                          <span>{t('homeArrived')}</span>
                         </button>
                       )}
                       {status === 'waiting' && (
@@ -847,13 +859,13 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           type="button"
                           onClick={() => {
                             applyStatus('in_room');
-                            if (addToast) addToast('success', `${appt.patientName} pasó a sala`, 'Consulta');
+                            if (addToast) addToast('success', t('homeToastInRoom', { name: appt.patientName }), t('homeConsultLabel'));
                           }}
                           className="btn btn-secondary btn-sm"
                           style={{ fontSize: '0.75rem', color: '#047857' }}
                         >
                           <UserCheck size={13} />
-                          <span>En sala</span>
+                          <span>{t('homeMoveToRoom')}</span>
                         </button>
                       )}
                       {(status === 'in_room' || status === 'in_consultation') && (
@@ -878,7 +890,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           }}
                         >
                           <Stethoscope size={15} />
-                          <span>{isCurrentlyConsulting ? 'Continuar consulta' : 'Iniciar consulta'}</span>
+                          <span>{isCurrentlyConsulting ? t('homeContinueConsult') : t('homeStartConsult')}</span>
                         </button>
                       )}
                       <button
@@ -892,18 +904,18 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           color: '#334155'
                         }}
                       >
-                        <span>Ver ficha</span>
+                        <span>{t('homeViewChart')}</span>
                       </button>
                       {!isTerminalAppointmentStatus(status) && status !== 'in_consultation' && (
                         <button
                           type="button"
                           onClick={() => {
                             applyStatus('cancelled');
-                            if (addToast) addToast('info', `${appt.patientName}: cita cancelada`, 'Consulta');
+                            if (addToast) addToast('info', t('homeToastCancelled', { name: appt.patientName }), t('homeConsultLabel'));
                           }}
                           className="btn btn-secondary btn-sm"
                           style={{ fontSize: '0.75rem', color: '#991b1b' }}
-                          title="Cancelar cita"
+                          title={t('homeCancelAppt')}
                         >
                           <Ban size={13} />
                         </button>
@@ -955,12 +967,12 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     <Check size={14} strokeWidth={2.5} />
                   </div>
                   <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#334155' }}>
-                    Consultas finalizadas hoy ({finishedAppointments.length})
+                    {t('homeFinishedToday', { count: finishedAppointments.length })}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
-                  <span>{showFinishedSection ? 'Ocultar' : 'Mostrar'}</span>
+                  <span>{showFinishedSection ? t('homeHide') : t('homeShow')}</span>
                   <ChevronDown
                     size={16}
                     style={{
@@ -1011,7 +1023,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                             borderRadius: '9999px'
                           }}
                         >
-                          ✓ Completada
+                          ✓ {t('homeCompleted')}
                         </span>
                       </div>
 
@@ -1023,7 +1035,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: '#0f766e', borderColor: '#a7f3d0' }}
                         >
                           <Eye size={12} />
-                          <span>Ver historial</span>
+                          <span>{t('homeViewHistory')}</span>
                         </button>
                         <button
                           type="button"
@@ -1031,7 +1043,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           className="btn btn-secondary btn-sm"
                           style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
                         >
-                          <span>Ficha</span>
+                          <span>{t('homeChart')}</span>
                         </button>
                       </div>
                     </div>
@@ -1067,13 +1079,13 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   <CheckCircle2 size={16} strokeWidth={2.5} />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                  Tareas Pendientes
+                  {t('homePendingTasks')}
                 </h3>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '9999px' }}>
-                  {tasks.filter(t => !t.completed).length} pendientes
+                  {t('homePendingCount', { count: tasks.filter((taskItem) => !taskItem.completed).length })}
                 </span>
 
                 <button
@@ -1088,7 +1100,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                     display: 'flex',
                     alignItems: 'center'
                   }}
-                  title="Añadir tarea"
+                  title={t('homeAddTask')}
                 >
                   <Plus size={16} strokeWidth={2.5} />
                 </button>
@@ -1102,7 +1114,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   type="text"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="Nueva tarea médica..."
+                  placeholder={t('homeNewTaskPlaceholder')}
                   className="form-input"
                   style={{ height: '32px', fontSize: '0.78rem', flex: 1 }}
                   autoFocus
@@ -1120,7 +1132,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
             {/* Drag & Drop Instructions Sub-bar */}
             <div style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <GripVertical size={12} />
-              <span>Arrastra y suelta para reordenar prioridades</span>
+              <span>{t('homeDragReorder')}</span>
             </div>
 
             {/* Drag & Drop Task List */}
@@ -1163,7 +1175,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                         alignItems: 'center',
                         flexShrink: 0
                       }}
-                      title="Arrastrar para mover"
+                      title={t('homeDragToMove')}
                     >
                       <GripVertical size={15} />
                     </div>
@@ -1196,24 +1208,24 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                           wordBreak: 'break-word'
                         }}
                       >
-                        {task.title}
+                        {DEFAULT_TASK_TITLE_KEYS[task.id] ? t(DEFAULT_TASK_TITLE_KEYS[task.id]) : task.title}
                       </div>
 
                       <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                         {task.urgent && (
                           <span style={{ color: '#e11d48', fontWeight: 800 }}>
-                            Urgente •
+                            {t('homeUrgent')} •
                           </span>
                         )}
-                        {task.patient && <span>Paciente: {task.patient}</span>}
+                        {task.patient && <span>{t('homePatientPrefix', { name: task.patient })}</span>}
                         {task.badgeText && !task.urgent && (
                           <span style={{ color: '#d97706', fontWeight: 700 }}>
-                            {task.badgeText}
+                            {DEFAULT_TASK_BADGE_KEYS[task.id] ? t(DEFAULT_TASK_BADGE_KEYS[task.id]) : task.badgeText}
                           </span>
                         )}
                         {task.completed && (
                           <span style={{ color: '#059669', fontWeight: 700, fontSize: '0.68rem' }}>
-                            ✓ Completada
+                            ✓ {t('homeCompleted')}
                           </span>
                         )}
                       </div>
@@ -1238,7 +1250,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.color = '#e11d48'}
                       onMouseLeave={(e) => e.currentTarget.style.color = '#cbd5e1'}
-                      title="Eliminar tarea"
+                      title={t('homeDeleteTask')}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -1254,7 +1266,7 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                 onClick={() => {
                   const sorted = sortTasksByCompletion(tasks);
                   setTasks(sorted);
-                  if (addToast) addToast('info', 'Tareas reordenadas: pendientes primero, completadas al final', 'Tareas');
+                  if (addToast) addToast('info', t('homeTaskReordered'), t('homeTasksLabel'));
                 }}
                 style={{
                   border: 'none',
@@ -1266,11 +1278,11 @@ export default function DoctorHomeDashboard({ onOpenScheduleModal, addToast }) {
                   padding: 0
                 }}
               >
-                Reordenar (Pendientes arriba)
+                {t('homeReorderPendingFirst')}
               </button>
 
               <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                {tasks.length} tareas
+                {t('homeTaskCount', { count: tasks.length })}
               </span>
             </div>
           </div>

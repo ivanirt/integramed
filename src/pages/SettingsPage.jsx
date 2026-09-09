@@ -246,10 +246,10 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   const [vaultStatus, setVaultStatus] = useState(null);
 
   useEffect(() => {
-    getClinicalVaultStatus()
+    getClinicalVaultStatus(language)
       .then(setVaultStatus)
       .catch(() => setVaultStatus({ exists: false, noteCount: 0 }));
-  }, []);
+  }, [language]);
 
   // Load practitioners
   useEffect(() => {
@@ -1914,19 +1914,33 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
             }}
           >
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
-              Vault clínico (Obsidian)
+              {language === 'en' ? 'Clinical vault (Obsidian)' : 'Vault clínico (Obsidian)'}
             </h3>
             <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.5 }}>
-              Exporta o copia notas <code>.md</code> a la carpeta <code>vault/</code> del proyecto (o define
-              <code> CLINICAL_VAULT_PATH</code> en <code>.env</code>). Usa frontmatter con <code>tags: [mtc]</code> y
-              <code>condition</code> o un título H1. La API key del modelo se configura en Mi perfil, no aquí.
+              {language === 'en'
+                ? (
+                  <>
+                    Notes load from <code>vault-en/</code> or <code>vault-es/</code> according to the signed-in user’s language.
+                    Override with <code>CLINICAL_VAULT_EN_PATH</code> / <code>CLINICAL_VAULT_ES_PATH</code> in <code>.env</code>.
+                    Use frontmatter with <code>tags: [mtc]</code> and <code>condition</code> or an H1 title. The model API key is set in My Profile, not here.
+                  </>
+                )
+                : (
+                  <>
+                    Las notas se cargan de <code>vault-en/</code> o <code>vault-es/</code> según el idioma del usuario.
+                    Puedes definir <code>CLINICAL_VAULT_EN_PATH</code> / <code>CLINICAL_VAULT_ES_PATH</code> en <code>.env</code>.
+                    Usa frontmatter con <code>tags: [mtc]</code> y <code>condition</code> o un título H1. La API key del modelo se configura en Mi perfil, no aquí.
+                  </>
+                )}
             </p>
             <div style={{ fontSize: '0.8125rem', color: vaultStatus?.exists ? '#047857' : '#b45309', fontWeight: 600 }}>
               {vaultStatus
                 ? (vaultStatus.exists
-                  ? `${vaultStatus.noteCount} notas encontradas`
-                  : 'Aún no hay notas .md en el vault')
-                : 'Comprobando vault…'}
+                  ? (language === 'en'
+                    ? `${vaultStatus.noteCount} notes in the ${vaultStatus.language === 'en' ? 'English' : 'Spanish'} vault`
+                    : `${vaultStatus.noteCount} notas en el vault ${vaultStatus.language === 'en' ? 'inglés' : 'español'}`)
+                  : (language === 'en' ? 'No .md notes in this language vault yet' : 'Aún no hay notas .md en el vault de este idioma'))
+                : (language === 'en' ? 'Checking vault…' : 'Comprobando vault…')}
             </div>
             {vaultStatus?.path && (
               <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem', wordBreak: 'break-all' }}>

@@ -178,7 +178,7 @@ app.post('/api/ai/consult', async (req, res) => {
     });
   }
 
-  const ranked = rankVaultNotes(notes, `${diagnosisText} ${question}`, modalities, 5);
+  const ranked = rankVaultNotes(notes, diagnosisText, modalities, 5);
   const sources = ranked.map((note) => ({
     file: note.file,
     title: note.title,
@@ -197,7 +197,7 @@ app.post('/api/ai/consult', async (req, res) => {
     'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
   ].join(' ');
 
-  const userPrompt = `Diagnóstico (código y texto): ${diagnosisText}\nModalidades activas: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda?'}\n\nContexto del vault:\n${contextBlock}`;
+  const userPrompt = `Diagnóstico del médico (código CIE y/o texto libre; cualquiera basta): ${diagnosisText}\nModalidades activas: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda para este diagnóstico?'}\n\nContexto del vault:\n${contextBlock}`;
 
   try {
     const llmHeaders = {

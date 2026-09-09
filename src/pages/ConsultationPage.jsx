@@ -149,6 +149,19 @@ function appendDictation(previous, chunk) {
   return /[\s]$/.test(current) ? `${current}${next}` : `${current} ${next}`;
 }
 
+function parseDiagnosisChip(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  const withLabel = text.match(/^([A-Za-z0-9][A-Za-z0-9.]{1,14})\s+(.+)$/);
+  if (withLabel) {
+    return { code: withLabel[1].toUpperCase(), label: withLabel[2].trim() };
+  }
+  if (/^[A-Za-z0-9][A-Za-z0-9.]{1,14}$/.test(text)) {
+    return { code: text.toUpperCase(), label: text.toUpperCase() };
+  }
+  return { code: '', label: text };
+}
+
 function getSpeechRecognition() {
   if (typeof window === 'undefined') return null;
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -373,16 +386,17 @@ export default function ConsultationPage({ addToast }) {
   };
 
   // Handle Diagnosis tag remove
-  const handleRemoveDiagnosis = (code) => {
-    setDiagnoses(prev => prev.filter(d => d.code !== code));
+  const handleRemoveDiagnosis = (chip) => {
+    setDiagnoses((prev) => prev.filter((d) => (d.code || d.label) !== chip));
   };
 
   // Handle Diagnosis tag add
   const handleAddDiagnosis = (e) => {
     if (e.key === 'Enter' && diagnosisInput.trim()) {
       e.preventDefault();
-      const code = diagnosisInput.trim().toUpperCase();
-      setDiagnoses(prev => [...prev, { code: code.slice(0, 4), label: diagnosisInput.trim() }]);
+      const chip = parseDiagnosisChip(diagnosisInput);
+      if (!chip) return;
+      setDiagnoses((prev) => [...prev, chip]);
       setDiagnosisInput('');
     }
   };
@@ -395,17 +409,6 @@ export default function ConsultationPage({ addToast }) {
       addToast('success', t('suggestionAddedToast'), t('toastUpdatedTitle'));
     }
   };
-
-  const diagnosisQuery = useMemo(() => {
-    const coded = diagnoses
-      .map((d) => `${d.code || ''} ${d.label || ''}`.trim())
-      .filter(Boolean)
-      .join(', ');
-    return [coded, diagnosisInput, assessmentText]
-      .map((part) => String(part || '').trim())
-      .filter(Boolean)
-      .join(' — ');
-  }, [diagnoses, diagnosisInput, assessmentText]);
 
   const aiSecrets = getStaffAiSecrets(currentUser?.id);
 
@@ -484,8 +487,14 @@ export default function ConsultationPage({ addToast }) {
   }, []);
 
   const handleConsultAi = async (question = '') => {
-    if (!diagnosisQuery.trim()) {
-      if (addToast) addToast('error', 'Escribe o selecciona un diagnóstico (código o texto libre).', t('toastErrorTitle'));
+    const pendingChip = parseDiagnosisChip(diagnosisInput);
+    const codedDiagnoses = [
+      ...diagnoses.map((item) => ({ code: item.code || '', label: item.label || '' })),
+      ...(pendingChip ? [pendingChip] : [])
+    ];
+    const diagnosisFreeText = String(assessmentText || '').trim();
+    if (!codedDiagnoses.length && !diagnosisFreeText) {
+      if (addToast) addToast('error', 'Indica un diagnóstico: código CIE o texto libre.', t('toastErrorTitle'));
       return;
     }
     if (!aiSecrets.aiApiKey) {
@@ -497,8 +506,8 @@ export default function ConsultationPage({ addToast }) {
     setIsAiLoading(true);
     try {
       const result = await consultClinicalAi({
-        diagnosis: diagnoses.map((item) => ({ code: item.code || '', label: item.label || '' })),
-        diagnosisFreeText: [diagnosisInput, assessmentText].map((part) => String(part || '').trim()).filter(Boolean).join('\n'),
+        diagnosis: codedDiagnoses,
+        diagnosisFreeText,
         modalities: modalitySpecsFromIds(resolveSearchModalities(currentUser?.integrativeModalities)),
         question,
         apiKey: aiSecrets.aiApiKey,
@@ -1337,7 +1346,7 @@ export default function ConsultationPage({ addToast }) {
                 <button
                   type="button"
                   onClick={() => handleConsultAi()}
-                  title="Consultar IA del vault (código CIE y texto libre)"
+                  title="Buscar en el vault con el diagnóstico (código CIE o texto libre)"
                   style={{
                     border: 'none',
                     background: isAiPanelOpen ? '#ccfbf1' : '#ecfdf5',
@@ -1377,9 +1386,9 @@ export default function ConsultationPage({ addToast }) {
                 gap: '0.5rem'
               }}
             >
-              {diagnoses.map((diag) => (
+              {diagnoses.map((diag, idx) => (
                 <div
-                  key={diag.code}
+                  key={`${diag.code || 'dx'}-${diag.label}-${idx}`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1393,10 +1402,12 @@ export default function ConsultationPage({ addToast }) {
                     fontWeight: 600
                   }}
                 >
-                  <span style={{ fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{diag.code}</span>
+                  {diag.code ? (
+                    <span style={{ fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{diag.code}</span>
+                  ) : null}
                   <span>{diag.label}</span>
                   <button
-                    onClick={() => handleRemoveDiagnosis(diag.code)}
+                    onClick={() => handleRemoveDiagnosis(diag.code || diag.label)}
                     style={{
                       border: 'none',
                       background: 'transparent',

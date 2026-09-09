@@ -67,7 +67,11 @@ export function tokenize(text) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 2 && !STOPWORDS.has(token));
+    .filter((token) => {
+      if (!token || STOPWORDS.has(token)) return false;
+      if (/\d/.test(token)) return token.length >= 2;
+      return token.length > 2;
+    });
 }
 
 function normalizeTag(tag) {
@@ -170,23 +174,52 @@ export function loadVaultNotes(vaultPath) {
       condition: meta.condition || meta.common || '',
       tags,
       body,
-      text: `${title}\n${yamlSearchText(meta)}\n${body}`
+      text: `${title}\n${relative}\n${yamlSearchText(meta)}\n${body}`
     };
   });
 }
 
+function normalizeSearchText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_/-]+/g, ' ');
+}
+
+function scoreNoteAgainstQuery(note, queryText) {
+  const query = String(queryText || '').trim();
+  if (!query) return 0;
+  const queryNorm = normalizeSearchText(query);
+  const queryTokens = tokenize(query);
+  const titleNorm = normalizeSearchText(`${note.title} ${note.condition} ${note.file}`);
+  const hayNorm = normalizeSearchText(note.text);
+  const haySet = new Set(tokenize(`${note.text} ${note.file}`));
+  let score = 0;
+  queryTokens.forEach((token) => {
+    if (haySet.has(token)) score += 1;
+    if (titleNorm.includes(token)) score += 3;
+  });
+  if (queryNorm.length >= 3 && titleNorm.includes(queryNorm)) score += 8;
+  queryNorm.split(/\s+/).forEach((word) => {
+    if (word.length < 4) return;
+    if (titleNorm.includes(word)) score += 4;
+    else if (hayNorm.includes(word)) score += 1;
+  });
+  return score;
+}
+
 export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5) {
-  const queryTokens = tokenize(diagnosisText);
   const filtered = notes.filter((note) => modalityMatches(note.tags, modalitySpecs));
+  const queries = String(diagnosisText || '')
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const searchQueries = queries.length ? queries : [String(diagnosisText || '').trim()].filter(Boolean);
+
   const scored = filtered.map((note) => {
-    const haystack = tokenize(note.text);
-    const haySet = new Set(haystack);
-    let overlap = 0;
-    queryTokens.forEach((token) => {
-      if (haySet.has(token)) overlap += 1;
-    });
-    const titleBoost = tokenize(`${note.title} ${note.condition}`).some((t) => queryTokens.includes(t)) ? 3 : 0;
-    return { ...note, score: overlap + titleBoost };
+    const score = searchQueries.reduce((sum, query) => sum + scoreNoteAgainstQuery(note, query), 0);
+    return { ...note, score };
   });
   const ranked = scored
     .filter((note) => note.score > 0)

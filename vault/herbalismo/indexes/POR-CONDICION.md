@@ -1,0 +1,33 @@
+---
+type: Index
+title: Por condicion
+description: "Entrada A-… del home herbal."
+tags: [alt-med, okf, herbal]
+generated:
+  by: process:grok-alt-med-vault
+  at: 2026-09-09T03:50:00Z
+status: draft
+stale_after: 2027-09-09
+sources:
+  - id: wallach-lan-herbal-doctor-2001
+    resource: attachments/_OceanofPDF.com_Lets_Play_Herbal_Doctor_-_Joel_D_Wallach.pdf
+    title: "Let's Play Herbal Doctor An American Home Herbal (Wallach & Ma Lan, Wellness 2001)"
+    author: human:Joel-D-Wallach
+    last_modified: 2001-02-01T00:00:00Z
+  - id: vault-curation
+    resource: boericke-vault/herbalismo/
+    title: Agent condition/plant catalog (no doses copied)
+    author: process:grok-alt-med-vault
+    last_modified: 2026-09-09T03:50:00Z
+---
+
+# Por condición (parte 4)
+
+El PDF recorre A–Z de síntomas. Notas locales:
+
+- [[herbalismo/condiciones/Abrasiones]]
+- [[herbalismo/condiciones/Absceso]]
+- [[herbalismo/condiciones/Acidez-hipoclorhidria]]
+- [[herbalismo/condiciones/Acne]]
+
+Si el término está en el índice del libro y no aquí, di que existe en el PDF y trabaja con plantas análogas + disclaimer.

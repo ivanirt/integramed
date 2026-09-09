@@ -145,22 +145,24 @@ app.get('/api/ai/vault-status', (req, res) => {
 
 app.post('/api/ai/consult', async (req, res) => {
   const apiKey = String(req.headers['x-ai-key'] || '').trim();
-  const baseUrl = String(req.headers['x-ai-base-url'] || 'https://api.openai.com/v1').replace(/\/$/, '');
-  const model = String(req.headers['x-ai-model'] || 'gpt-4o-mini').trim();
+  const baseUrl = String(req.headers['x-ai-base-url'] || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+  const model = String(req.headers['x-ai-model'] || 'openai/gpt-4o').trim();
 
   if (!apiKey) {
     return res.status(400).json({ error: 'Falta la API key del modelo. Configúrala en Mi perfil.' });
   }
 
   const diagnosis = req.body?.diagnosis;
-  const diagnosisText = Array.isArray(diagnosis)
+  const codedDiagnosis = Array.isArray(diagnosis)
     ? diagnosis.map((item) => (typeof item === 'string' ? item : `${item.code || ''} ${item.label || ''}`)).join(' ')
     : String(diagnosis || '');
+  const freeTextDiagnosis = String(req.body?.diagnosisFreeText || '').trim();
+  const diagnosisText = [codedDiagnosis, freeTextDiagnosis].filter((part) => String(part).trim()).join('\n');
   const question = String(req.body?.question || '').trim();
   const modalities = req.body?.modalities || [];
 
   if (!diagnosisText.trim()) {
-    return res.status(400).json({ error: 'Indica al menos un diagnóstico antes de consultar la IA.' });
+    return res.status(400).json({ error: 'Indica un diagnóstico (código o texto libre) antes de consultar la IA.' });
   }
 
   let notes = [];
@@ -195,15 +197,21 @@ app.post('/api/ai/consult', async (req, res) => {
     'Estructura: (1) lo que dice el vault de la condición, (2) ayudas o enfoques que recomiendan las notas, (3) límites / no es tratamiento.'
   ].join(' ');
 
-  const userPrompt = `Diagnóstico: ${diagnosisText}\nModalidades activas: ${(modalities || []).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda?'}\n\nContexto del vault:\n${contextBlock}`;
+  const userPrompt = `Diagnóstico (código y texto): ${diagnosisText}\nModalidades activas: ${(modalities || []).map((mod) => (typeof mod === 'object' ? mod.id : mod)).filter(Boolean).join(', ') || 'todas'}\nPregunta del médico: ${question || '¿Qué dice el vault y qué ayudas recomienda?'}\n\nContexto del vault:\n${contextBlock}`;
 
   try {
+    const llmHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    };
+    if (baseUrl.includes('openrouter.ai')) {
+      llmHeaders['HTTP-Referer'] = 'https://integramed.local';
+      llmHeaders['X-Title'] = 'IntegraMed';
+    }
+
     const llmResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
+      headers: llmHeaders,
       body: JSON.stringify({
         model,
         temperature: 0.2,

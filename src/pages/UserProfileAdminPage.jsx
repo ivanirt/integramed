@@ -47,7 +47,7 @@ import {
   getStaffFullName,
   getStaffList
 } from '../utils/staffStorage';
-import { INTEGRATIVE_MODALITIES, getStaffAiSecrets, saveStaffAiSecrets, getEnabledClinicModalityIds } from '../utils/integrativeMedicine';
+import { INTEGRATIVE_MODALITIES, getStaffAiSecrets, saveStaffAiSecrets, getEnabledClinicModalityIds, DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL } from '../utils/integrativeMedicine';
 import PractitionerAdminModal from '../components/practitioners/PractitionerAdminModal';
 import ChangePasswordModal from '../components/practitioners/ChangePasswordModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -139,8 +139,8 @@ export default function UserProfileAdminPage({ addToast }) {
     notifyEmail: true,
     notifyLabAlerts: true,
     integrativeModalities: [],
-    aiBaseUrl: 'https://api.openai.com/v1',
-    aiModel: 'gpt-4o-mini',
+    aiBaseUrl: DEFAULT_AI_BASE_URL,
+    aiModel: DEFAULT_AI_MODEL,
     aiApiKey: '',
     // Color
     avatarBg: '#0f766e',
@@ -178,8 +178,8 @@ export default function UserProfileAdminPage({ addToast }) {
         notifyEmail: currentUser.preferences?.notifyEmail ?? true,
         notifyLabAlerts: currentUser.preferences?.notifyLabAlerts ?? true,
         integrativeModalities: currentUser.integrativeModalities || [],
-        aiBaseUrl: currentUser.aiBaseUrl || secrets.aiBaseUrl,
-        aiModel: currentUser.aiModel || secrets.aiModel,
+        aiBaseUrl: secrets.aiBaseUrl,
+        aiModel: secrets.aiModel,
         aiApiKey: secrets.aiApiKey,
         avatarBg: currentUser.avatarBg || '#0f766e',
         avatarText: currentUser.avatarText || '#ffffff'
@@ -1259,7 +1259,7 @@ export default function UserProfileAdminPage({ addToast }) {
                           className="form-input"
                           value={profileForm.aiBaseUrl}
                           onChange={(e) => handleProfileFormChange('aiBaseUrl', e.target.value)}
-                          placeholder="https://api.openai.com/v1"
+                          placeholder={DEFAULT_AI_BASE_URL}
                         />
                       </div>
                       <div>
@@ -1269,7 +1269,7 @@ export default function UserProfileAdminPage({ addToast }) {
                           className="form-input"
                           value={profileForm.aiModel}
                           onChange={(e) => handleProfileFormChange('aiModel', e.target.value)}
-                          placeholder="gpt-4o-mini"
+                          placeholder={DEFAULT_AI_MODEL}
                         />
                       </div>
                       <div>

@@ -49,6 +49,7 @@ function walkMarkdownFiles(dir, acc = []) {
   entries.forEach((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name.startsWith('.')) return;
       walkMarkdownFiles(full, acc);
       return;
     }
@@ -69,18 +70,47 @@ export function tokenize(text) {
     .filter((token) => token.length > 2 && !STOPWORDS.has(token));
 }
 
+function normalizeTag(tag) {
+  return String(tag || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/-/g, '_');
+}
+
 function noteTags(meta) {
   const tags = meta.tags;
-  if (Array.isArray(tags)) return tags.map((t) => String(t).toLowerCase());
-  if (typeof tags === 'string') return tags.split(/[,\s]+/).map((t) => t.toLowerCase()).filter(Boolean);
+  if (Array.isArray(tags)) return tags.map(normalizeTag).filter(Boolean);
+  if (typeof tags === 'string') return tags.split(/[,\s]+/).map(normalizeTag).filter(Boolean);
   return [];
 }
 
 function inferPathTags(relativePath) {
   const p = String(relativePath || '').replace(/\\/g, '/').toLowerCase();
   const tags = [];
-  if (p.includes('boericke') || p.includes('homeopath') || p.includes('homeopat')) {
+  if (p.includes('boericke') || p.includes('homeopath') || p.includes('homeopat') || /(^|\/)remedies\//.test(p)) {
     tags.push('homeopathy', 'homeopatia', 'boericke');
+  }
+  if (p.includes('acupuntur') || p.includes('medicina-china') || p.includes('padilla') || /(^|\/)tcm(\/|$)/.test(p)) {
+    tags.push('tcm', 'mtc', 'acupuncture', 'acupuntura');
+  }
+  if (p.includes('biodescod')) {
+    tags.push('biodescodification', 'biodescodificacion');
+  }
+  if (p.includes('celulas-madre') || p.includes('celulas_madre') || p.includes('stem_cell') || p.includes('stem-cell')) {
+    tags.push('stem_cells', 'celulas_madre', 'stem_cells');
+  }
+  if (p.includes('iridol')) {
+    tags.push('iridology', 'iridologia');
+  }
+  if (p.includes('ayurveda')) {
+    tags.push('ayurveda');
+  }
+  if (p.includes('peptide') || p.includes('herbalismo') || p.includes('herbal')) {
+    tags.push('functional', 'medicina_funcional', 'peptides');
+  }
+  if (p.startsWith('condiciones/') || p.includes('/condiciones/')) {
+    tags.push('general');
   }
   return tags;
 }
@@ -98,14 +128,14 @@ function yamlSearchText(meta = {}) {
 }
 
 const MODALITY_ALIASES = {
-  tcm: ['tcm', 'mtc'],
+  tcm: ['tcm', 'mtc', 'acupuntura', 'acupuncture', 'medicina_tradicional_china'],
   acupuncture: ['acupuncture', 'acupuntura', 'mtc', 'tcm'],
-  stem_cells: ['stem_cells', 'celulas_madre', 'stem-cells'],
+  stem_cells: ['stem_cells', 'celulas_madre', 'regen_med'],
   homeopathy: ['homeopathy', 'homeopatia', 'boericke', 'homoeopathic', 'materia_medica'],
   iridology: ['iridology', 'iridologia'],
   biodescodification: ['biodescodification', 'biodescodificacion', 'biodecoding', 'biodecodificacion'],
   ayurveda: ['ayurveda'],
-  functional: ['functional', 'medicina_funcional']
+  functional: ['functional', 'medicina_funcional', 'peptides', 'herbalismo', 'herbal']
 };
 
 function expandModalityAliases(modalities) {
@@ -113,9 +143,9 @@ function expandModalityAliases(modalities) {
     if (mod && typeof mod === 'object') {
       return Array.isArray(mod.aliases) ? mod.aliases : [mod.id];
     }
-    const key = String(mod || '').toLowerCase();
+    const key = normalizeTag(mod);
     return MODALITY_ALIASES[key] || [key];
-  }).map((alias) => String(alias).toLowerCase());
+  }).map((alias) => normalizeTag(alias));
 }
 
 function modalityMatches(tags, modalities) {
@@ -169,11 +199,12 @@ export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5) {
     .sort((a, b) => {
       const rank = (file) => {
         const f = file.toLowerCase();
-        if (f.includes('keynotes')) return 0;
-        if (f.includes('playbook')) return 1;
-        if (f.includes('by-system')) return 2;
-        if (f.includes('/remedies/')) return 3;
-        return 4;
+        if (f.includes('condiciones/')) return 0;
+        if (f.includes('keynotes')) return 1;
+        if (f.includes('playbook')) return 2;
+        if (f.includes('by-system')) return 3;
+        if (f.includes('/remedies/')) return 4;
+        return 5;
       };
       return rank(a.file) - rank(b.file);
     })

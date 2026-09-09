@@ -2,6 +2,7 @@ const API_BASE = '/api';
 
 export async function consultClinicalAi({
   diagnosis,
+  diagnosisFreeText,
   modalities,
   question,
   apiKey,
@@ -14,11 +15,12 @@ export async function consultClinicalAi({
       'Content-Type': 'application/json',
       Accept: 'application/json',
       'x-ai-key': apiKey || '',
-      'x-ai-base-url': baseUrl || 'https://api.openai.com/v1',
-      'x-ai-model': model || 'gpt-4o-mini'
+      'x-ai-base-url': baseUrl || 'https://openrouter.ai/api/v1',
+      'x-ai-model': model || 'openai/gpt-4o'
     },
     body: JSON.stringify({
       diagnosis,
+      diagnosisFreeText: diagnosisFreeText || '',
       modalities,
       question: question || ''
     })

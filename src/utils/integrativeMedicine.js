@@ -3,7 +3,7 @@ export const INTEGRATIVE_MODALITIES = [
     id: 'tcm',
     labelEs: 'Medicina tradicional china',
     labelEn: 'Traditional Chinese medicine',
-    aliases: ['tcm', 'mtc']
+    aliases: ['tcm', 'mtc', 'acupuntura', 'acupuncture', 'medicina_tradicional_china']
   },
   {
     id: 'acupuncture',
@@ -15,7 +15,7 @@ export const INTEGRATIVE_MODALITIES = [
     id: 'stem_cells',
     labelEs: 'Células madre',
     labelEn: 'Stem cells',
-    aliases: ['stem_cells', 'celulas_madre', 'stem-cells']
+    aliases: ['stem_cells', 'celulas_madre', 'stem-cells', 'regen_med']
   },
   {
     id: 'homeopathy',
@@ -45,7 +45,7 @@ export const INTEGRATIVE_MODALITIES = [
     id: 'functional',
     labelEs: 'Medicina funcional',
     labelEn: 'Functional medicine',
-    aliases: ['functional', 'medicina_funcional']
+    aliases: ['functional', 'medicina_funcional', 'peptides', 'herbalismo', 'herbal']
   }
 ];
 
@@ -54,7 +54,9 @@ export const CLINIC_SEARCH_MODALITIES = [
   'homeopathy',
   'stem_cells',
   'iridology',
-  'biodescodification'
+  'biodescodification',
+  'ayurveda',
+  'functional'
 ];
 
 const CLINIC_MODALITIES_KEY = 'integramed_clinic_integrative_modalities';
@@ -107,6 +109,8 @@ export function resolveSearchModalities(doctorModalityIds) {
 }
 
 const AI_SECRETS_KEY = 'integramed_ai_secrets';
+export const DEFAULT_AI_BASE_URL = 'https://openrouter.ai/api/v1';
+export const DEFAULT_AI_MODEL = 'openai/gpt-4o';
 
 function readSecretsMap() {
   try {
@@ -117,25 +121,28 @@ function readSecretsMap() {
   }
 }
 
-export function getStaffAiSecrets(staffId) {
-  if (!staffId) return { aiApiKey: '', aiBaseUrl: 'https://api.openai.com/v1', aiModel: 'gpt-4o-mini' };
-  const map = readSecretsMap();
-  const saved = map[staffId] || {};
-  return {
-    aiApiKey: saved.aiApiKey || '',
-    aiBaseUrl: saved.aiBaseUrl || 'https://api.openai.com/v1',
-    aiModel: saved.aiModel || 'gpt-4o-mini'
+function withAiDefaults(partial = {}) {
+  const value = (key, fallback) => {
+    const next = String(partial[key] || '').trim();
+    return next || fallback;
   };
+  return {
+    aiApiKey: String(partial.aiApiKey || '').trim(),
+    aiBaseUrl: value('aiBaseUrl', DEFAULT_AI_BASE_URL),
+    aiModel: value('aiModel', DEFAULT_AI_MODEL)
+  };
+}
+
+export function getStaffAiSecrets(staffId) {
+  const map = readSecretsMap();
+  const saved = staffId ? (map[staffId] || {}) : {};
+  return withAiDefaults(saved);
 }
 
 export function saveStaffAiSecrets(staffId, secrets) {
   if (!staffId) return;
   const map = readSecretsMap();
-  map[staffId] = {
-    aiApiKey: secrets.aiApiKey || '',
-    aiBaseUrl: secrets.aiBaseUrl || 'https://api.openai.com/v1',
-    aiModel: secrets.aiModel || 'gpt-4o-mini'
-  };
+  map[staffId] = withAiDefaults(secrets);
   try {
     localStorage.setItem(AI_SECRETS_KEY, JSON.stringify(map));
   } catch (err) {

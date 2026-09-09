@@ -7,7 +7,6 @@ import {
   Stethoscope,
   Activity,
   Mic,
-  MicOff,
   Maximize2,
   Minimize2,
   Check,
@@ -142,6 +141,44 @@ const BANNER_CHIP = {
   whiteSpace: 'nowrap'
 };
 
+function appendDictation(previous, chunk) {
+  const next = String(chunk || '').trim();
+  if (!next) return previous || '';
+  const current = String(previous || '');
+  if (!current) return next;
+  return /[\s]$/.test(current) ? `${current}${next}` : `${current} ${next}`;
+}
+
+function getSpeechRecognition() {
+  if (typeof window === 'undefined') return null;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function DictationMicButton({ active, onClick, title }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      style={{
+        border: 'none',
+        background: active ? '#d1fae5' : '#f1f5f9',
+        color: active ? '#059669' : '#94a3b8',
+        borderRadius: '50%',
+        width: '24px',
+        height: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer'
+      }}
+    >
+      <Mic size={13} strokeWidth={active ? 2.6 : 2} />
+    </button>
+  );
+}
+
 export default function ConsultationPage({ addToast }) {
   const [searchParams] = useSearchParams();
   const { id: paramId } = useParams();
@@ -166,16 +203,12 @@ export default function ConsultationPage({ addToast }) {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isPastMenuOpen, setIsPastMenuOpen] = useState(false);
   const pastMenuRef = useRef(null);
+  const dictationRef = useRef(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [consultStartedAt, setConsultStartedAt] = useState(() => Date.now());
-
-  // Voice recording simulation states
-  const [isRecordingSubjective, setIsRecordingSubjective] = useState(false);
-  const [isRecordingPhysical, setIsRecordingPhysical] = useState(false);
-  const [isRecordingAssessment, setIsRecordingAssessment] = useState(false);
-  const [isRecordingPlan, setIsRecordingPlan] = useState(false);
+  const [dictatingField, setDictatingField] = useState(null);
 
   // SOAP Note State
   const [subjective, setSubjective] = useState('');
@@ -364,15 +397,95 @@ export default function ConsultationPage({ addToast }) {
   };
 
   const diagnosisQuery = useMemo(() => {
-    const chips = diagnoses.map((d) => d.label || d.code).filter(Boolean).join(', ');
-    return [chips, assessmentText].filter((part) => String(part || '').trim()).join(' — ');
-  }, [diagnoses, assessmentText]);
+    const coded = diagnoses
+      .map((d) => `${d.code || ''} ${d.label || ''}`.trim())
+      .filter(Boolean)
+      .join(', ');
+    return [coded, diagnosisInput, assessmentText]
+      .map((part) => String(part || '').trim())
+      .filter(Boolean)
+      .join(' — ');
+  }, [diagnoses, diagnosisInput, assessmentText]);
 
   const aiSecrets = getStaffAiSecrets(currentUser?.id);
 
+  const stopDictation = () => {
+    const rec = dictationRef.current;
+    dictationRef.current = null;
+    setDictatingField(null);
+    if (!rec) return;
+    rec.onresult = null;
+    rec.onerror = null;
+    rec.onend = null;
+    try {
+      rec.stop();
+    } catch {
+      /* already stopped */
+    }
+  };
+
+  const toggleDictation = (field) => {
+    if (dictatingField === field) {
+      stopDictation();
+      return;
+    }
+    stopDictation();
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) {
+      if (addToast) {
+        addToast('error', 'El navegador no permite dictado por voz. Usa Chrome o Edge con micrófono.', t('toastErrorTitle'));
+      }
+      return;
+    }
+    const rec = new SpeechRecognition();
+    rec.lang = String(locale || '').startsWith('en') ? 'en-US' : 'es-MX';
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (event) => {
+      let chunk = '';
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        if (event.results[i].isFinal) chunk += event.results[i][0].transcript;
+      }
+      if (!chunk.trim()) return;
+      if (field === 'subjective') setSubjective((prev) => appendDictation(prev, chunk));
+      if (field === 'physical') setPhysicalExam((prev) => appendDictation(prev, chunk));
+      if (field === 'assessment') setAssessmentText((prev) => appendDictation(prev, chunk));
+      if (field === 'plan') setPlan((prev) => appendDictation(prev, chunk));
+    };
+    rec.onerror = (event) => {
+      if (event.error === 'not-allowed' && addToast) {
+        addToast('error', 'Permite el micrófono en el navegador para dictar.', t('toastErrorTitle'));
+      }
+      stopDictation();
+    };
+    rec.onend = () => {
+      if (dictationRef.current === rec) {
+        dictationRef.current = null;
+        setDictatingField(null);
+      }
+    };
+    dictationRef.current = rec;
+    try {
+      rec.start();
+      setDictatingField(field);
+    } catch {
+      stopDictation();
+    }
+  };
+
+  useEffect(() => () => {
+    const rec = dictationRef.current;
+    if (!rec) return;
+    try {
+      rec.stop();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const handleConsultAi = async (question = '') => {
     if (!diagnosisQuery.trim()) {
-      if (addToast) addToast('error', 'Escribe o selecciona un diagnóstico primero.', t('toastErrorTitle'));
+      if (addToast) addToast('error', 'Escribe o selecciona un diagnóstico (código o texto libre).', t('toastErrorTitle'));
       return;
     }
     if (!aiSecrets.aiApiKey) {
@@ -384,12 +497,13 @@ export default function ConsultationPage({ addToast }) {
     setIsAiLoading(true);
     try {
       const result = await consultClinicalAi({
-        diagnosis: diagnoses.length ? diagnoses : diagnosisQuery,
+        diagnosis: diagnoses.map((item) => ({ code: item.code || '', label: item.label || '' })),
+        diagnosisFreeText: [diagnosisInput, assessmentText].map((part) => String(part || '').trim()).filter(Boolean).join('\n'),
         modalities: modalitySpecsFromIds(resolveSearchModalities(currentUser?.integrativeModalities)),
         question,
         apiKey: aiSecrets.aiApiKey,
-        baseUrl: currentUser?.aiBaseUrl || aiSecrets.aiBaseUrl,
-        model: currentUser?.aiModel || aiSecrets.aiModel
+        baseUrl: aiSecrets.aiBaseUrl,
+        model: aiSecrets.aiModel
       });
       setAiAnswer(result.answer || '');
       setAiSources(result.sources || []);
@@ -1049,24 +1163,11 @@ export default function ConsultationPage({ addToast }) {
                 {t('soapSubjectiveLabel')}
               </label>
 
-              <button
-                onClick={() => setIsRecordingSubjective(!isRecordingSubjective)}
-                style={{
-                  border: 'none',
-                  background: isRecordingSubjective ? '#fee2e2' : '#f1f5f9',
-                  color: isRecordingSubjective ? '#ef4444' : '#64748b',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
+              <DictationMicButton
+                active={dictatingField === 'subjective'}
+                onClick={() => toggleDictation('subjective')}
                 title="Dictar motivo de consulta"
-              >
-                {isRecordingSubjective ? <MicOff size={13} /> : <Mic size={13} />}
-              </button>
+              />
             </div>
 
             <textarea
@@ -1197,24 +1298,11 @@ export default function ConsultationPage({ addToast }) {
                 {t('soapPhysicalExamLabel')}
               </label>
 
-              <button
-                onClick={() => setIsRecordingPhysical(!isRecordingPhysical)}
-                style={{
-                  border: 'none',
-                  background: isRecordingPhysical ? '#fee2e2' : '#f1f5f9',
-                  color: isRecordingPhysical ? '#ef4444' : '#64748b',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
+              <DictationMicButton
+                active={dictatingField === 'physical'}
+                onClick={() => toggleDictation('physical')}
                 title="Dictar exploración física"
-              >
-                {isRecordingPhysical ? <MicOff size={13} /> : <Mic size={13} />}
-              </button>
+              />
             </div>
 
             <textarea
@@ -1249,7 +1337,7 @@ export default function ConsultationPage({ addToast }) {
                 <button
                   type="button"
                   onClick={() => handleConsultAi()}
-                  title={aiSecrets.aiApiKey ? 'Consultar IA del vault' : 'Configura la IA en Mi perfil'}
+                  title="Consultar IA del vault (código CIE y texto libre)"
                   style={{
                     border: 'none',
                     background: isAiPanelOpen ? '#ccfbf1' : '#ecfdf5',
@@ -1265,24 +1353,11 @@ export default function ConsultationPage({ addToast }) {
                 >
                   <Sparkles size={20} strokeWidth={2.25} />
                 </button>
-                <button
-                onClick={() => setIsRecordingAssessment(!isRecordingAssessment)}
-                style={{
-                  border: 'none',
-                  background: isRecordingAssessment ? '#fee2e2' : '#f1f5f9',
-                  color: isRecordingAssessment ? '#ef4444' : '#64748b',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-                title="Dictar diagnóstico o evaluación clínica"
-              >
-                {isRecordingAssessment ? <MicOff size={13} /> : <Mic size={13} />}
-              </button>
+                <DictationMicButton
+                  active={dictatingField === 'assessment'}
+                  onClick={() => toggleDictation('assessment')}
+                  title="Dictar diagnóstico o evaluación clínica"
+                />
               </div>
             </div>
 
@@ -1391,24 +1466,11 @@ export default function ConsultationPage({ addToast }) {
                 {t('soapPlanLabel')}
               </label>
 
-              <button
-                onClick={() => setIsRecordingPlan(!isRecordingPlan)}
-                style={{
-                  border: 'none',
-                  background: isRecordingPlan ? '#fee2e2' : '#f1f5f9',
-                  color: isRecordingPlan ? '#ef4444' : '#64748b',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
+              <DictationMicButton
+                active={dictatingField === 'plan'}
+                onClick={() => toggleDictation('plan')}
                 title="Dictar plan de tratamiento"
-              >
-                {isRecordingPlan ? <MicOff size={13} /> : <Mic size={13} />}
-              </button>
+              />
             </div>
 
             <textarea

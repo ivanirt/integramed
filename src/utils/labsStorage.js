@@ -10,7 +10,8 @@ import {
   loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray
 } from '../services/fhirPayloadStore.js';
 import { isEmptyLabPanel } from './clinicalContent.js';
 
@@ -225,28 +226,13 @@ export const INITIAL_LAB_PANELS = [
   }
 ];
 
-const LABS_STORAGE_KEY = 'integramed_labs_panels';
+const LABS_STORAGE_KEY = 'integramed_labs_panels_fhir';
 
 /**
  * Get all laboratory panels from localStorage
  */
 export function getLabPanels() {
-  try {
-    const raw = localStorage.getItem(LABS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading lab panels from storage', e);
-  }
-  // Initialize storage
-  try {
-    localStorage.setItem(LABS_STORAGE_KEY, JSON.stringify(INITIAL_LAB_PANELS));
-  } catch (e) {}
-  return INITIAL_LAB_PANELS;
+  return readCachedArray(LABS_STORAGE_KEY);
 }
 
 /**
@@ -340,6 +326,6 @@ export async function loadLabPanelsFromFhir() {
  * Reset lab panels back to default seed
  */
 export function resetLabPanelsToDefault() {
-  saveLabPanels(INITIAL_LAB_PANELS);
-  return INITIAL_LAB_PANELS;
+  saveLabPanels([]);
+  return [];
 }

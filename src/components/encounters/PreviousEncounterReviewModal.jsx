@@ -226,7 +226,7 @@ export default function PreviousEncounterReviewModal({
                 </span>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                {encounter.patientName || 'Mariana Silva Ruiz'} • {formatDate(encounter.date)}
+                {encounter.patientName || ''} • {formatDate(encounter.date)}
               </p>
             </div>
           </div>

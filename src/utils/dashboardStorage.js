@@ -17,12 +17,13 @@ import {
   loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray
 } from '../services/fhirPayloadStore.js';
 
 const STORAGE_KEYS = {
-  TODAY_APPOINTMENTS: 'integramed_today_appointments',
-  PENDING_TASKS: 'integramed_pending_tasks',
+  TODAY_APPOINTMENTS: 'integramed_today_appointments_fhir',
+  PENDING_TASKS: 'integramed_pending_tasks_fhir',
   ROLE_HOME_PREF: 'integramed_role_home_preference'
 };
 
@@ -211,36 +212,22 @@ export const INITIAL_AI_SUGGESTIONS = [
 // Helper methods for Dashboard Data
 
 export function getTodayAppointments() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TODAY_APPOINTMENTS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.TODAY_APPOINTMENTS, JSON.stringify(INITIAL_TODAY_APPOINTMENTS));
-      return INITIAL_TODAY_APPOINTMENTS.map((appt) => {
-        const decorated = decorateAppointmentStatus(appt.status);
-        return {
-          ...appt,
-          status: decorated.status,
-          statusLabel: decorated.label,
-          statusColor: decorated.color,
-          statusBg: decorated.bg,
-          statusBorder: decorated.border
-        };
-      });
-    }
-    return JSON.parse(raw).map((appt) => {
-      const decorated = decorateAppointmentStatus(appt.status);
-      return {
-        ...appt,
-        status: decorated.status,
-        statusLabel: decorated.label,
-        statusColor: decorated.color,
-        statusBg: decorated.bg,
-        statusBorder: decorated.border
-      };
-    });
-  } catch {
-    return INITIAL_TODAY_APPOINTMENTS;
-  }
+  const today = localTodayDate();
+  const fromWeekly = getStoredAppointments()
+    .filter((appt) => isAppointmentOnDate(appt, today))
+    .map((appt) => toTodayAppointment(appt));
+  if (fromWeekly.length > 0) return fromWeekly;
+  return readCachedArray(STORAGE_KEYS.TODAY_APPOINTMENTS).map((appt) => {
+    const decorated = decorateAppointmentStatus(appt.status);
+    return {
+      ...appt,
+      status: decorated.status,
+      statusLabel: decorated.label,
+      statusColor: decorated.color,
+      statusBg: decorated.bg,
+      statusBorder: decorated.border
+    };
+  });
 }
 
 export function saveTodayAppointments(appointments) {
@@ -375,18 +362,7 @@ export function sortTasksByCompletion(tasks) {
 }
 
 export function getPendingTasks() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PENDING_TASKS);
-    if (!raw) {
-      const initialSorted = sortTasksByCompletion(INITIAL_PENDING_TASKS);
-      localStorage.setItem(STORAGE_KEYS.PENDING_TASKS, JSON.stringify(initialSorted));
-      return initialSorted;
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? sortTasksByCompletion(parsed) : sortTasksByCompletion(INITIAL_PENDING_TASKS);
-  } catch {
-    return sortTasksByCompletion(INITIAL_PENDING_TASKS);
-  }
+  return sortTasksByCompletion(readCachedArray(STORAGE_KEYS.PENDING_TASKS));
 }
 
 export function savePendingTasks(tasks) {
@@ -405,6 +381,21 @@ export function toggleTaskCompleted(taskId) {
   const updated = tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
   const sorted = sortTasksByCompletion(updated);
   savePendingTasks(sorted);
+  const changed = sorted.find((t) => t.id === taskId);
+  if (changed) {
+    upsertPayloadItem({
+      resourceType: 'Task',
+      kind: 'task',
+      item: changed,
+      buildBase: (p) => ({
+        status: p.completed ? 'completed' : 'requested',
+        description: p.title,
+        intent: 'order',
+        for: p.patient ? { display: p.patient } : undefined,
+        priority: p.urgent ? 'urgent' : 'routine'
+      })
+    }).catch((err) => console.info('FHIR Task sync skipped:', err.message));
+  }
   return sorted;
 }
 
@@ -465,9 +456,7 @@ export async function loadDashboardFromFhir() {
   const todayAppts = (appts || [])
     .filter((a) => isAppointmentOnDate(a, localTodayDate()))
     .map((a) => toTodayAppointment(a));
-  if (todayAppts.length > 0) {
-    saveTodayAppointments(todayAppts);
-  }
+  saveTodayAppointments(todayAppts);
 
   const remoteTasks = await loadPayloadCollection('Task', 'task');
   const tasks = preferRemote(remoteTasks, getPendingTasks());

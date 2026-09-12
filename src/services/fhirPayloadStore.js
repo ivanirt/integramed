@@ -154,6 +154,151 @@ export async function saveConfigBlob(kind, data, fhirId) {
 
 export function preferRemote(remote, local) {
   if (remote === null) return local;
-  if (Array.isArray(remote) && remote.length > 0) return remote;
-  return local;
+  return remote;
+}
+
+export function readCachedArray(storageKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function loadKindOrNative(resourceType, kind, mapNative) {
+  const payload = await loadPayloadCollection(resourceType, kind);
+  let natives = [];
+  try {
+    natives = await searchResources(resourceType, '_count=200');
+  } catch {
+    natives = [];
+  }
+  if (payload === null && natives.length === 0) return null;
+  const fromPayload = Array.isArray(payload) ? payload : [];
+  const seen = new Set(fromPayload.map((item) => item.fhirId || item.id).filter(Boolean));
+  const extras = mapNative
+    ? natives
+      .filter((resource) => resource?.id && !seen.has(resource.id))
+      .map((resource) => mapNative(resource))
+      .filter(Boolean)
+    : [];
+  return [...fromPayload, ...extras];
+}
+
+function firstName(resource) {
+  const name = Array.isArray(resource?.name) ? resource.name[0] : resource?.name;
+  return name && typeof name === 'object' ? name : {};
+}
+
+function telecom(resource, system) {
+  return (resource?.telecom || []).find((item) => item.system === system)?.value || '';
+}
+
+export function mapNativePractitioner(resource) {
+  if (!resource?.id) return null;
+  const name = firstName(resource);
+  return {
+    id: resource.id,
+    fhirId: resource.id,
+    prefix: name.prefix?.[0] || '',
+    givenName: (name.given || []).join(' '),
+    familyName: name.family || name.text || '',
+    email: telecom(resource, 'email'),
+    phone: telecom(resource, 'phone'),
+    gender: resource.gender || 'unknown',
+    specialty: resource.qualification?.[0]?.code?.text || '',
+    status: resource.active === false ? 'inactive' : 'active',
+    primaryRole: 'doctor',
+    roles: ['doctor']
+  };
+}
+
+export function mapNativeAppointment(resource) {
+  if (!resource?.id) return null;
+  const start = resource.start || resource.period?.start || '';
+  const end = resource.end || resource.period?.end || '';
+  const participants = resource.participant || [];
+  const patient = participants.find((item) => String(item.actor?.reference || '').includes('Patient/'));
+  const pract = participants.find((item) => String(item.actor?.reference || '').includes('Practitioner/'));
+  return {
+    id: resource.id,
+    fhirId: resource.id,
+    date: String(start).slice(0, 10),
+    time: String(start).slice(11, 16),
+    period: { start, end },
+    patientId: String(patient?.actor?.reference || '').split('/').pop() || '',
+    patientName: patient?.actor?.display || resource.description || '',
+    practitionerId: String(pract?.actor?.reference || '').split('/').pop() || '',
+    practitionerName: pract?.actor?.display || '',
+    reason: resource.description || resource.reasonCode?.[0]?.text || '',
+    status: resource.status || 'booked'
+  };
+}
+
+export function mapNativeOrganization(resource) {
+  if (!resource?.id) return null;
+  const addr = Array.isArray(resource.address) ? resource.address[0] : resource.address;
+  return {
+    id: resource.id,
+    fhirId: resource.id,
+    name: resource.name || resource.alias?.[0] || resource.id,
+    alias: resource.alias?.[0] || '',
+    status: resource.active === false ? 'inactive' : 'active',
+    phone: telecom(resource, 'phone'),
+    email: telecom(resource, 'email'),
+    website: telecom(resource, 'url'),
+    address: addr
+      ? {
+          line: Array.isArray(addr.line) ? addr.line.join(', ') : (addr.line || ''),
+          district: addr.district || '',
+          city: addr.city || '',
+          state: addr.state || '',
+          postalCode: addr.postalCode || '',
+          country: addr.country || ''
+        }
+      : undefined
+  };
+}
+
+export function mapNativeLocation(resource) {
+  if (!resource?.id) return null;
+  const addr = resource.address;
+  const typeCode = resource.type?.[0]?.coding?.[0]?.code || resource.physicalType?.coding?.[0]?.code || '';
+  return {
+    id: resource.id,
+    fhirId: resource.id,
+    name: resource.name || resource.id,
+    status: resource.status === 'inactive' ? 'inactive' : 'active',
+    organizationId: String(resource.managingOrganization?.reference || '').split('/').pop() || '',
+    partOfId: String(resource.partOf?.reference || '').split('/').pop() || '',
+    description: resource.description || '',
+    kind: resource.physicalType?.coding?.[0]?.code === 'si' ? 'site' : 'area',
+    areaType: typeCode,
+    address: addr
+      ? {
+          line: Array.isArray(addr.line) ? addr.line.join(', ') : (addr.line || ''),
+          district: addr.district || '',
+          city: addr.city || '',
+          state: addr.state || '',
+          postalCode: addr.postalCode || '',
+          country: addr.country || ''
+        }
+      : undefined
+  };
+}
+
+export function mapNativeMedication(resource) {
+  if (!resource?.id) return null;
+  return {
+    id: resource.id,
+    fhirId: resource.id,
+    name: resource.code?.text || resource.code?.coding?.[0]?.display || resource.id,
+    stock: 0,
+    minStock: 0,
+    maxStock: 0,
+    status: resource.status === 'inactive' ? 'inactive' : 'active'
+  };
 }

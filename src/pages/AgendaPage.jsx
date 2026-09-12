@@ -31,7 +31,6 @@ import { TableSkeleton } from '../components/LoadingSkeleton';
 import { useLanguage } from '../i18n/LanguageContext';
 import { getStaffList } from '../utils/staffStorage';
 import { getStoredAppointments, updateAppointment, loadAppointmentsFromFhir } from '../utils/appointmentStorage';
-import { generateWeeklySampleEncounters } from '../utils/weeklyAgendaData';
 
 export default function AgendaPage({ addToast, onOpenScheduleModal }) {
   const navigate = useNavigate();
@@ -157,13 +156,13 @@ export default function AgendaPage({ addToast, onOpenScheduleModal }) {
             time: appt.time,
             patientId: appt.patientId,
             patientName: appt.patientName,
-            practitionerName: appt.practitionerName || 'Dr. Alejandro Morales',
+            practitionerName: appt.practitionerName || '',
             reason: appt.reason,
             status: appt.status,
             statusLabel: appt.statusLabel,
             room: appt.room,
             subject: { display: appt.patientName, reference: `Patient/${appt.patientId}` },
-            participant: [{ individual: { display: appt.practitionerName || 'Dr. Alejandro Morales' } }],
+            participant: [{ individual: { display: appt.practitionerName || '' } }],
             reasonCode: [{ text: appt.reason }],
             type: [{ text: appt.reason }]
           });

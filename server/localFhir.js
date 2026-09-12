@@ -6,7 +6,7 @@ const RESOURCE_TYPES = [
   'Patient', 'Practitioner', 'Encounter', 'Observation', 'Condition',
   'MedicationRequest', 'Medication', 'AllergyIntolerance', 'DiagnosticReport',
   'DocumentReference', 'HealthcareService', 'Organization', 'Location',
-  'Appointment', 'RelatedPerson'
+  'Appointment', 'RelatedPerson', 'Task', 'List', 'Basic', 'Schedule', 'Slot', 'PractitionerRole'
 ];
 
 function nowInstant() {
@@ -93,37 +93,7 @@ export function createLocalFhirStore(projectRoot) {
       .filter(Boolean);
   }
 
-  function seedIfEmpty() {
-    fs.mkdirSync(dataDir, { recursive: true });
-    if (listType('Patient').length) return;
-    writeResource({
-      resourceType: 'Patient',
-      id: 'demo-maria',
-      active: true,
-      name: [{ use: 'official', family: 'González', given: ['María', 'Elena'] }],
-      gender: 'female',
-      birthDate: '1984-03-12',
-      identifier: [{ system: 'http://integramed.local/mrn', value: 'IM-1001' }]
-    });
-    writeResource({
-      resourceType: 'Patient',
-      id: 'demo-john',
-      active: true,
-      name: [{ use: 'official', family: 'Carter', given: ['John'] }],
-      gender: 'male',
-      birthDate: '1976-11-02',
-      identifier: [{ system: 'http://integramed.local/mrn', value: 'IM-1002' }]
-    });
-    writeResource({
-      resourceType: 'Practitioner',
-      id: 'demo-silva',
-      active: true,
-      name: [{ use: 'official', prefix: ['Dra.'], family: 'Silva Ruiz', given: ['Ana'] }],
-      gender: 'female'
-    });
-  }
-
-  seedIfEmpty();
+  fs.mkdirSync(dataDir, { recursive: true });
 
   return { readResource, writeResource, deleteResource, listType, dataDir };
 }
@@ -162,7 +132,19 @@ function resourceDate(resource) {
 function matchesQuery(resource, query) {
   if (query._id && resource.id !== query._id) return false;
   if (query.name && !resourceText(resource).includes(String(query.name).toLowerCase())) return false;
-  if (query.identifier && !resourceText(resource).includes(String(query.identifier).toLowerCase())) return false;
+  if (query.identifier) {
+    const raw = String(query.identifier);
+    const pipe = raw.indexOf('|');
+    const system = pipe >= 0 ? raw.slice(0, pipe) : '';
+    const value = pipe >= 0 ? raw.slice(pipe + 1) : raw;
+    const ids = resource.identifier || [];
+    const matched = ids.some((id) => {
+      if (system && value) return id.system === system && String(id.value) === value;
+      return String(id.value || '') === value || String(id.value || '').toLowerCase().includes(value.toLowerCase());
+    });
+    if (!matched && !resourceText(resource).includes(value.toLowerCase())) return false;
+    if (!matched) return false;
+  }
   if (query.gender && resource.gender !== query.gender) return false;
   const patient = query.patient || query.subject;
   if (patient) {

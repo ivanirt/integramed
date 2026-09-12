@@ -11,6 +11,8 @@ import ScheduleEncounterModal from './components/encounters/ScheduleEncounterMod
 import Toast from './components/Toast';
 import { checkProxyHealth } from './services/fhirApi';
 import { useLanguage } from './i18n/LanguageContext';
+import { loadMenuCapabilitiesFromFhir } from './utils/menuCapabilitiesStorage';
+import { loadClinicIntegrativeModalitiesFromFhir } from './utils/integrativeMedicine';
 
 import ConsultationPage from './pages/ConsultationPage';
 import SettingsPage from './pages/SettingsPage';
@@ -63,6 +65,8 @@ export default function App() {
         });
     };
     run();
+    loadMenuCapabilitiesFromFhir().catch(() => {});
+    loadClinicIntegrativeModalitiesFromFhir().catch(() => {});
     const timer = setInterval(run, 20000);
     return () => {
       cancelled = true;

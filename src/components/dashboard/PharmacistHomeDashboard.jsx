@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Pill,
@@ -14,43 +14,38 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { getMedications } from '../../utils/medicationInventoryStorage';
+import { getMedications, loadMedicationsFromFhir } from '../../utils/medicationInventoryStorage';
+import { getClinicMedicationRequests } from '../../services/fhirApi';
 
 export default function PharmacistHomeDashboard({ addToast }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { currentUser } = useAuth();
 
-  const [inventory] = useState(() => getMedications());
-  const [prescriptionsQueue, setPrescriptionsQueue] = useState([
-    {
-      id: 'rx-01',
-      patientName: 'Mariana Silva Ruiz',
-      doctor: 'Dr. Jesús Robledo',
-      medications: ['Losartán 50mg (30 tabs)', 'Salbutamol 100mcg Aerosol'],
-      status: 'pending',
-      urgency: 'Normal',
-      time: '10:15 AM'
-    },
-    {
-      id: 'rx-02',
-      patientName: 'Carlos Mendoza Ruiz',
-      doctor: 'Dr. Alejandro Morales',
-      medications: ['Metformina 850mg (60 tabs)', 'Enalapril 10mg (30 tabs)'],
-      status: 'pending',
-      urgency: 'Prioritaria',
-      time: '09:50 AM'
-    },
-    {
-      id: 'rx-03',
-      patientName: 'Roberto Silva',
-      doctor: 'Dr. Alejandro Morales',
-      medications: ['Ketorolaco 10mg (10 tabs)', 'Amoxicilina / Clavulánico 875mg'],
-      status: 'dispensed',
-      urgency: 'Normal',
-      time: '09:20 AM'
-    }
-  ]);
+  const [inventory, setInventory] = useState(() => getMedications());
+  const [prescriptionsQueue, setPrescriptionsQueue] = useState([]);
+
+  useEffect(() => {
+    loadMedicationsFromFhir().then(setInventory).catch(() => {});
+    getClinicMedicationRequests()
+      .then((requests) => {
+        setPrescriptionsQueue((requests || []).map((req) => ({
+          id: req.id,
+          patientName: req.subject?.display || '',
+          doctor: req.requester?.display || '',
+          medications: [
+            req.medicationCodeableConcept?.text
+            || req.medicationCodeableConcept?.coding?.[0]?.display
+            || req.medicationReference?.display
+            || ''
+          ].filter(Boolean),
+          status: req.status === 'completed' || req.status === 'cancelled' ? 'dispensed' : 'pending',
+          urgency: req.priority === 'urgent' || req.priority === 'stat' ? 'Prioritaria' : 'Normal',
+          time: (req.authoredOn || '').slice(11, 16)
+        })));
+      })
+      .catch(() => setPrescriptionsQueue([]));
+  }, []);
 
   const handleDispense = (id) => {
     setPrescriptionsQueue(prev => prev.map(p => p.id === id ? { ...p, status: 'dispensed' } : p));
@@ -59,7 +54,7 @@ export default function PharmacistHomeDashboard({ addToast }) {
     }
   };
 
-  const lowStockCount = inventory.filter(m => (m.currentStock || 0) <= (m.minStock || 10)).length || 4;
+  const lowStockCount = inventory.filter(m => (m.stock ?? m.currentStock ?? 0) <= (m.minStock || 10)).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '1440px', margin: '0 auto' }}>

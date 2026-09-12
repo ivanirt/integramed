@@ -14,7 +14,8 @@ import {
   loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray
 } from '../services/fhirPayloadStore.js';
 
 export const INITIAL_MEDICATIONS = [
@@ -331,28 +332,16 @@ export const INITIAL_DISPENSATIONS = [
   }
 ];
 
-const MEDS_STORAGE_KEY = 'integramed_medications_inventory';
-const INGRESS_STORAGE_KEY = 'integramed_stock_ingresses';
-const DISPENSE_STORAGE_KEY = 'integramed_patient_dispensations';
+const MEDS_STORAGE_KEY = 'integramed_medications_inventory_fhir';
+const INGRESS_STORAGE_KEY = 'integramed_stock_ingresses_fhir';
+const DISPENSE_STORAGE_KEY = 'integramed_patient_dispensations_fhir';
 
 // ==========================================
 // 1. MEDICATIONS CATALOG & STOCK
 // ==========================================
 
 export function getMedications() {
-  try {
-    const raw = localStorage.getItem(MEDS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading medications inventory', e);
-  }
-  try {
-    localStorage.setItem(MEDS_STORAGE_KEY, JSON.stringify(INITIAL_MEDICATIONS));
-  } catch {}
-  return INITIAL_MEDICATIONS;
+  return readCachedArray(MEDS_STORAGE_KEY);
 }
 
 export function saveMedications(medsList) {
@@ -428,7 +417,10 @@ export async function loadMedicationsFromFhir() {
   const local = getMedications();
   try {
     const remote = await getFhirMedications();
-    if (!remote?.length) return local;
+    if (!remote?.length) {
+      saveMedications([]);
+      return [];
+    }
     const mapped = remote.map(res => fhirMedicationToCatalog(res));
     const byId = new Map();
     local.forEach(item => byId.set(item.id, item));
@@ -483,19 +475,7 @@ export function adjustMedicationStock(medId, { type, quantity, reason, user }) {
 // ==========================================
 
 export function getStockIngresses() {
-  try {
-    const raw = localStorage.getItem(INGRESS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading stock ingresses', e);
-  }
-  try {
-    localStorage.setItem(INGRESS_STORAGE_KEY, JSON.stringify(INITIAL_STOCK_INGRESSES));
-  } catch {}
-  return INITIAL_STOCK_INGRESSES;
+  return readCachedArray(INGRESS_STORAGE_KEY);
 }
 
 export function saveStockIngresses(ingList) {
@@ -608,19 +588,7 @@ export function deleteStockIngress(ingressId) {
 // ==========================================
 
 export function getPatientDispensations() {
-  try {
-    const raw = localStorage.getItem(DISPENSE_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading patient dispensations', e);
-  }
-  try {
-    localStorage.setItem(DISPENSE_STORAGE_KEY, JSON.stringify(INITIAL_DISPENSATIONS));
-  } catch {}
-  return INITIAL_DISPENSATIONS;
+  return readCachedArray(DISPENSE_STORAGE_KEY);
 }
 
 export function savePatientDispensations(dispList) {
@@ -740,12 +708,12 @@ export async function loadPharmacyFromFhir() {
 }
 
 export function resetMedicationsData() {
-  saveMedications(INITIAL_MEDICATIONS);
-  saveStockIngresses(INITIAL_STOCK_INGRESSES);
-  savePatientDispensations(INITIAL_DISPENSATIONS);
+  saveMedications([]);
+  saveStockIngresses([]);
+  savePatientDispensations([]);
   return {
-    medications: INITIAL_MEDICATIONS,
-    ingresses: INITIAL_STOCK_INGRESSES,
-    dispensations: INITIAL_DISPENSATIONS
+    medications: [],
+    ingresses: [],
+    dispensations: []
   };
 }

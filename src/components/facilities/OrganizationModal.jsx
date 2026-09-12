@@ -51,17 +51,24 @@ export default function OrganizationModal({
           name: '',
           alias: '',
           type: 'prov',
-          typeName: 'Red Hospitalaria y Clínicas de Especialidad',
-          taxId: 'IME' + Math.floor(Math.random() * 899999 + 100000),
-          license: 'COFEPRIS 24-3300-100-001',
-          director: 'Dr. Jesús Robledo Morales',
-          phone: '+52 55 5234 8100',
-          email: 'contacto@integramed.com',
-          website: 'https://integramed.health',
+          typeName: language === 'en' ? 'Healthcare provider' : 'Prestador de servicios médicos',
+          taxId: '',
+          license: '',
+          director: '',
+          phone: '',
+          email: '',
+          website: '',
           status: 'active',
           logoBg: '#0f766e',
           logoText: '#ffffff',
-          foundedYear: 2022
+          address: {
+            line: '',
+            district: '',
+            city: '',
+            state: '',
+            postalCode: '',
+            country: 'México'
+          }
         });
       }
     }
@@ -142,11 +149,11 @@ export default function OrganizationModal({
             <div>
               <h2 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 {organization
-                  ? (language === 'en' ? 'Edit Organization (FHIR Organization)' : 'Editar Organización (FHIR Organization)')
-                  : (language === 'en' ? 'New Healthcare Organization' : 'Nueva Organización Médica')}
+                  ? (language === 'en' ? 'Edit organization' : 'Editar organización')
+                  : (language === 'en' ? 'New organization' : 'Nueva organización')}
               </h2>
               <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.15rem 0 0' }}>
-                {language === 'en' ? 'Legal entity, licensing and administrative entity' : 'Entidad legal, registro sanitario y razón social matriz'}
+                {language === 'en' ? 'FHIR Organization — legal entity and main address' : 'FHIR Organization — entidad legal y domicilio principal'}
               </p>
             </div>
           </div>
@@ -198,7 +205,7 @@ export default function OrganizationModal({
               className="form-input"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ej. IntegraMed Red Hospitalaria S.A. de C.V."
+              placeholder="Clínica Yeshua"
               required
             />
           </div>
@@ -292,6 +299,80 @@ export default function OrganizationModal({
                   placeholder="direccion@integramed.com"
                 />
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+              {language === 'en' ? 'Street and building' : 'Calle y edificio'}
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.address?.line || ''}
+              onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), line: e.target.value } })}
+              placeholder="Av. México 46, piso 2"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                {language === 'en' ? 'Neighborhood' : 'Colonia / fraccionamiento'}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.address?.district || ''}
+                onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), district: e.target.value } })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                {language === 'en' ? 'City' : 'Ciudad'}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.address?.city || ''}
+                onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), city: e.target.value } })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                {language === 'en' ? 'State' : 'Estado'}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.address?.state || ''}
+                onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), state: e.target.value } })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                {language === 'en' ? 'Postal code' : 'C.P.'}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.address?.postalCode || ''}
+                onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), postalCode: e.target.value } })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                {language === 'en' ? 'Country' : 'País'}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.address?.country || ''}
+                onChange={(e) => setFormData({ ...formData, address: { ...(formData.address || {}), country: e.target.value } })}
+              />
             </div>
           </div>
 

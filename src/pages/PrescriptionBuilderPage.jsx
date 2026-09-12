@@ -285,17 +285,22 @@ export default function PrescriptionBuilderPage({ addToast }) {
 
     setIsSubmitting(true);
     try {
-      const patientName = patient ? getPatientFullName(patient) : 'Mariana Silva Ruiz';
+      if (!selectedPatientId || !patient) {
+        if (addToast) addToast('error', t('emptyPrescriptionError'), t('toastErrorTitle'));
+        setIsSubmitting(false);
+        return;
+      }
+      const patientName = getPatientFullName(patient);
       const selectedDoc = practitionersList.find(p => p.id === selectedPractitionerId);
       const doctorName = selectedDoc
         ? `${selectedDoc.name?.[0]?.prefix?.[0] || 'Dr.'} ${selectedDoc.name?.[0]?.given?.join(' ')} ${selectedDoc.name?.[0]?.family}`.trim()
-        : 'Dr. Alejandro Morales';
+        : '';
 
       // Submit FHIR MedicationRequest for each item
       for (const item of prescriptionItems) {
         if (!String(item.name || '').trim()) continue;
         await createMedicationRequest({
-          patientId: selectedPatientId || 'temp-patient',
+          patientId: selectedPatientId,
           patientName,
           practitionerId: selectedPractitionerId || undefined,
           practitionerName: doctorName,
@@ -324,14 +329,14 @@ export default function PrescriptionBuilderPage({ addToast }) {
     }
   };
 
-  const fullName = patient ? getPatientFullName(patient) : 'Mariana Silva Ruiz';
-  const age = calculateAge(patient?.birthDate) ?? 34;
-  const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '84920';
+  const fullName = patient ? getPatientFullName(patient) : '';
+  const age = patient ? calculateAge(patient?.birthDate) : '';
+  const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '';
 
   const selectedDoctor = practitionersList.find(p => p.id === selectedPractitionerId);
   const doctorDisplayName = selectedDoctor
     ? `${selectedDoctor.name?.[0]?.prefix?.[0] || 'Dr.'} ${selectedDoctor.name?.[0]?.given?.join(' ')} ${selectedDoctor.name?.[0]?.family}`.trim()
-    : 'Dr. Alejandro Morales';
+    : '';
   const doctorSpecialty = selectedDoctor?.qualification?.[0]?.code?.text || 'Medicina Interna';
 
   const todayFormatted = new Date().toLocaleDateString(locale === 'es' ? 'es-MX' : 'en-US', {

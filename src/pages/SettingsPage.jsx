@@ -67,11 +67,13 @@ import { useLanguage } from '../i18n/LanguageContext';
 import {
   getMenuCapabilities,
   setMenuCapabilityVisible,
+  loadMenuCapabilitiesFromFhir,
   MENU_CAPABILITY_ITEMS
 } from '../utils/menuCapabilitiesStorage';
 import {
   getClinicIntegrativeModalities,
   setClinicIntegrativeModalityEnabled,
+  loadClinicIntegrativeModalitiesFromFhir,
   CLINIC_SEARCH_MODALITIES,
   INTEGRATIVE_MODALITIES
 } from '../utils/integrativeMedicine';
@@ -95,6 +97,11 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [menuCapabilities, setMenuCapabilities] = useState(() => getMenuCapabilities());
   const [clinicModalities, setClinicModalities] = useState(() => getClinicIntegrativeModalities());
+
+  useEffect(() => {
+    loadMenuCapabilitiesFromFhir().then(setMenuCapabilities).catch(() => {});
+    loadClinicIntegrativeModalitiesFromFhir().then(setClinicModalities).catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {

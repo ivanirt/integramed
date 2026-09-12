@@ -1,3 +1,5 @@
+import { loadConfigBlob, saveConfigBlob } from '../services/fhirPayloadStore.js';
+
 export const INTEGRATIVE_MODALITIES = [
   {
     id: 'tcm',
@@ -59,8 +61,9 @@ export const CLINIC_SEARCH_MODALITIES = [
   'functional'
 ];
 
-const CLINIC_MODALITIES_KEY = 'integramed_clinic_integrative_modalities';
+const CLINIC_MODALITIES_KEY = 'integramed_clinic_integrative_modalities_fhir';
 export const CLINIC_MODALITIES_EVENT = 'integramed_clinic_modalities_updated';
+let clinicModalitiesFhirId = null;
 
 function defaultClinicModalities() {
   return CLINIC_SEARCH_MODALITIES.reduce((acc, id) => {
@@ -87,7 +90,23 @@ export function saveClinicIntegrativeModalities(next) {
   const merged = { ...defaultClinicModalities(), ...next };
   localStorage.setItem(CLINIC_MODALITIES_KEY, JSON.stringify(merged));
   window.dispatchEvent(new Event(CLINIC_MODALITIES_EVENT));
+  saveConfigBlob('clinic-integrative-modalities', merged, clinicModalitiesFhirId)
+    .then((id) => { clinicModalitiesFhirId = id; })
+    .catch((err) => console.info('FHIR integrative modalities sync skipped:', err.message));
   return merged;
+}
+
+export async function loadClinicIntegrativeModalitiesFromFhir() {
+  const blob = await loadConfigBlob('clinic-integrative-modalities');
+  if (blob === null) return getClinicIntegrativeModalities();
+  if (blob.data && typeof blob.data === 'object') {
+    clinicModalitiesFhirId = blob.fhirId;
+    const merged = { ...defaultClinicModalities(), ...blob.data };
+    localStorage.setItem(CLINIC_MODALITIES_KEY, JSON.stringify(merged));
+    window.dispatchEvent(new Event(CLINIC_MODALITIES_EVENT));
+    return merged;
+  }
+  return getClinicIntegrativeModalities();
 }
 
 export function setClinicIntegrativeModalityEnabled(id, enabled) {

@@ -4,12 +4,15 @@
  */
 
 import {
-  loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
   loadConfigBlob,
   saveConfigBlob,
-  preferRemote
+  preferRemote,
+  readCachedArray,
+  loadKindOrNative,
+  mapNativeOrganization,
+  mapNativeLocation
 } from '../services/fhirPayloadStore.js';
 
 export const INITIAL_ORGANIZATIONS = [
@@ -227,6 +230,57 @@ export const DEFAULT_FACILITY_RESOURCE_TYPES = [
   }
 ];
 
+export const AREA_TYPES = [
+  { id: 'consultation', labelEs: 'Consultorio', labelEn: 'Consultation' },
+  { id: 'therapy', labelEs: 'Terapia', labelEn: 'Therapy' },
+  { id: 'procedure', labelEs: 'Procedimientos', labelEn: 'Procedure' },
+  { id: 'waiting', labelEs: 'Espera', labelEn: 'Waiting' },
+  { id: 'laboratory', labelEs: 'Laboratorio', labelEn: 'Laboratory' },
+  { id: 'imaging', labelEs: 'Imagenología', labelEn: 'Imaging' },
+  { id: 'pharmacy', labelEs: 'Farmacia', labelEn: 'Pharmacy' },
+  { id: 'administration', labelEs: 'Administración', labelEn: 'Administration' },
+  { id: 'other', labelEs: 'Otro', labelEn: 'Other' }
+];
+
+export function areaTypeLabel(typeId, language = 'es') {
+  const match = AREA_TYPES.find((item) => item.id === typeId);
+  if (!match) return typeId || '';
+  return language === 'en' ? match.labelEn : match.labelEs;
+}
+
+export function formatFacilityAddress(address) {
+  if (!address) return '';
+  return [
+    address.line,
+    address.district,
+    [address.postalCode, address.city].filter(Boolean).join(' '),
+    address.state,
+    address.country
+  ].filter(Boolean).join(', ');
+}
+
+export function locationsForOrganization(orgId, locations = getLocations(), organizations = getOrganizations()) {
+  if (!orgId) return [];
+  const org = organizations.find((item) => item.id === orgId || item.fhirId === orgId);
+  const ids = new Set([orgId, org?.id, org?.fhirId].filter(Boolean));
+  const seen = new Set();
+  return locations.filter((loc) => {
+    if (!ids.has(loc.organizationId)) return false;
+    const key = loc.id || loc.fhirId;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function areasForOrganization(orgId, locations = getLocations()) {
+  return locationsForOrganization(orgId, locations).filter((loc) => loc.kind !== 'site');
+}
+
+export function siteForOrganization(orgId, locations = getLocations()) {
+  return locationsForOrganization(orgId, locations).find((loc) => loc.kind === 'site') || null;
+}
+
 export const DEFAULT_FACILITY_SERVICES_CATALOG = [
   'Urgencias y Triage 24h',
   'Laboratorio Clínico FHIR R4',
@@ -246,33 +300,31 @@ export const DEFAULT_FACILITY_SERVICES_CATALOG = [
   'Sala de Choque y Reanimación'
 ];
 
-const ORGS_STORAGE_KEY = 'integramed_organizations_data';
-const LOCS_STORAGE_KEY = 'integramed_locations_data';
-const RESOURCE_TYPES_STORAGE_KEY = 'integramed_facility_resource_types';
-const SERVICES_CATALOG_STORAGE_KEY = 'integramed_facility_services_catalog';
+const ORGS_STORAGE_KEY = 'integramed_organizations_fhir';
+const LOCS_STORAGE_KEY = 'integramed_locations_fhir';
+const RESOURCE_TYPES_STORAGE_KEY = 'integramed_facility_resource_types_fhir';
+const SERVICES_CATALOG_STORAGE_KEY = 'integramed_facility_services_catalog_fhir';
 
 let resourceTypesFhirId = null;
 let servicesCatalogFhirId = null;
 
 export function getOrganizations() {
-  try {
-    const raw = localStorage.getItem(ORGS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error loading organizations', e);
-  }
-  try {
-    localStorage.setItem(ORGS_STORAGE_KEY, JSON.stringify(INITIAL_ORGANIZATIONS));
-  } catch {}
-  return INITIAL_ORGANIZATIONS;
+  return readCachedArray(ORGS_STORAGE_KEY);
+}
+
+function dedupeById(items) {
+  const seen = new Set();
+  return (items || []).filter((item) => {
+    const key = item?.id || item?.fhirId;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function saveOrganizations(orgList) {
   try {
-    localStorage.setItem(ORGS_STORAGE_KEY, JSON.stringify(orgList));
+    localStorage.setItem(ORGS_STORAGE_KEY, JSON.stringify(dedupeById(orgList)));
   } catch (e) {
     console.error('Failed to save organizations', e);
   }
@@ -303,7 +355,19 @@ export function saveOrganization(orgData) {
         ...(p.phone ? [{ system: 'phone', value: p.phone }] : []),
         ...(p.email ? [{ system: 'email', value: p.email }] : []),
         ...(p.website ? [{ system: 'url', value: p.website }] : [])
-      ]
+      ],
+      address: p.address
+        ? [{
+            use: 'work',
+            type: 'physical',
+            line: p.address.line ? [p.address.line] : undefined,
+            city: p.address.city,
+            district: p.address.district,
+            state: p.address.state,
+            postalCode: p.address.postalCode,
+            country: p.address.country
+          }]
+        : undefined
     })
   }).then((remote) => {
     if (remote?.fhirId) {
@@ -313,6 +377,47 @@ export function saveOrganization(orgData) {
   }).catch((err) => console.info('FHIR Organization sync skipped:', err.message));
 
   return updated;
+}
+
+export async function persistOrganization(orgData) {
+  const list = saveOrganization(orgData);
+  const saved = list.find((o) => o.id === orgData.id) || orgData;
+  try {
+    const remote = await upsertPayloadItem({
+      resourceType: 'Organization',
+      kind: 'organization',
+      item: saved,
+      buildBase: (p) => ({
+        name: p.name,
+        alias: p.alias ? [p.alias] : undefined,
+        active: p.status !== 'inactive',
+        telecom: [
+          ...(p.phone ? [{ system: 'phone', value: p.phone }] : []),
+          ...(p.email ? [{ system: 'email', value: p.email }] : []),
+          ...(p.website ? [{ system: 'url', value: p.website }] : [])
+        ],
+        address: p.address
+          ? [{
+              use: 'work',
+              type: 'physical',
+              line: p.address.line ? [p.address.line] : undefined,
+              city: p.address.city,
+              district: p.address.district,
+              state: p.address.state,
+              postalCode: p.address.postalCode,
+              country: p.address.country
+            }]
+          : undefined
+      })
+    });
+    if (remote?.fhirId) {
+      const next = getOrganizations().map((o) => (o.id === remote.id ? { ...o, fhirId: remote.fhirId } : o));
+      saveOrganizations(next);
+    }
+  } catch (err) {
+    console.info('FHIR Organization persist skipped:', err.message);
+  }
+  return getOrganizations();
 }
 
 export function deleteOrganization(orgId) {
@@ -325,24 +430,12 @@ export function deleteOrganization(orgId) {
 }
 
 export function getLocations() {
-  try {
-    const raw = localStorage.getItem(LOCS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error loading locations', e);
-  }
-  try {
-    localStorage.setItem(LOCS_STORAGE_KEY, JSON.stringify(INITIAL_LOCATIONS));
-  } catch {}
-  return INITIAL_LOCATIONS;
+  return readCachedArray(LOCS_STORAGE_KEY);
 }
 
 export function saveLocations(locList) {
   try {
-    localStorage.setItem(LOCS_STORAGE_KEY, JSON.stringify(locList));
+    localStorage.setItem(LOCS_STORAGE_KEY, JSON.stringify(dedupeById(locList)));
   } catch (e) {
     console.error('Failed to save locations', e);
   }
@@ -370,6 +463,24 @@ export function saveLocation(locData) {
       name: p.name,
       status: p.status === 'inactive' ? 'inactive' : 'active',
       description: p.description,
+      mode: 'instance',
+      physicalType: {
+        coding: [{
+          system: 'http://terminology.hl7.org/CodeSystem/location-physical-type',
+          code: p.kind === 'site' ? 'si' : 'ro',
+          display: p.kind === 'site' ? 'Site' : 'Room'
+        }]
+      },
+      type: p.areaType
+        ? [{
+            coding: [{
+              system: 'https://integramed.app/fhir/CodeSystem/location-type',
+              code: p.areaType,
+              display: p.typeName || p.areaType
+            }],
+            text: p.typeName || p.areaType
+          }]
+        : undefined,
       telecom: [
         ...(p.phone ? [{ system: 'phone', value: p.phone }] : []),
         ...(p.email ? [{ system: 'email', value: p.email }] : [])
@@ -386,6 +497,9 @@ export function saveLocation(locData) {
         : undefined,
       managingOrganization: org?.fhirId
         ? { reference: `Organization/${org.fhirId}`, display: org.name }
+        : undefined,
+      partOf: p.partOfFhirId
+        ? { reference: `Location/${p.partOfFhirId}`, display: p.partOfName }
         : undefined
     })
   }).then((remote) => {
@@ -396,6 +510,65 @@ export function saveLocation(locData) {
   }).catch((err) => console.info('FHIR Location sync skipped:', err.message));
 
   return updated;
+}
+
+export async function persistLocation(locData) {
+  const list = saveLocation(locData);
+  const saved = list.find((l) => l.id === locData.id) || locData;
+  const org = getOrganizations().find((o) => o.id === saved.organizationId);
+  try {
+    const remote = await upsertPayloadItem({
+      resourceType: 'Location',
+      kind: 'location',
+      item: { ...saved, fhirId: saved.fhirId },
+      buildBase: (p) => ({
+        name: p.name,
+        status: p.status === 'inactive' ? 'inactive' : 'active',
+        description: p.description,
+        mode: 'instance',
+        physicalType: {
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/location-physical-type',
+            code: p.kind === 'site' ? 'si' : 'ro',
+            display: p.kind === 'site' ? 'Site' : 'Room'
+          }]
+        },
+        type: p.areaType
+          ? [{
+              coding: [{
+                system: 'https://integramed.app/fhir/CodeSystem/location-type',
+                code: p.areaType,
+                display: p.typeName || p.areaType
+              }],
+              text: p.typeName || p.areaType
+            }]
+          : undefined,
+        address: p.address
+          ? {
+              line: p.address.line ? [p.address.line] : undefined,
+              city: p.address.city,
+              district: p.address.district,
+              state: p.address.state,
+              postalCode: p.address.postalCode,
+              country: p.address.country
+            }
+          : undefined,
+        managingOrganization: org?.fhirId
+          ? { reference: `Organization/${org.fhirId}`, display: org.name }
+          : undefined,
+        partOf: p.partOfFhirId
+          ? { reference: `Location/${p.partOfFhirId}`, display: p.partOfName }
+          : undefined
+      })
+    });
+    if (remote?.fhirId) {
+      const next = getLocations().map((l) => (l.id === remote.id ? { ...l, fhirId: remote.fhirId } : l));
+      saveLocations(next);
+    }
+  } catch (err) {
+    console.info('FHIR Location persist skipped:', err.message);
+  }
+  return getLocations();
 }
 
 export function deleteLocation(locId) {
@@ -411,19 +584,7 @@ export function deleteLocation(locId) {
  * Facility Resource Types (Consultorios, Cabinas, Quirófanos, Camas, etc.) Storage & CRUD
  */
 export function getFacilityResourceTypes() {
-  try {
-    const raw = localStorage.getItem(RESOURCE_TYPES_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error loading facility resource types', e);
-  }
-  try {
-    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(DEFAULT_FACILITY_RESOURCE_TYPES));
-  } catch {}
-  return DEFAULT_FACILITY_RESOURCE_TYPES;
+  return readCachedArray(RESOURCE_TYPES_STORAGE_KEY);
 }
 
 export function saveFacilityResourceTypes(typesList) {
@@ -459,27 +620,15 @@ export function deleteFacilityResourceType(resourceTypeId) {
 }
 
 export function resetFacilityResourceTypes() {
-  saveFacilityResourceTypes(DEFAULT_FACILITY_RESOURCE_TYPES);
-  return DEFAULT_FACILITY_RESOURCE_TYPES;
+  saveFacilityResourceTypes([]);
+  return [];
 }
 
 /**
  * Facility Services Catalog Storage & CRUD
  */
 export function getFacilityServicesCatalog() {
-  try {
-    const raw = localStorage.getItem(SERVICES_CATALOG_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error loading facility services catalog', e);
-  }
-  try {
-    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(DEFAULT_FACILITY_SERVICES_CATALOG));
-  } catch {}
-  return DEFAULT_FACILITY_SERVICES_CATALOG;
+  return readCachedArray(SERVICES_CATALOG_STORAGE_KEY);
 }
 
 export function saveFacilityServicesCatalog(servicesList) {
@@ -557,43 +706,50 @@ export function deleteFacilityServiceCatalogItem(serviceName) {
 }
 
 export function resetFacilityServicesCatalog() {
-  saveFacilityServicesCatalog(DEFAULT_FACILITY_SERVICES_CATALOG);
-  return DEFAULT_FACILITY_SERVICES_CATALOG;
+  saveFacilityServicesCatalog([]);
+  return [];
 }
 
 export function resetFacilitiesData() {
-  saveOrganizations(INITIAL_ORGANIZATIONS);
-  saveLocations(INITIAL_LOCATIONS);
-  saveFacilityResourceTypes(DEFAULT_FACILITY_RESOURCE_TYPES);
-  saveFacilityServicesCatalog(DEFAULT_FACILITY_SERVICES_CATALOG);
+  saveOrganizations([]);
+  saveLocations([]);
+  saveFacilityResourceTypes([]);
+  saveFacilityServicesCatalog([]);
   return {
-    organizations: INITIAL_ORGANIZATIONS,
-    locations: INITIAL_LOCATIONS,
-    resourceTypes: DEFAULT_FACILITY_RESOURCE_TYPES,
-    servicesCatalog: DEFAULT_FACILITY_SERVICES_CATALOG
+    organizations: [],
+    locations: [],
+    resourceTypes: [],
+    servicesCatalog: []
   };
 }
 
 export async function loadFacilitiesFromFhir() {
   const [orgs, locs, resourceBlob, servicesBlob] = await Promise.all([
-    loadPayloadCollection('Organization', 'organization'),
-    loadPayloadCollection('Location', 'location'),
+    loadKindOrNative('Organization', 'organization', mapNativeOrganization),
+    loadKindOrNative('Location', 'location', mapNativeLocation),
     loadConfigBlob('facility-resource-types'),
     loadConfigBlob('facility-services-catalog')
   ]);
 
   const organizations = preferRemote(orgs, getOrganizations());
-  const locations = preferRemote(locs, getLocations());
+  const orgKeys = new Set(organizations.flatMap((org) => [org.id, org.fhirId]).filter(Boolean));
+  const rawLocations = preferRemote(locs, getLocations());
+  const locations = (rawLocations || []).filter((loc) => {
+    if (!loc) return false;
+    if (String(loc.id || '').startsWith('loc-yeshua') || loc.kind === 'site') return true;
+    if (loc.areaType && orgKeys.has(loc.organizationId)) return true;
+    return orgKeys.has(loc.organizationId);
+  });
   saveOrganizations(organizations);
   saveLocations(locations);
 
-  if (resourceBlob && resourceBlob.data) {
+  if (resourceBlob) {
     resourceTypesFhirId = resourceBlob.fhirId;
-    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(resourceBlob.data));
+    localStorage.setItem(RESOURCE_TYPES_STORAGE_KEY, JSON.stringify(resourceBlob.data || []));
   }
-  if (servicesBlob && servicesBlob.data) {
+  if (servicesBlob) {
     servicesCatalogFhirId = servicesBlob.fhirId;
-    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(servicesBlob.data));
+    localStorage.setItem(SERVICES_CATALOG_STORAGE_KEY, JSON.stringify(servicesBlob.data || []));
   }
 
   return {

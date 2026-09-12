@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HeartPulse,
@@ -18,58 +18,48 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { getTodayAppointments, loadDashboardFromFhir } from '../../utils/dashboardStorage';
+import { getPatientDispensations, loadMedicationsFromFhir } from '../../utils/medicationInventoryStorage';
 
 export default function NurseHomeDashboard({ addToast }) {
   const navigate = useNavigate();
   const { t, locale } = useLanguage();
   const { currentUser } = useAuth();
 
-  // Triage & Nursing queue
-  const [triageQueue, setTriageQueue] = useState([
-    {
-      id: 'triage-1',
-      patientName: 'Elena Gómez Morales',
-      age: 42,
-      gender: 'F',
-      timeWaiting: '8 min',
-      triageLevel: 'Nivel 3 - Urgencia Menor',
-      triageColor: '#d97706',
-      triageBg: '#fef3c7',
-      chiefComplaint: 'Cefalea intensa con náuseas y presión arterial elevada.',
-      vitalsRecorded: false
-    },
-    {
-      id: 'triage-2',
-      patientName: 'Luis Hernández Soto',
-      age: 29,
-      gender: 'M',
-      timeWaiting: '14 min',
-      triageLevel: 'Nivel 4 - No Urgente',
-      triageColor: '#0284c7',
-      triageBg: '#e0f2fe',
-      chiefComplaint: 'Curación post-quirúrgica de herida en extremidad inferior.',
-      vitalsRecorded: true,
-      lastVitals: 'PA 120/75 • FC 70 • SpO2 99%'
-    },
-    {
-      id: 'triage-3',
-      patientName: 'María Fernanda Ruiz',
-      age: 65,
-      gender: 'F',
-      timeWaiting: '3 min',
-      triageLevel: 'Nivel 2 - Urgencia Calificada',
-      triageColor: '#e11d48',
-      triageBg: '#fff1f2',
-      chiefComplaint: 'Dificultad respiratoria leve y antecedente de EPOC.',
-      vitalsRecorded: false
-    }
-  ]);
+  const [triageQueue, setTriageQueue] = useState([]);
+  const [medAdministrations, setMedAdministrations] = useState([]);
 
-  const [medAdministrations, setMedAdministrations] = useState([
-    { id: 'adm-1', patient: 'Elena Gómez', med: 'Ketorolaco 30mg IV', time: '10:00 AM', room: 'Cama 02 - Observación', status: 'pending' },
-    { id: 'adm-2', patient: 'Carlos Mendoza', med: 'Solución Fisiológica 0.9% 500ml', time: '10:30 AM', room: 'Sillón Infusión 1', status: 'pending' },
-    { id: 'adm-3', patient: 'Luis Hernández', med: 'Curación con apósito estéril', time: '11:00 AM', room: 'Cubículo Curaciones', status: 'completed' }
-  ]);
+  useEffect(() => {
+    loadDashboardFromFhir()
+      .then(() => {
+        setTriageQueue(getTodayAppointments().map((appt) => ({
+          id: appt.id,
+          patientName: appt.patientName,
+          age: appt.age,
+          gender: appt.gender,
+          timeWaiting: appt.time || '',
+          triageLevel: appt.statusLabel || appt.status || '',
+          triageColor: appt.statusColor || '#0f766e',
+          triageBg: appt.statusBg || '#ccfbf1',
+          chiefComplaint: appt.reason || '',
+          vitalsRecorded: Boolean(appt.vitalSigns),
+          lastVitals: appt.vitalSigns ? String(appt.vitalSigns) : ''
+        })));
+      })
+      .catch(() => {});
+    loadMedicationsFromFhir()
+      .then(() => {
+        setMedAdministrations(getPatientDispensations().map((item) => ({
+          id: item.id,
+          patient: item.patientName,
+          med: item.medicationName || item.brandName || item.genericName,
+          time: item.dispenseTime || item.dispenseDate || '',
+          room: item.locationName || '',
+          status: item.status || 'pending'
+        })));
+      })
+      .catch(() => {});
+  }, []);
 
   const handleAdministerMed = (id) => {
     setMedAdministrations(prev => prev.map(m => m.id === id ? { ...m, status: 'completed' } : m));
@@ -78,7 +68,7 @@ export default function NurseHomeDashboard({ addToast }) {
     }
   };
 
-  const name = currentUser?.givenName ? `${currentUser.givenName} ${currentUser.familyName || ''}`.trim() : 'Carmen Saldaña';
+  const name = currentUser?.givenName ? `${currentUser.givenName} ${currentUser.familyName || ''}`.trim() : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '1440px', margin: '0 auto' }}>

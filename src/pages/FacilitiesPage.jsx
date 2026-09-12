@@ -1,26 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
   MapPin,
   Plus,
-  Search,
-  Phone,
-  Mail,
-  Clock,
-  Edit3,
+  ArrowLeft,
+  Pencil,
   Trash2,
-  ShieldCheck,
-  CheckCircle2,
-  Building,
-  Activity,
-  Layers,
-  Sparkles,
-  ExternalLink,
-  RotateCcw,
-  Check,
-  Bed,
-  Stethoscope,
-  Filter
+  Users,
+  Stethoscope
 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
@@ -28,900 +15,356 @@ import {
   saveOrganization,
   deleteOrganization,
   getLocations,
-  saveLocation,
+  persistLocation,
   deleteLocation,
-  resetFacilitiesData,
-  getFacilityResourceTypes,
-  getFacilityServicesCatalog,
-  loadFacilitiesFromFhir
+  loadFacilitiesFromFhir,
+  areasForOrganization,
+  siteForOrganization,
+  formatFacilityAddress,
+  areaTypeLabel
 } from '../utils/facilityStorage';
+import { getStaffList, getStaffFullName, loadStaffFromFhir } from '../utils/staffStorage';
+import { ensureClinicaYeshua } from '../utils/clinicaYeshuaBootstrap';
 import OrganizationModal from '../components/facilities/OrganizationModal';
-import LocationModal from '../components/facilities/LocationModal';
+import AreaModal from '../components/facilities/AreaModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import FacilityCatalogManagerModal, { getResourceIconComponent } from '../components/facilities/FacilityCatalogManagerModal';
 
 export default function FacilitiesPage({ addToast, embedded = false }) {
-  const { language, t } = useLanguage();
-
+  const { language } = useLanguage();
   const [organizations, setOrganizations] = useState(() => getOrganizations());
   const [locations, setLocations] = useState(() => getLocations());
-  const [resourceTypes, setResourceTypes] = useState(() => getFacilityResourceTypes());
-
-  const [activeTab, setActiveTab] = useState('locations'); // 'locations' | 'organizations'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState('all');
-
-  // Modals state
+  const [staff, setStaff] = useState(() => getStaffList());
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
   const [orgModal, setOrgModal] = useState({ isOpen: false, organization: null });
-  const [locModal, setLocModal] = useState({ isOpen: false, location: null });
-  const [catalogModal, setCatalogModal] = useState({ isOpen: false });
+  const [areaModal, setAreaModal] = useState({ isOpen: false, area: null });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+  const selectedOrg = organizations.find((org) => org.id === selectedOrgId) || null;
+  const site = selectedOrg ? siteForOrganization(selectedOrg.id, locations) : null;
+  const areas = selectedOrg ? areasForOrganization(selectedOrg.id, locations, organizations) : [];
 
   useEffect(() => {
-    loadFacilitiesFromFhir()
-      .then((data) => {
-        setOrganizations(data.organizations);
-        setLocations(data.locations);
-        setResourceTypes(data.resourceTypes);
-      })
-      .catch(() => {});
+    let cancelled = false;
+    (async () => {
+      await Promise.all([loadFacilitiesFromFhir(), loadStaffFromFhir().catch(() => [])]);
+      const bootstrapped = await ensureClinicaYeshua();
+      if (cancelled) return;
+      setOrganizations(bootstrapped.organizations);
+      setLocations(bootstrapped.locations);
+      setStaff(bootstrapped.staff);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  // Filtered Locations
-  const filteredLocations = useMemo(() => {
-    return locations.filter(loc => {
-      if (selectedOrgFilter !== 'all' && loc.organizationId !== selectedOrgFilter) {
-        return false;
-      }
-      if (selectedTypeFilter !== 'all' && loc.type !== selectedTypeFilter) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const name = (loc.name || '').toLowerCase();
-        const code = (loc.code || '').toLowerCase();
-        const city = (loc.address?.city || '').toLowerCase();
-        const district = (loc.address?.district || '').toLowerCase();
-        const services = (loc.services || []).join(' ').toLowerCase();
+  const staffName = (id) => {
+    const member = staff.find((item) => item.id === id);
+    return member ? getStaffFullName(member) : '';
+  };
 
-        return name.includes(q) || code.includes(q) || city.includes(q) || district.includes(q) || services.includes(q);
-      }
+  const orgCards = useMemo(() => {
+    const seen = new Set();
+    return organizations.filter((org) => {
+      if (!org?.id || seen.has(org.id)) return false;
+      seen.add(org.id);
       return true;
-    });
-  }, [locations, selectedOrgFilter, selectedTypeFilter, searchQuery]);
+    }).map((org) => ({
+      org,
+      orgAreas: areasForOrganization(org.id, locations, organizations),
+      orgSite: siteForOrganization(org.id, locations)
+    }));
+  }, [organizations, locations]);
 
-  // Statistics (Dynamically calculated for all resource types)
-  const stats = useMemo(() => {
-    const totalLocations = locations.length;
-    const activeLocations = locations.filter(l => l.status === 'active').length;
-    
-    // Dynamic totals per registered resource type
-    const resourceTotals = {};
-    resourceTypes.forEach(rt => {
-      resourceTotals[rt.id] = locations.reduce((acc, l) => acc + (Number(l.capacity?.[rt.id]) || 0), 0);
-    });
-
-    return {
-      totalLocations,
-      activeLocations,
-      totalOrgs: organizations.length,
-      resourceTotals,
-      totalConsultingRooms: resourceTotals.consultingRooms || 0,
-      totalTherapyBooths: resourceTotals.therapyBooths || 0,
-      totalTheaters: resourceTotals.operatingTheaters || 0,
-      totalBeds: resourceTotals.recoveryBeds || 0
-    };
-  }, [locations, organizations, resourceTypes]);
-
-  // Handle Save Organization
   const handleSaveOrg = (orgData) => {
     const updated = saveOrganization(orgData);
     setOrganizations(updated);
     if (addToast) {
-      addToast(
-        'success',
-        language === 'en' ? `Organization ${orgData.name} saved` : `Organización ${orgData.name} guardada exitosamente`,
-        language === 'en' ? 'Organization Saved' : 'Organización Guardada'
-      );
+      addToast('success', language === 'en' ? 'Organization saved' : 'Organización guardada', orgData.name);
     }
   };
 
-  // Universal Confirm Modal State
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    warningText: '',
-    confirmText: '',
-    variant: 'danger',
-    icon: 'trash',
-    onConfirm: null
-  });
-
-  // Handle Delete Organization
-  const handleDeleteOrg = (org) => {
-    setConfirmModal({
-      isOpen: true,
-      title: language === 'en' ? 'Delete Organization' : 'Eliminar Organización',
-      message: language === 'en'
-        ? `Are you sure you want to delete "${org.name}"?`
-        : `¿Estás seguro de que deseas eliminar la organización "${org.name}"?`,
-      warningText: language === 'en'
-        ? 'Locations linked to this organization may need reassignment.'
-        : 'Los planteles o sedes vinculadas a esta organización requerirán reasignación.',
-      confirmText: language === 'en' ? 'Delete Organization' : 'Eliminar Organización',
-      variant: 'danger',
-      icon: 'trash',
-      onConfirm: () => {
-        const updated = deleteOrganization(org.id);
-        setOrganizations(updated);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        if (addToast) {
-          addToast(
-            'info',
-            language === 'en' ? `Organization "${org.name}" deleted` : `Organización "${org.name}" eliminada`,
-            language === 'en' ? 'Deleted' : 'Eliminado'
-          );
-        }
-      }
+  const handleSaveArea = async (areaData) => {
+    const list = await persistLocation({
+      ...areaData,
+      organizationId: selectedOrg?.id,
+      kind: 'area',
+      address: selectedOrg?.address || site?.address,
+      partOfId: site?.id,
+      partOfFhirId: site?.fhirId,
+      partOfName: site?.name
     });
-  };
-
-  // Handle Save Location
-  const handleSaveLoc = (locData) => {
-    const updated = saveLocation(locData);
-    setLocations(updated);
+    setLocations(list);
     if (addToast) {
-      addToast(
-        'success',
-        language === 'en' ? `Plantel ${locData.name} saved` : `Plantel ${locData.name} guardado exitosamente`,
-        language === 'en' ? 'Facility Saved' : 'Plantel Guardado'
-      );
+      addToast('success', language === 'en' ? 'Area saved' : 'Área guardada', areaData.name);
     }
   };
 
-  // Handle Delete Location
-  const handleDeleteLoc = (loc) => {
+  const askDelete = ({ title, message, onConfirm }) => {
     setConfirmModal({
       isOpen: true,
-      title: language === 'en' ? 'Delete Location' : 'Eliminar Plantel o Sede',
-      message: language === 'en'
-        ? `Are you sure you want to delete location "${loc.name}"?`
-        : `¿Estás seguro de que deseas eliminar el plantel "${loc.name}"?`,
-      warningText: language === 'en'
-        ? 'Doctors and clinical services linked to this location will lose this campus association.'
-        : 'El personal médico y servicios clínicos asignados a esta sede perderán dicha vinculación.',
-      confirmText: language === 'en' ? 'Delete Location' : 'Eliminar Plantel',
+      title,
+      message,
+      warningText: language === 'en' ? 'This removes the FHIR record.' : 'Esto elimina el registro FHIR.',
+      confirmText: language === 'en' ? 'Delete' : 'Eliminar',
       variant: 'danger',
       icon: 'trash',
       onConfirm: () => {
-        const updated = deleteLocation(loc.id);
-        setLocations(updated);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        if (addToast) {
-          addToast(
-            'info',
-            language === 'en' ? `Location "${loc.name}" removed` : `Plantel "${loc.name}" eliminado`,
-            language === 'en' ? 'Deleted' : 'Eliminado'
-          );
-        }
-      }
-    });
-  };
-
-  // Reset to default
-  const handleReset = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: language === 'en' ? 'Reset Facilities & Locations' : 'Restablecer Planteles y Sedes',
-      message: language === 'en'
-        ? 'Reset all organization and campus locations back to default demo setup?'
-        : '¿Restablecer las organizaciones y planteles a los valores iniciales de prueba?',
-      warningText: language === 'en'
-        ? 'All newly added campus locations and customized departments will be restored.'
-        : 'Se restaurarán todos los planteles y departamentos personalizados.',
-      confirmText: language === 'en' ? 'Reset to Default' : 'Restablecer Planteles',
-      variant: 'warning',
-      icon: 'reset',
-      onConfirm: () => {
-        const { organizations: newOrgs, locations: newLocs } = resetFacilitiesData();
-        setOrganizations(newOrgs);
-        setLocations(newLocs);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        if (addToast) {
-          addToast(
-            'success',
-            language === 'en' ? 'Facilities restored to initial demo records' : 'Planteles y sedes restaurados con éxito',
-            language === 'en' ? 'Reset Complete' : 'Restablecimiento Completo'
-          );
-        }
+        onConfirm();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       }
     });
   };
 
   return (
-    <div style={{ padding: embedded ? '0' : '1.75rem', maxWidth: '1440px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+    <div style={{ padding: embedded ? '0' : '1.75rem', maxWidth: '1100px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.35rem', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                backgroundColor: '#ecfdf5',
-                border: '1px solid #a7f3d0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#059669'
-              }}
-            >
-              <Building2 size={22} strokeWidth={2.5} />
-            </div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
-              {language === 'en' ? 'Healthcare Facilities & Locations' : 'Administración de Planteles y Sedes'}
-            </h1>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
-            {language === 'en'
-              ? 'Manage hospital branches, outpatient specialty clinics, consulting room capacity, and FHIR Organizations'
-              : 'Gestión de planteles, sedes hospitalarias, consultorios, áreas de atención y organizaciones jurídicas FHIR'}
+          <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748b' }}>
+            {language === 'en' ? 'Administration' : 'Administración'}
+          </p>
+          <h1 style={{ margin: '0.2rem 0 0', fontSize: '1.55rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+            {selectedOrg
+              ? (language === 'en' ? 'Areas' : 'Áreas')
+              : (language === 'en' ? 'Organizations' : 'Organizaciones')}
+          </h1>
+          <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: '#64748b', maxWidth: '42rem' }}>
+            {selectedOrg
+              ? (language === 'en'
+                ? 'Rooms and service areas of this organization, with assigned staff.'
+                : 'Consultorios y áreas de servicio de esta organización, con el personal asignado.')
+              : (language === 'en'
+                ? 'Create the organization first, then open its areas — same flow as Clinic, with a clearer workspace.'
+                : 'Primero la organización, luego sus áreas: el mismo flujo que Clinic, con un espacio de trabajo más claro.')}
           </p>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.8125rem', gap: '0.35rem' }}
-          >
-            <RotateCcw size={14} />
-            <span>{language === 'en' ? 'Reset Demo Data' : 'Restablecer Demo'}</span>
+        {!selectedOrg ? (
+          <button type="button" className="btn btn-primary" style={{ backgroundColor: '#0f766e' }} onClick={() => setOrgModal({ isOpen: true, organization: null })}>
+            <Plus size={16} />
+            {language === 'en' ? 'New organization' : 'Nueva organización'}
           </button>
-
-          <button
-            type="button"
-            onClick={() => setCatalogModal({ isOpen: true })}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.8125rem', gap: '0.4rem', borderColor: '#0f766e', color: '#0f766e', backgroundColor: '#f0fdfa' }}
-          >
-            <Layers size={15} />
-            <span>{language === 'en' ? 'Manage Resources & Services' : 'Catálogo de Recursos & Servicios'}</span>
+        ) : (
+          <button type="button" className="btn btn-primary" style={{ backgroundColor: '#0f766e' }} onClick={() => setAreaModal({ isOpen: true, area: null })}>
+            <Plus size={16} />
+            {language === 'en' ? 'New area' : 'Nueva área'}
           </button>
-
-          <button
-            type="button"
-            onClick={() => setOrgModal({ isOpen: true, organization: null })}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.8125rem', gap: '0.35rem', borderColor: '#cbd5e1' }}
-          >
-            <Building2 size={15} />
-            <span>{language === 'en' ? '+ New Organization' : '+ Nueva Organización'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLocModal({ isOpen: true, location: null })}
-            className="btn btn-primary"
-            style={{ backgroundColor: '#0f766e', boxShadow: '0 4px 10px rgba(15, 118, 110, 0.3)', gap: '0.4rem' }}
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span>{language === 'en' ? 'New Plantel / Facility' : 'Nuevo Plantel / Sede'}</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* KPI Stats Tiles (Dynamic for All Registered Resource Types) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {/* Total Locations */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0',
-            padding: '1.15rem 1.25rem',
-            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              backgroundColor: '#ecfdf5',
-              border: '1px solid #a7f3d0',
-              color: '#059669',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <MapPin size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Planteles & Locations' : 'Planteles & Sedes'}
+      {!selectedOrg && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {orgCards.length === 0 && (
+            <div style={{ backgroundColor: '#ffffff', border: '1px dashed #cbd5e1', borderRadius: '1rem', padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+              {language === 'en' ? 'Create an organization first.' : 'Crea una organización primero.'}
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-              {stats.totalLocations}{' '}
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981' }}>
-                ({stats.activeLocations} {language === 'en' ? 'active' : 'operando'})
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Tiles for each registered resource type */}
-        {resourceTypes.map(rt => {
-          const IconComp = getResourceIconComponent(rt.icon);
-          const totalCount = stats.resourceTotals?.[rt.id] || 0;
-
-          return (
-            <div
-              key={rt.id}
+          )}
+          {orgCards.map(({ org, orgAreas, orgSite }) => (
+            <article
+              key={org.id}
               style={{
                 backgroundColor: '#ffffff',
-                borderRadius: '0.75rem',
                 border: '1px solid #e2e8f0',
-                padding: '1.15rem 1.25rem',
-                boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem'
+                borderRadius: '1rem',
+                padding: '1.2rem 1.35rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: '1rem',
+                alignItems: 'center'
               }}
             >
-              <div
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '10px',
-                  backgroundColor: rt.bgColor || '#f0fdf4',
-                  border: `1px solid ${rt.borderColor || '#bbf7d0'}`,
-                  color: rt.color || '#15803d',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <IconComp size={22} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rt.nameEs}>
-                  {language === 'en' ? rt.nameEn || rt.nameEs : rt.nameEs}
-                </div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                  {totalCount}{' '}
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>
-                    {rt.defaultUnit || 'unid.'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Main Tabs (Locations vs Organizations) */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('locations')}
-          style={{
-            padding: '0.65rem 1.25rem',
-            borderRadius: '0.625rem',
-            fontSize: '0.875rem',
-            fontWeight: activeTab === 'locations' ? 800 : 500,
-            border: 'none',
-            backgroundColor: activeTab === 'locations' ? '#ecfdf5' : 'transparent',
-            color: activeTab === 'locations' ? '#065f46' : '#64748b',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <MapPin size={18} />
-          <span>{language === 'en' ? 'Planteles & Clinical Locations' : 'Planteles y Sedes Clínicas'} ({locations.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('organizations')}
-          style={{
-            padding: '0.65rem 1.25rem',
-            borderRadius: '0.625rem',
-            fontSize: '0.875rem',
-            fontWeight: activeTab === 'organizations' ? 800 : 500,
-            border: 'none',
-            backgroundColor: activeTab === 'organizations' ? '#ecfdf5' : 'transparent',
-            color: activeTab === 'organizations' ? '#065f46' : '#64748b',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Building2 size={18} />
-          <span>{language === 'en' ? 'FHIR Organizations' : 'Organizaciones Matrices'} ({organizations.length})</span>
-        </button>
-      </div>
-
-      {/* TAB 1: LOCATIONS & PLANTELES */}
-      {activeTab === 'locations' && (
-        <div>
-          {/* Filters Bar */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '0.75rem',
-              border: '1px solid #e2e8f0',
-              padding: '1rem 1.25rem',
-              marginBottom: '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}
-          >
-            {/* Search */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="form-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={language === 'en' ? 'Search by plantel name, code, district...' : 'Buscar por nombre de plantel, código, zona...'}
-                style={{
-                  paddingLeft: '2.4rem',
-                  height: '38px',
-                  fontSize: '0.8125rem',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '0.5rem'
-                }}
-              />
-            </div>
-
-            {/* Dropdown Filters */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Building2 size={15} color="#64748b" />
-                <select
-                  className="form-input"
-                  style={{ height: '38px', width: 'auto', fontSize: '0.8125rem' }}
-                  value={selectedOrgFilter}
-                  onChange={(e) => setSelectedOrgFilter(e.target.value)}
-                >
-                  <option value="all">{language === 'en' ? 'All Organizations' : 'Todas las Organizaciones'}</option>
-                  {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.alias || org.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Filter size={15} color="#64748b" />
-                <select
-                  className="form-input"
-                  style={{ height: '38px', width: 'auto', fontSize: '0.8125rem' }}
-                  value={selectedTypeFilter}
-                  onChange={(e) => setSelectedTypeFilter(e.target.value)}
-                >
-                  <option value="all">{language === 'en' ? 'All Facility Types' : 'Todos los Tipos'}</option>
-                  <option value="hospital">{language === 'en' ? 'Hospital' : 'Hospital Ambulatorio'}</option>
-                  <option value="clinic">{language === 'en' ? 'Specialty Clinic' : 'Clínica de Especialidades'}</option>
-                  <option value="rehab_center">{language === 'en' ? 'Rehab Center' : 'Centro de Fisioterapia'}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Locations Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1.5rem' }}>
-            {filteredLocations.map(loc => {
-              const parentOrg = organizations.find(o => o.id === loc.organizationId);
-
-              return (
-                <div
-                  key={loc.id}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '1rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 2px 5px rgba(15, 23, 42, 0.04)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {/* Card Header */}
-                  <div style={{ padding: '1.25rem 1.5rem 1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                          <span
-                            style={{
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '9999px',
-                              backgroundColor: '#ecfdf5',
-                              color: '#065f46',
-                              border: '1px solid #a7f3d0',
-                              fontFamily: 'var(--font-mono)'
-                            }}
-                          >
-                            {loc.code}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                            {parentOrg?.alias || parentOrg?.name}
-                          </span>
-                        </div>
-
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.25, margin: 0 }}>
-                          {loc.name}
-                        </h3>
-                      </div>
-
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          padding: '0.2rem 0.55rem',
-                          borderRadius: '9999px',
-                          backgroundColor: loc.status === 'active' ? '#ecfdf5' : '#fef3c7',
-                          color: loc.status === 'active' ? '#047857' : '#b45309',
-                          border: `1px solid ${loc.status === 'active' ? '#a7f3d0' : '#fde68a'}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          flexShrink: 0
-                        }}
-                      >
-                        <CheckCircle2 size={11} />
-                        {loc.status === 'active' ? (language === 'en' ? 'Active' : 'Operando') : (language === 'en' ? 'Maintenance' : 'Mantenimiento')}
-                      </span>
-                    </div>
-
-                    <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '0.875rem' }}>
-                      {loc.description}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: org.logoBg || '#0f766e', color: org.logoText || '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building2 size={20} />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{org.name}</h2>
+                    <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#0f766e', fontWeight: 600 }}>
+                      {org.alias && org.alias !== org.name ? `${org.alias} · ` : ''}{org.typeName || (language === 'en' ? 'Healthcare provider' : 'Prestador de servicios')}
                     </p>
-
-                    {/* Address Box */}
-                    <div
-                      style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '0.625rem',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '0.8125rem',
-                        color: '#334155',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.35rem',
-                        marginBottom: '0.875rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
-                        <MapPin size={14} color="#059669" flexShrink={0} />
-                        <span>{loc.address?.line}, {loc.address?.district}, {loc.address?.city}</span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Clock size={12} color="#94a3b8" />
-                          <span>{loc.operatingHours}</span>
-                        </div>
-                        {loc.phone && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Phone size={12} color="#94a3b8" />
-                            <span>{loc.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Capacity Overview (Dynamic for all resource types) */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(auto-fit, minmax(70px, 1fr))`,
-                        gap: '0.4rem',
-                        padding: '0.625rem',
-                        backgroundColor: '#f0fdf4',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #bbf7d0',
-                        textAlign: 'center',
-                        marginBottom: '0.875rem'
-                      }}
-                    >
-                      {resourceTypes.map(rt => {
-                        const count = loc.capacity?.[rt.id] !== undefined ? loc.capacity[rt.id] : 0;
-                        return (
-                          <div key={rt.id} style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '0.63rem', color: rt.color || '#166534', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rt.nameEs}>
-                              {language === 'en' ? rt.nameEn || rt.nameEs : rt.nameEs}
-                            </div>
-                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: rt.color || '#15803d' }}>
-                              {count}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Services Chips */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                      {loc.services?.map((serv, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '0.2rem 0.5rem',
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '4px',
-                            color: '#475569',
-                            fontWeight: 500
-                          }}
-                        >
-                          ✓ {serv}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Card Footer Actions */}
-                  <div
-                    style={{
-                      backgroundColor: '#fafafa',
-                      borderTop: '1px solid #f1f5f9',
-                      padding: '0.75rem 1.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      {loc.rooms?.length || 0} {language === 'en' ? 'rooms configured' : 'cubículos configurados'}
-                    </span>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => setLocModal({ isOpen: true, location: loc })}
-                        className="btn btn-primary btn-sm"
-                        style={{ backgroundColor: '#0f766e', fontSize: '0.75rem', gap: '0.35rem' }}
-                      >
-                        <Edit3 size={13} />
-                        <span>{language === 'en' ? 'Edit Plantel' : 'Editar Sede'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteLoc(loc)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#94a3b8',
-                          cursor: 'pointer',
-                          padding: '0.35rem',
-                          display: 'flex',
-                          borderRadius: '0.375rem'
-                        }}
-                        title={language === 'en' ? 'Delete location' : 'Eliminar plantel'}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                <p style={{ margin: '0.7rem 0 0', fontSize: '0.8125rem', color: '#334155', display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+                  <MapPin size={14} color="#0d9488" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <span>{formatFacilityAddress(org.address || orgSite?.address) || (language === 'en' ? 'No address yet' : 'Sin domicilio')}</span>
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4', borderRadius: '9999px', padding: '0.2rem 0.55rem' }}>
+                    {orgAreas.length} {language === 'en' ? 'areas' : 'áreas'}
+                  </span>
+                  {org.director && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '9999px', padding: '0.2rem 0.55rem' }}>
+                      {org.director}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <button type="button" className="btn btn-primary btn-sm" style={{ backgroundColor: '#0f766e' }} onClick={() => setSelectedOrgId(org.id)}>
+                  {language === 'en' ? 'Open areas' : 'Ver áreas'}
+                </button>
+                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-secondary btn-sm" aria-label="Edit" onClick={() => setOrgModal({ isOpen: true, organization: org })}>
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    aria-label="Delete"
+                    onClick={() => askDelete({
+                      title: language === 'en' ? 'Delete organization' : 'Eliminar organización',
+                      message: org.name,
+                      onConfirm: () => {
+                        setOrganizations(deleteOrganization(org.id));
+                        areasForOrganization(org.id, getLocations()).forEach((loc) => deleteLocation(loc.id));
+                        const siteLoc = siteForOrganization(org.id, getLocations());
+                        if (siteLoc) deleteLocation(siteLoc.id);
+                        setLocations(getLocations());
+                      }
+                    })}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
-      {/* TAB 2: ORGANIZATIONS */}
-      {activeTab === 'organizations' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.5rem' }}>
-          {organizations.map(org => {
-            const orgLocations = locations.filter(l => l.organizationId === org.id);
+      {selectedOrg && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setSelectedOrgId(null)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#0f766e',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              cursor: 'pointer',
+              marginBottom: '0.85rem',
+              padding: 0
+            }}
+          >
+            <ArrowLeft size={15} />
+            {language === 'en' ? 'Back to organizations' : 'Volver a organizaciones'}
+          </button>
 
-            return (
+          <div
+            style={{
+              backgroundColor: '#f0fdfa',
+              border: '1px solid #99f6e4',
+              borderRadius: '1rem',
+              padding: '1rem 1.2rem',
+              marginBottom: '1rem'
+            }}
+          >
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0f766e' }}>
+              {language === 'en' ? 'Organization' : 'Organización'}
+            </div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.15rem' }}>{selectedOrg.name}</div>
+            <div style={{ fontSize: '0.8125rem', color: '#334155', marginTop: '0.25rem' }}>
+              {formatFacilityAddress(selectedOrg.address || site?.address)}
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '1rem', overflow: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1.4fr 1fr auto', gap: '0.75rem', padding: '0.7rem 1.1rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#64748b' }}>
+              <span>{language === 'en' ? 'Area' : 'Área'}</span>
+              <span>{language === 'en' ? 'Type' : 'Tipo'}</span>
+              <span>{language === 'en' ? 'Services' : 'Servicios'}</span>
+              <span>{language === 'en' ? 'Staff' : 'Personal'}</span>
+              <span />
+            </div>
+            {areas.length === 0 && (
+              <div style={{ padding: '1.75rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
+                {language === 'en' ? 'No areas yet. Add consultation rooms, therapy, or procedure rooms.' : 'Aún no hay áreas. Añade consultorios, terapia o salas de procedimiento.'}
+              </div>
+            )}
+            {areas.map((area) => (
               <div
-                key={org.id}
+                key={area.id}
                 style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '1rem',
-                  border: '1px solid #e2e8f0',
-                  padding: '1.5rem',
-                  boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '1.25rem'
+                  display: 'grid',
+                  gridTemplateColumns: '1.2fr 0.8fr 1.4fr 1fr auto',
+                  gap: '0.75rem',
+                  padding: '0.95rem 1.1rem',
+                  borderBottom: '1px solid #f1f5f9',
+                  alignItems: 'start'
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                      <div
-                        style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '12px',
-                          backgroundColor: org.logoBg || '#0f766e',
-                          color: org.logoText || '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '1.2rem',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <Building2 size={24} />
-                      </div>
-
-                      <div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.25 }}>
-                          {org.name}
-                        </h3>
-                        <div style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: 700, marginTop: '0.2rem' }}>
-                          {org.alias} • {org.typeName}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '9999px',
-                        backgroundColor: '#ecfdf5',
-                        color: '#047857',
-                        border: '1px solid #a7f3d0'
-                      }}
-                    >
-                      FHIR Organization
-                    </span>
-                  </div>
-
-                  {/* Credentials & Director */}
-                  <div
-                    style={{
-                      padding: '0.875rem',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '0.625rem',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.4rem',
-                      fontSize: '0.8125rem',
-                      color: '#334155'
-                    }}
-                  >
-                    <div><strong>RFC / Tax ID:</strong> <code style={{ fontFamily: 'var(--font-mono)' }}>{org.taxId}</code></div>
-                    <div><strong>Licencia Sanitaria:</strong> {org.license}</div>
-                    <div><strong>Director Médico:</strong> {org.director}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem', fontSize: '0.75rem', color: '#64748b' }}>
-                      <span>📞 {org.phone}</span>
-                      <span>✉️ {org.email}</span>
-                    </div>
-                  </div>
-
-                  {/* Connected Locations List */}
-                  <div style={{ marginTop: '1rem' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
-                      {language === 'en' ? 'Associated Planteles / Branches:' : 'Planteles y Sedes Asociadas:'} ({orgLocations.length})
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      {orgLocations.map(l => (
-                        <div
-                          key={l.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.4rem 0.65rem',
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>{l.name}</span>
-                          <span style={{ color: '#64748b' }}>{l.code}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>{area.name}</div>
+                  <div style={{ fontSize: '0.72rem', color: area.status === 'active' ? '#047857' : '#b45309', fontWeight: 600 }}>
+                    {area.status === 'active' ? (language === 'en' ? 'Active' : 'Activa') : (language === 'en' ? 'Inactive' : 'Inactiva')}
                   </div>
                 </div>
-
-                {/* Bottom Edit */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.875rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setOrgModal({ isOpen: true, organization: org })}
-                    className="btn btn-primary btn-sm"
-                    style={{ backgroundColor: '#0f766e', fontSize: '0.75rem', gap: '0.35rem' }}
-                  >
-                    <Edit3 size={13} />
-                    <span>{language === 'en' ? 'Edit Organization' : 'Editar Organización'}</span>
+                <div style={{ fontSize: '0.8125rem', color: '#334155' }}>{areaTypeLabel(area.areaType, language) || area.typeName}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                  {(area.services || []).map((service) => (
+                    <span key={service} style={{ fontSize: '0.7rem', backgroundColor: '#ecfdf5', color: '#065f46', borderRadius: '9999px', padding: '0.15rem 0.45rem', fontWeight: 600 }}>
+                      {service}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#0f172a' }}>
+                  {(area.practitionerIds || []).map(staffName).filter(Boolean).join(', ') || '—'}
+                </div>
+                <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAreaModal({ isOpen: true, area })}>
+                    <Pencil size={13} />
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => handleDeleteOrg(org)}
-                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.35rem' }}
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => askDelete({
+                      title: language === 'en' ? 'Delete area' : 'Eliminar área',
+                      message: area.name,
+                      onConfirm: () => setLocations(deleteLocation(area.id))
+                    })}
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', color: '#64748b', fontSize: '0.78rem', alignItems: 'center' }}>
+            <Stethoscope size={14} />
+            <span>{areas.reduce((acc, area) => acc + (area.services || []).length, 0)} {language === 'en' ? 'service links' : 'servicios vinculados'}</span>
+            <Users size={14} />
+            <span>{staff.filter((member) => member.organizationId === selectedOrg.id).length} {language === 'en' ? 'staff in this organization' : 'colaboradores en esta organización'}</span>
+          </div>
         </div>
       )}
 
-      {/* Organization Modal */}
       <OrganizationModal
         isOpen={orgModal.isOpen}
-        onClose={() => setOrgModal({ isOpen: false, organization: null })}
         organization={orgModal.organization}
+        onClose={() => setOrgModal({ isOpen: false, organization: null })}
         onSave={handleSaveOrg}
       />
-
-      {/* Location Modal */}
-      <LocationModal
-        isOpen={locModal.isOpen}
-        onClose={() => {
-          setLocModal({ isOpen: false, location: null });
-          setLocations(getLocations());
-        }}
-        location={locModal.location}
-        organizations={organizations}
-        onSave={handleSaveLoc}
+      <AreaModal
+        isOpen={areaModal.isOpen}
+        area={areaModal.area}
+        organization={selectedOrg}
+        onClose={() => setAreaModal({ isOpen: false, area: null })}
+        onSave={handleSaveArea}
       />
-
-      {/* Facility Catalog Manager Modal (Resources & Services CRUD) */}
-      {catalogModal.isOpen && (
-        <FacilityCatalogManagerModal
-          isOpen={catalogModal.isOpen}
-          onClose={() => {
-            setCatalogModal({ isOpen: false });
-            setResourceTypes(getFacilityResourceTypes());
-            setLocations(getLocations());
-          }}
-          onCatalogChanged={() => {
-            setResourceTypes(getFacilityResourceTypes());
-            setLocations(getLocations());
-          }}
-          addToast={addToast}
-        />
-      )}
-
-      {/* Universal Confirm Modal for Delete and Reset Actions */}
       <DeleteConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
         message={confirmModal.message}
         warningText={confirmModal.warningText}
         confirmText={confirmModal.confirmText}
         variant={confirmModal.variant}
         icon={confirmModal.icon}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
       />
     </div>
   );

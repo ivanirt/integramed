@@ -6,10 +6,10 @@
 import { loadConfigBlob, saveConfigBlob } from '../services/fhirPayloadStore.js';
 
 const STORAGE_KEYS = {
-  SCHEDULE: 'integramed_clinic_schedule',
-  DATE_OVERRIDES: 'integramed_date_overrides',
-  HOLIDAYS: 'integramed_clinic_holidays',
-  DOCTOR_LEAVES: 'integramed_doctor_leaves',
+  SCHEDULE: 'integramed_clinic_schedule_fhir',
+  DATE_OVERRIDES: 'integramed_date_overrides_fhir',
+  HOLIDAYS: 'integramed_clinic_holidays_fhir',
+  DOCTOR_LEAVES: 'integramed_doctor_leaves_fhir',
   PRACTITIONER_SCHEDULES: 'integramed_practitioner_schedules'
 };
 
@@ -113,13 +113,11 @@ export function saveClinicSchedule(schedule) {
 export function getDateOverrides() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DATE_OVERRIDES);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(DEFAULT_DATE_OVERRIDES));
-      return DEFAULT_DATE_OVERRIDES;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DEFAULT_DATE_OVERRIDES;
+    return [];
   }
 }
 
@@ -170,13 +168,11 @@ export function getDateOverrideForDate(dateStr, practitionerId = null) {
 export function getClinicHolidays() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(DEFAULT_HOLIDAYS));
-      return DEFAULT_HOLIDAYS;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DEFAULT_HOLIDAYS;
+    return [];
   }
 }
 
@@ -217,13 +213,11 @@ export function isDateClinicHoliday(dateStr) {
 export function getDoctorLeaves() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DOCTOR_LEAVES);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.DOCTOR_LEAVES, JSON.stringify(DEFAULT_DOCTOR_LEAVES));
-      return DEFAULT_DOCTOR_LEAVES;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DEFAULT_DOCTOR_LEAVES;
+    return [];
   }
 }
 
@@ -341,14 +335,14 @@ export async function loadScheduleFromFhir() {
   if (scheduleBlob?.data) {
     localStorage.setItem(STORAGE_KEYS.SCHEDULE, JSON.stringify(scheduleBlob.data));
   }
-  if (overridesBlob?.data) {
-    localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(overridesBlob.data));
+  if (overridesBlob) {
+    localStorage.setItem(STORAGE_KEYS.DATE_OVERRIDES, JSON.stringify(overridesBlob.data || []));
   }
-  if (holidaysBlob?.data) {
-    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidaysBlob.data));
+  if (holidaysBlob) {
+    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidaysBlob.data || []));
   }
-  if (leavesBlob?.data) {
-    localStorage.setItem(STORAGE_KEYS.DOCTOR_LEAVES, JSON.stringify(leavesBlob.data));
+  if (leavesBlob) {
+    localStorage.setItem(STORAGE_KEYS.DOCTOR_LEAVES, JSON.stringify(leavesBlob.data || []));
   }
   return {
     schedule: getClinicSchedule(),

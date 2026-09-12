@@ -10,10 +10,12 @@
  */
 
 import {
-  loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray,
+  loadKindOrNative,
+  mapNativePractitioner
 } from '../services/fhirPayloadStore.js';
 
 export const CLINICAL_ROLES = {
@@ -668,33 +670,16 @@ export const INITIAL_STAFF_DIRECTORY = [
   }
 ];
 
-const STORAGE_KEY = 'integramed_practitioners_data';
+const STORAGE_KEY = 'integramed_practitioners_fhir';
 
 /**
  * Retrieve current staff list from localStorage or initialize with seed
  */
 export function getStaffList() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map(item => ({
-          ...item,
-          preferredLanguage: item.preferredLanguage === 'en' ? 'en' : 'es'
-        }));
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading staff directory from storage, using initial directory', e);
-  }
-  // Initialize storage
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAFF_DIRECTORY));
-  } catch (e) {
-    // Ignore storage write issues
-  }
-  return INITIAL_STAFF_DIRECTORY;
+  return readCachedArray(STORAGE_KEY).map((item) => ({
+    ...item,
+    preferredLanguage: item.preferredLanguage === 'en' ? 'en' : 'es'
+  }));
 }
 
 /**
@@ -765,6 +750,42 @@ export function saveStaffMember(staffMember) {
   }).catch((err) => console.info('FHIR Practitioner sync skipped:', err.message));
 
   return updatedList;
+}
+
+export async function persistStaffMember(staffMember) {
+  saveStaffMember(staffMember);
+  const saved = getStaffList().find((s) => s.id === staffMember.id) || staffMember;
+  try {
+    const remote = await upsertPayloadItem({
+      resourceType: 'Practitioner',
+      kind: 'practitioner',
+      item: saved,
+      buildBase: (p) => ({
+        active: p.status !== 'inactive',
+        name: [
+          {
+            use: 'official',
+            prefix: p.prefix ? [p.prefix] : undefined,
+            family: p.familyName || '',
+            given: p.givenName ? String(p.givenName).split(/\s+/).filter(Boolean) : []
+          }
+        ],
+        gender: p.gender || 'unknown',
+        telecom: [
+          ...(p.email ? [{ system: 'email', value: p.email, use: 'work' }] : []),
+          ...(p.phone ? [{ system: 'phone', value: p.phone, use: 'work' }] : [])
+        ],
+        qualification: p.specialty ? [{ code: { text: p.specialty } }] : undefined
+      })
+    });
+    if (remote?.fhirId) {
+      const next = getStaffList().map((s) => (s.id === remote.id ? { ...s, fhirId: remote.fhirId } : s));
+      saveStaffList(next);
+    }
+  } catch (err) {
+    console.info('FHIR Practitioner persist skipped:', err.message);
+  }
+  return getStaffList();
 }
 
 /**
@@ -859,7 +880,7 @@ export function deleteStaffMember(staffId) {
 }
 
 export async function loadStaffFromFhir() {
-  const remote = await loadPayloadCollection('Practitioner', 'practitioner');
+  const remote = await loadKindOrNative('Practitioner', 'practitioner', mapNativePractitioner);
   const merged = preferRemote(remote, getStaffList());
   const withPasswords = merged.map((remoteItem) => {
     const local = getStaffList().find((s) => s.id === remoteItem.id || s.email === remoteItem.email);
@@ -882,8 +903,8 @@ export async function loadStaffFromFhir() {
  * Reset all practitioners data back to initial seed
  */
 export function resetStaffToDefault() {
-  saveStaffList(INITIAL_STAFF_DIRECTORY);
-  return INITIAL_STAFF_DIRECTORY;
+  saveStaffList([]);
+  return [];
 }
 
 /**

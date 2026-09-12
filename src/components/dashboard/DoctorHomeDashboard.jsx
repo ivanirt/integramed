@@ -39,8 +39,7 @@ import {
   addPendingTask,
   reorderTasks,
   deleteTask,
-  sortTasksByCompletion,
-  INITIAL_AI_SUGGESTIONS
+  sortTasksByCompletion
 } from '../../utils/dashboardStorage';
 import { loadPatientPastEncounters } from '../../utils/encounterHistoryStorage';
 import { isTerminalAppointmentStatus, normalizeAppointmentStatus } from '../../utils/appointmentStatus';

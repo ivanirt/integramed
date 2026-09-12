@@ -6,7 +6,8 @@ import {
   loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray
 } from '../services/fhirPayloadStore.js';
 
 export const GUARD_TYPES = {
@@ -170,23 +171,11 @@ export const INITIAL_COVERAGES = [
   }
 ];
 
-const GUARDS_STORAGE_KEY = 'integramed_guards_schedule';
-const COVERAGES_STORAGE_KEY = 'integramed_staff_coverages';
+const GUARDS_STORAGE_KEY = 'integramed_guards_schedule_fhir';
+const COVERAGES_STORAGE_KEY = 'integramed_staff_coverages_fhir';
 
 export function getGuards() {
-  try {
-    const raw = localStorage.getItem(GUARDS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading guards schedule', e);
-  }
-  try {
-    localStorage.setItem(GUARDS_STORAGE_KEY, JSON.stringify(INITIAL_GUARDS));
-  } catch {}
-  return INITIAL_GUARDS;
+  return readCachedArray(GUARDS_STORAGE_KEY);
 }
 
 export function saveGuards(guardsList) {
@@ -233,19 +222,7 @@ export function deleteGuard(guardId) {
 }
 
 export function getCoverages() {
-  try {
-    const raw = localStorage.getItem(COVERAGES_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading coverages', e);
-  }
-  try {
-    localStorage.setItem(COVERAGES_STORAGE_KEY, JSON.stringify(INITIAL_COVERAGES));
-  } catch {}
-  return INITIAL_COVERAGES;
+  return readCachedArray(COVERAGES_STORAGE_KEY);
 }
 
 export function saveCoverages(coveragesList) {
@@ -304,7 +281,7 @@ export async function loadShiftGuardFromFhir() {
 }
 
 export function resetShiftGuardData() {
-  saveGuards(INITIAL_GUARDS);
-  saveCoverages(INITIAL_COVERAGES);
-  return { guards: INITIAL_GUARDS, coverages: INITIAL_COVERAGES };
+  saveGuards([]);
+  saveCoverages([]);
+  return { guards: [], coverages: [] };
 }

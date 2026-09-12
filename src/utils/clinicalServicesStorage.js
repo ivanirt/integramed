@@ -14,6 +14,7 @@ import {
   deleteHealthcareService,
   healthcareServiceToClinicalService
 } from '../services/fhirApi.js';
+import { readCachedArray } from '../services/fhirPayloadStore.js';
 
 export const SERVICE_CATEGORIES = {
   consulta_especialidad: {
@@ -374,27 +375,13 @@ export const INITIAL_CLINICAL_SERVICES = [
   }
 ];
 
-const STORAGE_KEY = 'integramed_clinical_services_catalog';
+const STORAGE_KEY = 'integramed_clinical_services_catalog_fhir';
 
 /**
  * Get all clinical & diagnostic services
  */
 export function getClinicalServices() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading clinical services, using defaults', e);
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_CLINICAL_SERVICES));
-  } catch (e) {}
-  return INITIAL_CLINICAL_SERVICES;
+  return readCachedArray(STORAGE_KEY);
 }
 
 /**
@@ -507,14 +494,13 @@ export async function loadClinicalServicesFromFhir() {
   try {
     const remote = await getHealthcareServices();
     const mapped = (remote || []).map(healthcareServiceToClinicalService).filter(Boolean);
-    if (mapped.length === 0) return local;
+    if (mapped.length === 0) {
+      saveClinicalServicesList([]);
+      return [];
+    }
 
     const byId = new Map();
-    local.forEach(item => byId.set(item.id, item));
-    mapped.forEach(item => {
-      const existing = byId.get(item.id);
-      byId.set(item.id, existing ? { ...existing, ...item } : item);
-    });
+    mapped.forEach(item => byId.set(item.id, item));
     const merged = Array.from(byId.values());
     saveClinicalServicesList(merged);
     return merged;
@@ -528,6 +514,6 @@ export async function loadClinicalServicesFromFhir() {
  * Reset clinical services to default seed
  */
 export function resetClinicalServicesToDefault() {
-  saveClinicalServicesList(INITIAL_CLINICAL_SERVICES);
-  return INITIAL_CLINICAL_SERVICES;
+  saveClinicalServicesList([]);
+  return [];
 }

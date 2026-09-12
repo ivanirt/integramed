@@ -311,7 +311,7 @@ export default function LabsPage({ addToast }) {
 
     const englishAnswer = {
       title: 'Automated clinical findings',
-      summary: `Metabolic and lipid profile changes are noted for patient Mariana Silva Ruiz:
+      summary: `Metabolic and lipid profile changes are noted for patient ${patientName || 'the selected patient'}:
 • Serum glucose 104 mg/dL (normal 70–99 mg/dL), suggesting impaired fasting glucose / early prediabetes.
 • Total cholesterol (218 mg/dL), triglycerides (165 mg/dL) and estimated LDL (138 mg/dL) consistent with mild mixed dyslipidemia.
 • Renal function (creatinine 0.85 mg/dL) and uric acid (4.2 mg/dL) are normal, without signs of nephropathy.
@@ -325,7 +325,7 @@ export default function LabsPage({ addToast }) {
 
     const spanishAnswer = {
       title: 'Evaluación y Hallazgos Clínicos Automatizados',
-      summary: `Se observa alteración en el perfil metabólico y lipídico de la paciente Mariana Silva Ruiz:
+      summary: `Se observa alteración en el perfil metabólico y lipídico de ${patientName || 'el paciente seleccionado'}:
 • Glucosa sérica en 104 mg/dL (rango normal 70-99 mg/dL), lo que sugiere estado de glucemia basal alterada / prediabetes incipiente.
 • Colesterol total (218 mg/dL), Triglicéridos (165 mg/dL) y LDL estimado (138 mg/dL) compatibles con Dislipidemia Mixta leve.
 • Función renal (Creatinina 0.85 mg/dL) y ácido úrico (4.2 mg/dL) normales sin indicios de nefropatía.
@@ -440,13 +440,13 @@ export default function LabsPage({ addToast }) {
     );
   };
 
-  const patientName = selectedPatient ? getPatientFullName(selectedPatient) : 'Mariana Silva Ruiz';
-  const patientAge = selectedPatient ? calculateAge(selectedPatient.birthDate) : 34;
-  const patientFolio = selectedPatient ? getPatientIdentifier(selectedPatient) : 'CLI-84920';
+  const patientName = selectedPatient ? getPatientFullName(selectedPatient) : '';
+  const patientAge = selectedPatient ? calculateAge(selectedPatient.birthDate) : '';
+  const patientFolio = selectedPatient ? getPatientIdentifier(selectedPatient) : '';
 
   const patientInitials = selectedPatient
-    ? `${selectedPatient.name?.[0]?.given?.[0]?.[0] || 'M'}${selectedPatient.name?.[0]?.family?.[0] || 'S'}`
-    : 'MS';
+    ? `${selectedPatient.name?.[0]?.given?.[0]?.[0] || ''}${selectedPatient.name?.[0]?.family?.[0] || ''}`
+    : '';
 
   return (
     <div

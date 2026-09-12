@@ -1,8 +1,12 @@
 /**
  * Clinic-wide sidebar menu visibility (which modules appear in the left nav).
+ * Cached locally; persisted on FHIR as a List config blob.
  */
 
-const STORAGE_KEY = 'integramed_menu_capabilities';
+import { loadConfigBlob, saveConfigBlob } from '../services/fhirPayloadStore.js';
+
+const STORAGE_KEY = 'integramed_menu_capabilities_fhir';
+let menuCapabilitiesFhirId = null;
 export const MENU_CAPABILITIES_EVENT = 'integramed_menu_capabilities_updated';
 
 export const MENU_CAPABILITY_ITEMS = [
@@ -45,7 +49,23 @@ export function saveMenuCapabilities(next) {
   const merged = { ...defaultCapabilities(), ...next };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   window.dispatchEvent(new Event(MENU_CAPABILITIES_EVENT));
+  saveConfigBlob('menu-capabilities', merged, menuCapabilitiesFhirId)
+    .then((id) => { menuCapabilitiesFhirId = id; })
+    .catch((err) => console.info('FHIR menu capabilities sync skipped:', err.message));
   return merged;
+}
+
+export async function loadMenuCapabilitiesFromFhir() {
+  const blob = await loadConfigBlob('menu-capabilities');
+  if (blob === null) return getMenuCapabilities();
+  if (blob.data && typeof blob.data === 'object') {
+    menuCapabilitiesFhirId = blob.fhirId;
+    const merged = { ...defaultCapabilities(), ...blob.data };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    window.dispatchEvent(new Event(MENU_CAPABILITIES_EVENT));
+    return merged;
+  }
+  return getMenuCapabilities();
 }
 
 export function setMenuCapabilityVisible(id, visible) {

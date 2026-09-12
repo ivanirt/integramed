@@ -32,8 +32,8 @@ export default function LoginPage({ addToast }) {
   const currentDirectory = staffList && staffList.length > 0 ? staffList : [];
   const initialStaff = currentDirectory[0] || null;
 
-  const [email, setEmail] = useState(initialStaff?.email || 'jesus.robledo@integramed.com');
-  const [password, setPassword] = useState(initialStaff?.password || 'IntegraMed27');
+  const [email, setEmail] = useState(initialStaff?.email || '');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState(initialStaff);

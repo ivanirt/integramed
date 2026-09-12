@@ -4,12 +4,13 @@
  * Persists in LocalStorage and syncs with FHIR server.
  */
 
-import { generateWeeklySampleEncounters } from './weeklyAgendaData.js';
 import {
-  loadPayloadCollection,
   upsertPayloadItem,
   deletePayloadItem,
-  preferRemote
+  preferRemote,
+  readCachedArray,
+  loadKindOrNative,
+  mapNativeAppointment
 } from '../services/fhirPayloadStore.js';
 import {
   APPOINTMENT_STATUS_OPTIONS,
@@ -17,7 +18,7 @@ import {
   fhirAppointmentStatus
 } from './appointmentStatus.js';
 
-const STORAGE_KEY = 'integramed_weekly_appointments_v2';
+const STORAGE_KEY = 'integramed_weekly_appointments_fhir';
 
 export { APPOINTMENT_STATUS_OPTIONS };
 
@@ -25,26 +26,7 @@ export { APPOINTMENT_STATUS_OPTIONS };
  * Retrieve all appointments from persistent storage
  */
 export function getStoredAppointments() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to parse appointments from storage, generating seed:', err);
-  }
-
-  // Initialize with weekly sample encounters
-  const initial = generateWeeklySampleEncounters(new Date());
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-  } catch (e) {
-    console.error('Storage write error:', e);
-  }
-  return initial;
+  return readCachedArray(STORAGE_KEY);
 }
 
 /**
@@ -259,18 +241,14 @@ export async function deleteAppointment(id) {
 }
 
 export async function loadAppointmentsFromFhir() {
-  const remote = await loadPayloadCollection('Appointment', 'appointment');
+  const remote = await loadKindOrNative('Appointment', 'appointment', mapNativeAppointment);
   const merged = preferRemote(remote, getStoredAppointments());
   saveStoredAppointments(merged);
   window.dispatchEvent(new CustomEvent('integramed_appointments_changed', { detail: merged }));
   return merged;
 }
 
-/**
- * Reset all appointments to weekly default
- */
 export function resetAppointmentsToDefault() {
-  const initial = generateWeeklySampleEncounters(new Date());
-  saveStoredAppointments(initial);
-  return initial;
+  saveStoredAppointments([]);
+  return [];
 }

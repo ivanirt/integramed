@@ -712,9 +712,11 @@ export default function ConsultationPage({ addToast }) {
         date: new Date().toISOString(),
         type: diagnoses[0]?.label ? `Consulta: ${diagnoses[0].label}` : 'Consulta de Medicina General',
         status: 'finished',
-        practitionerName: 'Dra. Mariana Silva Ruiz',
-        practitionerSpecialty: 'Medicina General',
-        locationName: 'Plantel Central - Consultorio 102',
+        practitionerName: currentUser
+          ? `${currentUser.prefix || ''} ${currentUser.givenName || ''} ${currentUser.familyName || ''}`.trim()
+          : '',
+        practitionerSpecialty: currentUser?.specialty || '',
+        locationName: '',
         reason: reasonSummary,
         summary: assessmentText || subjective.slice(0, 100),
         vitals: {
@@ -761,9 +763,9 @@ export default function ConsultationPage({ addToast }) {
     }
   };
 
-  const fullName = patient ? getPatientFullName(patient) : 'Mariana Silva Ruiz';
-  const age = calculateAge(patient?.birthDate) ?? 34;
-  const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '84920';
+  const fullName = patient ? getPatientFullName(patient) : '';
+  const age = patient ? calculateAge(patient?.birthDate) : '';
+  const expNumber = patient?.identifier?.find(i => i.type?.coding?.some(c => c.code === 'MR'))?.value || patient?.id?.slice(0, 8).toUpperCase() || '';
   const liveAppointment = pickActiveAppointment(getTodayAppointments(), selectedPatientId)
     || getTodayAppointments().find((a) => String(a.patientId) === String(selectedPatientId));
   const liveStatus = liveAppointment

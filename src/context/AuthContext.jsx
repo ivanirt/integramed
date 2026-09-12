@@ -10,6 +10,7 @@ import {
   deleteStaffMember,
   resetStaffToDefault,
   loadStaffFromFhir,
+  persistStaffMember,
   CLINICAL_ROLES
 } from '../utils/staffStorage';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -41,8 +42,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('Could not read user from storage', e);
     }
-    const initialList = getStaffList();
-    return initialList[0];
+    return null;
   });
 
   const [activeRole, setActiveRole] = useState(() => {
@@ -52,8 +52,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('Could not read role from storage', e);
     }
-    const initialList = getStaffList();
-    return initialList[0]?.primaryRole || 'doctor';
+    return 'doctor';
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -69,11 +68,33 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     loadStaffFromFhir()
-      .then((list) => {
-        setStaffList(list);
+      .then(async (list) => {
+        const hasIvan = list.some((s) => s.id === 'staff-ivan-renteria' || s.email === 'ivan_renteria@integramed.com');
+        if (!hasIvan) {
+          await persistStaffMember({
+            id: 'staff-ivan-renteria',
+            givenName: 'Ivan',
+            familyName: 'Renteria',
+            prefix: 'Lic.',
+            gender: 'male',
+            email: 'ivan_renteria@integramed.com',
+            roles: ['therapist'],
+            primaryRole: 'therapist',
+            specialty: 'Fisioterapia',
+            consultingRoom: 'Consultorio fisioterapia',
+            organizationId: 'org-clinica-yeshua',
+            locationId: 'loc-yeshua-fisioterapia',
+            preferredLanguage: 'es',
+            status: 'active',
+            avatarBg: '#0284c7',
+            avatarText: '#ffffff'
+          });
+        }
+        const next = getStaffList();
+        setStaffList(next);
         setCurrentUser((prev) => {
-          const match = list.find((s) => s.id === prev?.id || s.email === prev?.email) || list[0] || prev;
-          if (!match) return prev;
+          const match = next.find((s) => s.id === prev?.id || s.email === prev?.email);
+          if (!match) return isAuthenticated ? (next[0] || prev) : prev;
           return {
             ...match,
             preferredLanguage: match.preferredLanguage === 'en' || prev?.preferredLanguage === 'en' ? 'en' : (match.preferredLanguage || prev?.preferredLanguage || 'es')
@@ -81,7 +102,7 @@ export function AuthProvider({ children }) {
         });
       })
       .catch(() => {});
-  }, []);
+  }, [isAuthenticated]);
 
   // Keep activeRole consistent if user changes
   useEffect(() => {

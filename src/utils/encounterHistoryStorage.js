@@ -21,7 +21,7 @@ function isLikelyFhirId(id) {
   return !value.startsWith('enc-') && !value.startsWith('serv-') && !value.startsWith('med-');
 }
 
-const STORAGE_KEY = 'integramed_patient_encounters_history';
+const STORAGE_KEY = 'integramed_patient_encounters_history_fhir';
 
 // Realistic sample previous encounters for demo patients
 export const DEFAULT_PAST_ENCOUNTERS = [

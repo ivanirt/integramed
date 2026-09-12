@@ -212,6 +212,14 @@ export async function getPatientMedications(patientId) {
   return [];
 }
 
+export async function getClinicMedicationRequests() {
+  const data = await fhirRequest('MedicationRequest?_count=100');
+  if (data?.resourceType === 'Bundle' && Array.isArray(data.entry)) {
+    return data.entry.map((e) => e.resource).filter((r) => r && r.resourceType === 'MedicationRequest');
+  }
+  return [];
+}
+
 /**
  * Create a new FHIR MedicationRequest resource.
  */
@@ -1152,7 +1160,13 @@ export function clinicalServiceToHealthcareService(service) {
     extraDetails: JSON.stringify(service),
     category: [{ text: service.category || 'consulta_especialidad' }],
     type: [{ text: service.department || service.category || 'Clinical Service' }],
-    appointmentRequired: Boolean(service.requiresAppointment)
+    appointmentRequired: Boolean(service.requiresAppointment),
+    providedBy: service.organizationFhirId
+      ? { reference: `Organization/${service.organizationFhirId}`, display: service.organizationName }
+      : undefined,
+    location: Array.isArray(service.locationFhirIds)
+      ? service.locationFhirIds.filter(Boolean).map((id) => ({ reference: `Location/${id}` }))
+      : undefined
   };
 }
 
@@ -1201,6 +1215,46 @@ export async function updateHealthcareService(fhirId, service) {
 export async function deleteHealthcareService(fhirId) {
   if (!fhirId) return true;
   return fhirRequest(`HealthcareService/${encodeURIComponent(fhirId)}`, { method: 'DELETE' });
+}
+
+export async function upsertPractitionerRole({
+  practitionerFhirId,
+  practitionerName,
+  organizationFhirId,
+  organizationName,
+  locationFhirId,
+  locationName,
+  role,
+  specialties = []
+}) {
+  if (!practitionerFhirId || !organizationFhirId) return null;
+  const existing = await fhirRequest(
+    `PractitionerRole?practitioner=${encodeURIComponent(practitionerFhirId)}&_count=20`
+  );
+  const roles = bundleResources(existing, 'PractitionerRole');
+  const match = roles.find((item) => {
+    const orgId = String(item.organization?.reference || '').split('/').pop();
+    const locId = String(item.location?.[0]?.reference || '').split('/').pop();
+    return orgId === organizationFhirId && (!locationFhirId || locId === locationFhirId);
+  }) || roles[0];
+
+  const body = {
+    resourceType: 'PractitionerRole',
+    ...(match?.id ? { id: match.id } : {}),
+    active: true,
+    practitioner: { reference: `Practitioner/${practitionerFhirId}`, display: practitionerName },
+    organization: { reference: `Organization/${organizationFhirId}`, display: organizationName },
+    location: locationFhirId
+      ? [{ reference: `Location/${locationFhirId}`, display: locationName }]
+      : undefined,
+    code: role ? [{ text: role }] : undefined,
+    specialty: specialties.map((text) => ({ text }))
+  };
+
+  if (match?.id) {
+    return fhirRequest(`PractitionerRole/${encodeURIComponent(match.id)}`, { method: 'PUT', body });
+  }
+  return fhirRequest('PractitionerRole', { method: 'POST', body });
 }
 
 export async function getFhirMedications() {

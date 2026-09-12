@@ -6,41 +6,191 @@ const STOPWORDS = new Set([
   'the', 'and', 'of', 'to', 'in', 'or', 'es', 'que', 'se', 'su', 'al'
 ]);
 
+function unquoteYaml(value) {
+  const v = String(value ?? '').trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
+function parseInlineYamlArray(value) {
+  return String(value)
+    .slice(1, -1)
+    .split(',')
+    .map((part) => unquoteYaml(part))
+    .filter(Boolean);
+}
+
+function parseSimpleYaml(yaml) {
+  const lines = String(yaml || '').split(/\r?\n/);
+  let i = 0;
+
+  function parseBlock(minIndent) {
+    const obj = {};
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim() || line.trim().startsWith('#')) {
+        i += 1;
+        continue;
+      }
+      const indent = line.match(/^ */)[0].length;
+      if (indent < minIndent) break;
+      const trimmed = line.trim();
+      if (trimmed.startsWith('- ')) break;
+      const kv = trimmed.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+      if (!kv) {
+        i += 1;
+        continue;
+      }
+      i += 1;
+      const key = kv[1];
+      const rest = kv[2].trim();
+      if (rest === '') {
+        let j = i;
+        while (j < lines.length && (!lines[j].trim() || lines[j].trim().startsWith('#'))) j += 1;
+        const next = lines[j] || '';
+        const nextIndent = (next.match(/^ */) || [''])[0].length;
+        if (!next.trim() || nextIndent <= indent) {
+          obj[key] = '';
+        } else if (next.trim().startsWith('- ')) {
+          obj[key] = parseList(indent + 1);
+        } else {
+          obj[key] = parseBlock(indent + 1);
+        }
+      } else if (rest.startsWith('[') && rest.endsWith(']')) {
+        obj[key] = parseInlineYamlArray(rest);
+      } else {
+        obj[key] = unquoteYaml(rest);
+      }
+    }
+    return obj;
+  }
+
+  function parseList(minIndent) {
+    const list = [];
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim() || line.trim().startsWith('#')) {
+        i += 1;
+        continue;
+      }
+      const indent = line.match(/^ */)[0].length;
+      if (indent < minIndent) break;
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('- ')) break;
+      i += 1;
+      const rest = trimmed.slice(2);
+      const kv = rest.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+      if (!kv) {
+        list.push(unquoteYaml(rest));
+        continue;
+      }
+      const item = {};
+      const val = kv[2].trim();
+      if (val === '') item[kv[1]] = '';
+      else if (val.startsWith('[') && val.endsWith(']')) item[kv[1]] = parseInlineYamlArray(val);
+      else item[kv[1]] = unquoteYaml(val);
+      Object.assign(item, parseBlock(indent + 1));
+      list.push(item);
+    }
+    return list;
+  }
+
+  return parseBlock(0);
+}
+
 export function parseFrontmatter(raw) {
   const match = String(raw || '').match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: String(raw || '') };
-  const yaml = match[1];
-  const body = match[2] || '';
-  const meta = {};
-  let listKey = null;
-  yaml.split(/\r?\n/).forEach((line) => {
-    const listItem = line.match(/^\s+-\s+(.+)$/);
-    if (listItem && listKey) {
-      meta[listKey] = Array.isArray(meta[listKey]) ? meta[listKey] : [];
-      meta[listKey].push(listItem[1].replace(/^['"]|['"]$/g, '').trim());
-      return;
+  return { meta: parseSimpleYaml(match[1]), body: match[2] || '' };
+}
+
+export function extractWikilinks(body) {
+  const links = [];
+  const re = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g;
+  let match;
+  const text = String(body || '');
+  while ((match = re.exec(text))) {
+    const target = match[1].trim().replace(/\\/g, '/');
+    links.push({
+      raw: match[0],
+      target,
+      label: (match[2] || target.split('/').pop()).trim()
+    });
+  }
+  return links;
+}
+
+function firstParagraph(body) {
+  return String(body || '')
+    .replace(/^#.*$/m, '')
+    .split(/\n\s*\n/)
+    .map((part) => part.replace(/[#*_>`]/g, '').replace(/\s+/g, ' ').trim())
+    .find((part) => part.length > 20) || '';
+}
+
+function extractHeadingSection(body, patterns) {
+  const lines = String(body || '').split(/\r?\n/);
+  let collecting = false;
+  const collected = [];
+  for (const line of lines) {
+    if (/^##\s+/.test(line)) {
+      if (collecting) break;
+      collecting = patterns.some((re) => re.test(line));
+      continue;
     }
-    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!kv) return;
-    listKey = null;
-    const key = kv[1];
-    let value = kv[2].trim();
-    if (value === '') {
-      listKey = key;
-      meta[key] = [];
-      return;
-    }
-    if (value.startsWith('[') && value.endsWith(']')) {
-      meta[key] = value
-        .slice(1, -1)
-        .split(',')
-        .map((part) => part.trim().replace(/^['"]|['"]$/g, ''))
-        .filter(Boolean);
-      return;
-    }
-    meta[key] = value.replace(/^['"]|['"]$/g, '');
-  });
-  return { meta, body };
+    if (collecting) collected.push(line);
+  }
+  return collected.join('\n').replace(/\s+/g, ' ').trim();
+}
+
+export function extractClinicalCard(meta = {}, body = '', title = '') {
+  const what = extractHeadingSection(body, [/^##\s*(qu[eé]|what)\b/i])
+    || title
+    || meta.common
+    || meta.sanskrit;
+  const why = extractHeadingSection(body, [/^##\s*(por\s*qu[eé]|why|porque)\b/i])
+    || meta.description
+    || '';
+  const how = extractHeadingSection(body, [/^##\s*(c[oó]mo|how|mecanismo|acts?)\b/i])
+    || (String(body).match(/(?:cubre|uso(?: en el tomo)?|objetivos de enrutado)[^\n]*:?\s*([^\n]+)/i)?.[1] || '')
+      .replace(/\*+/g, '')
+      .trim();
+  const when = extractHeadingSection(body, [/^##\s*(cu[aá]ndo|cu[aá]nto|dosis|dose|posolog|when|how much)\b/i])
+    || meta.dose_boericke
+    || (String(body).match(/(?:dosis|posolog[ií]a|no posolog[ií]a)[^\n]*/i)?.[0] || '');
+  const sourceSection = extractHeadingSection(body, [/^##\s*(fuente|source|referen)/i]);
+  const sources = Array.isArray(meta.sources) ? meta.sources.filter((s) => s && typeof s === 'object') : [];
+  const primary = sources[0] || {};
+  const sourceTitle = sourceSection || primary.title || primary.resource || '';
+  const sourceUrl = [primary.url, primary.link, primary.resource].find((value) => /^https?:\/\//i.test(String(value || ''))) || '';
+  return {
+    what: String(what || title || '').trim(),
+    why: String(why || firstParagraph(body)).trim(),
+    how: String(how || '').trim(),
+    when: String(when || '').trim(),
+    source: String(sourceTitle || '').trim(),
+    sourceUrl,
+    author: String(primary.author || meta.author || meta.generated?.by || '').trim(),
+    date: String(primary.last_modified || meta.generated?.at || meta.date || '').trim()
+  };
+}
+
+function normalizeSourceEntry(entry, fallbackId) {
+  if (!entry) return null;
+  if (typeof entry === 'string') {
+    return { id: fallbackId, title: entry, author: '', date: '', url: '', resource: '' };
+  }
+  const id = entry.id || fallbackId || '';
+  return {
+    id,
+    title: entry.title || entry.resource || id,
+    author: entry.author || '',
+    date: entry.last_modified || entry.date || '',
+    url: entry.url || entry.link || (/^https?:\/\//i.test(String(entry.resource || '')) ? entry.resource : ''),
+    resource: entry.resource || ''
+  };
 }
 
 function walkMarkdownFiles(dir, acc = []) {
@@ -162,6 +312,11 @@ function modalityMatches(tags, modalities) {
 
 const notesCache = new Map();
 
+export function invalidateVaultCache(vaultPath) {
+  if (vaultPath) notesCache.delete(vaultPath);
+  else notesCache.clear();
+}
+
 export function normalizeVaultLanguage(lang) {
   return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'es';
 }
@@ -187,11 +342,26 @@ export function loadVaultNotes(vaultPath) {
     const relative = path.relative(vaultPath, filePath).replace(/\\/g, '/');
     const title = meta.title || meta.name || body.match(/^#\s+(.+)$/m)?.[1] || relative;
     const tags = [...new Set([...noteTags(meta), ...inferPathTags(relative)])];
+    const rawSources = Array.isArray(meta.sources) ? meta.sources : [];
+    const sources = rawSources
+      .map((entry, idx) => normalizeSourceEntry(entry, `${relative}#${idx}`))
+      .filter(Boolean);
+    const wikilinks = extractWikilinks(body);
+    const clinicalCard = extractClinicalCard(meta, body, title);
+    const topic = relative.split('/')[0] || meta.type || '';
     return {
       file: relative,
       title,
+      type: meta.type || '',
+      topic,
+      description: meta.description || '',
       condition: meta.condition || meta.common || '',
       tags,
+      sources,
+      author: clinicalCard.author,
+      date: clinicalCard.date,
+      wikilinks,
+      clinicalCard,
       body,
       text: `${title}\n${relative}\n${yamlSearchText(meta)}\n${body}`
     };
@@ -230,7 +400,7 @@ function scoreNoteAgainstQuery(note, queryText) {
   return score;
 }
 
-export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5) {
+export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5, options = {}) {
   const filtered = notes.filter((note) => modalityMatches(note.tags, modalitySpecs));
   const queries = String(diagnosisText || '')
     .split(/\n+/)
@@ -247,6 +417,7 @@ export function rankVaultNotes(notes, diagnosisText, modalitySpecs, limit = 5) {
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
   if (ranked.length > 0) return ranked;
+  if (options.strict) return [];
 
   const fallback = filtered
     .slice()

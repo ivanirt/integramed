@@ -241,9 +241,15 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
   // 5. FHIR Server State
   const [fhirUrl, setFhirUrl] = useState(serverInfo?.serverUrl || '');
   const [fhirToken, setFhirToken] = useState('');
+  const [fhirMode, setFhirMode] = useState(serverInfo?.mode === 'local' ? 'local' : 'proxy');
   const [isSavingFhir, setIsSavingFhir] = useState(false);
   const [fhirStatusMsg, setFhirStatusMsg] = useState(null);
   const [vaultStatus, setVaultStatus] = useState(null);
+
+  useEffect(() => {
+    if (serverInfo?.serverUrl) setFhirUrl(serverInfo.serverUrl);
+    if (serverInfo?.mode) setFhirMode(serverInfo.mode === 'local' ? 'local' : 'proxy');
+  }, [serverInfo]);
 
   useEffect(() => {
     getClinicalVaultStatus(language)
@@ -483,7 +489,7 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
     setFhirStatusMsg(null);
 
     try {
-      await updateProxyConfig(fhirUrl, fhirToken || undefined);
+      await updateProxyConfig(fhirMode === 'local' ? 'local' : fhirUrl, fhirToken || undefined, fhirMode);
       const updatedHealth = await checkProxyHealth();
       setFhirStatusMsg({ type: 'success', text: t('settingsSuccess') });
       if (onConfigUpdated) onConfigUpdated(updatedHealth);
@@ -1878,14 +1884,38 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '650px' }}>
               <div>
+                <label className="form-label">{t('fhirModeLabel')}</label>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                  {['local', 'proxy'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setFhirMode(mode)}
+                      style={{
+                        backgroundColor: fhirMode === mode ? '#5eead4' : '#ffffff',
+                        color: fhirMode === mode ? '#047857' : '#475569',
+                        border: '1px solid #e2e8f0',
+                        fontWeight: fhirMode === mode ? 700 : 500
+                      }}
+                    >
+                      {mode === 'local' ? t('fhirModeLocal') : t('fhirModeProxy')}
+                    </button>
+                  ))}
+                </div>
+                <span className="form-helper">{t('fhirModeHelp')}</span>
+              </div>
+
+              <div>
                 <label className="form-label">{t('fhirUrlLabel')}</label>
                 <input
                   type="url"
                   className="form-input"
-                  value={fhirUrl}
+                  value={fhirMode === 'local' ? 'http://localhost:3001/fhir' : fhirUrl}
                   onChange={(e) => setFhirUrl(e.target.value)}
                   placeholder="https://fhir.medblocks.com/fhir/..."
-                  required
+                  required={fhirMode === 'proxy'}
+                  disabled={fhirMode === 'local'}
                 />
                 <span className="form-helper">{t('fhirUrlHelper')}</span>
               </div>
@@ -1947,6 +1977,9 @@ export default function SettingsPage({ addToast, serverInfo, onConfigUpdated, de
                 {vaultStatus.path}
               </div>
             )}
+            <a href="/boveda" style={{ display: 'inline-block', marginTop: '0.85rem', color: '#0f766e', fontWeight: 700, fontSize: '0.8125rem' }}>
+              {language === 'en' ? 'Open context vault →' : 'Abrir bóveda de contexto →'}
+            </a>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

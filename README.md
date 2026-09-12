@@ -122,6 +122,25 @@ Or run them individually:
 - Backend proxy: `npm run dev:server` (or `node server/index.js`)
 - Frontend client: `npm run dev:client` (or `npx vite`)
 
+### 5. Context vault
+
+Open [http://localhost:5173/boveda](http://localhost:5173/boveda) (sidebar: **Context vault** / **Bóveda de contexto**).
+
+- Catalog shows topic, author, source and date. Toggle sources on the left so AI and search ignore disabled ones.
+- Import Congress, YouTube, NotebookLM or a `.md` file. Export writes a zip of Markdown notes.
+- Authoring rules: `docs/vault-context-files.md` (also the **MD rules** tab). NotebookLM prompt: `docs/notebooklm/PROMPT.md`.
+- Auto-link writes `[[wikilinks]]`. Congruence flags dose / pregnancy disagreements.
+
+### 6. Local FHIR R4 server
+
+The proxy always serves a local FHIR R4 store at `http://localhost:3001/fhir` (`GET /fhir/metadata`).
+
+In **Settings → FHIR**, switch between **IntegraMed local FHIR R4** (`FHIR_MODE=local`) and the remote Medblocks proxy. Local resources live in `data/fhir/` (gitignored).
+
+```env
+FHIR_MODE=local
+```
+
 ### 4. Build for Production
 
 ```bash

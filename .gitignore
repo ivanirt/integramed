@@ -35,3 +35,8 @@ Thumbs.db
 # Scratch and internal logs
 .gemini/
 scratch/
+
+# Local FHIR store and vault source toggles
+data/fhir/
+data/vault-source-settings.json
+

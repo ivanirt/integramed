@@ -20,7 +20,8 @@ import {
   Building2,
   Pill,
   Clock,
-  RotateCw
+  RotateCw,
+  Library
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -33,6 +34,7 @@ import {
 export default function Sidebar({ onOpenSettings }) {
   const { language, t } = useLanguage();
   const { currentUser, activeRole } = useAuth();
+  const location = useLocation();
   const [menuCaps, setMenuCaps] = useState(() => getMenuCapabilities());
 
   useEffect(() => {
@@ -71,7 +73,8 @@ export default function Sidebar({ onOpenSettings }) {
     { id: 'practitioners', to: '/practitioners', label: t('navPractitioners'), icon: UserCheck, aliases: ['/practitioners', '/medicos', '/turnos', '/guardias', '/shifts', '/personal'] },
     { id: 'inventory', to: '/inventario', label: t('navInventory'), icon: Pill, aliases: ['/inventario', '/medicamentos', '/pharmacy'] },
     { id: 'labs', to: '/laboratorios', label: t('navLabs'), icon: Microscope, aliases: ['/labs', '/laboratorios'] },
-    { id: 'prescriptions', to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] }
+    { id: 'prescriptions', to: '/recetas', label: t('navPrescriptions'), icon: FileText, aliases: ['/recetas', '/prescriptions'] },
+    { id: 'vault', to: '/boveda', label: t('navVault'), icon: Library, aliases: ['/boveda', '/vault'] }
   ].filter((item) => menuCaps[item.id] !== false);
 
   const isItemActive = (item) => {

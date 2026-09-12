@@ -21,6 +21,7 @@ import FacilitiesPage from './pages/FacilitiesPage';
 import MedicationsInventoryPage from './pages/MedicationsInventoryPage';
 import StaffShiftsGuardsPage from './pages/StaffShiftsGuardsPage';
 import UserProfileAdminPage from './pages/UserProfileAdminPage';
+import VaultPage from './pages/VaultPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -335,6 +336,22 @@ export default function App() {
                 defaultTab="guards"
                 addToast={addToast}
                 onOpenScheduleModal={() => setIsScheduleOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/boveda"
+            element={
+              <VaultPage
+                addToast={addToast}
+              />
+            }
+          />
+          <Route
+            path="/vault"
+            element={
+              <VaultPage
+                addToast={addToast}
               />
             }
           />

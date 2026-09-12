@@ -5,6 +5,9 @@ import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
+import { registerVaultRoutes } from './vaultRoutes.js';
+import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
+import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,15 +65,34 @@ app.use(express.json({
 // Config
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
 let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
+let FHIR_MODE = String(process.env.FHIR_MODE || '').toLowerCase() === 'local' ? 'local' : 'proxy';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
+const LOCAL_FHIR_PUBLIC = `http://localhost:${process.env.PORT || 3001}/fhir`;
+const localFhir = createLocalFhirHandler(PROJECT_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
 
-console.log(`[FHIR Proxy] Initialized with Base URL: ${FHIR_BASE_URL ? FHIR_BASE_URL : '(NOT SET)'}`);
+function isLocalFhirMode() {
+  return FHIR_MODE === 'local';
+}
+
+console.log(`[FHIR] Mode: ${FHIR_MODE}${isLocalFhirMode() ? ` (${LOCAL_FHIR_PUBLIC})` : FHIR_BASE_URL ? ` → ${FHIR_BASE_URL}` : ''}`);
 console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);
 console.log(`[Clinical AI] Vault EN: ${resolveVaultPath('en', PROJECT_ROOT)}`);
 
 // Health check and status endpoint
 app.get('/api/health', async (req, res) => {
+  if (isLocalFhirMode()) {
+    const patientCount = localFhir.patientCount();
+    return res.json({
+      status: 'connected',
+      mode: 'local',
+      message: 'IntegraMed FHIR R4 (local) connected',
+      patientCount,
+      serverUrl: LOCAL_FHIR_PUBLIC,
+      hasToken: false
+    });
+  }
+
   const isConfigured = Boolean(FHIR_BASE_URL && FHIR_AUTH_TOKEN);
   let liveStatus = 'disconnected';
   let message = '';
@@ -106,6 +128,7 @@ app.get('/api/health', async (req, res) => {
 
   res.json({
     status: liveStatus,
+    mode: FHIR_MODE,
     message,
     patientCount,
     serverUrl: FHIR_BASE_URL ? FHIR_BASE_URL.replace(/\/$/, '') : null,
@@ -115,14 +138,16 @@ app.get('/api/health', async (req, res) => {
 
 // Update config dynamically if requested
 app.post('/api/config', (req, res) => {
-  const { fhirBaseUrl, fhirAuthToken } = req.body;
+  const { fhirBaseUrl, fhirAuthToken, fhirMode } = req.body;
+  if (fhirMode === 'local' || fhirMode === 'proxy') FHIR_MODE = fhirMode;
   if (fhirBaseUrl) FHIR_BASE_URL = fhirBaseUrl.trim();
   if (fhirAuthToken) FHIR_AUTH_TOKEN = fhirAuthToken.trim();
 
   res.json({
     success: true,
     message: 'Configuration updated',
-    serverUrl: FHIR_BASE_URL,
+    mode: FHIR_MODE,
+    serverUrl: isLocalFhirMode() ? LOCAL_FHIR_PUBLIC : FHIR_BASE_URL,
     hasToken: Boolean(FHIR_AUTH_TOKEN)
   });
 });
@@ -182,7 +207,9 @@ app.post('/api/ai/consult', async (req, res) => {
     });
   }
 
-  const ranked = rankVaultNotes(notes, diagnosisText, modalities, 5);
+  const disabled = loadVaultSourceSettings(PROJECT_ROOT)[language]?.disabled || [];
+  const considered = notes.filter((note) => noteIsEnabled(note, disabled));
+  const ranked = rankVaultNotes(considered, diagnosisText, modalities, 5);
   const sources = ranked.map((note) => ({
     file: note.file,
     title: note.title,
@@ -262,8 +289,32 @@ app.post('/api/ai/consult', async (req, res) => {
   }
 });
 
-// FHIR Proxy Endpoint
+registerVaultRoutes(app, { PROJECT_ROOT });
+
+function parseFhirQuery(url) {
+  const queryString = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
+  const params = new URLSearchParams(queryString);
+  const query = {};
+  params.forEach((value, key) => {
+    query[key] = value;
+  });
+  return query;
+}
+
+app.all('/fhir*', (req, res) => {
+  const fhirPath = req.path.replace(/^\/fhir\/?/, '');
+  const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+  return sendFhirResult(res, result);
+});
+
+// FHIR Proxy Endpoint (local store or remote)
 app.all('/api/fhir/*', async (req, res) => {
+  const fhirPath = req.params[0] || '';
+  if (isLocalFhirMode()) {
+    const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+    return sendFhirResult(res, result);
+  }
+
   if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
     return res.status(500).json({
       resourceType: 'OperationOutcome',
@@ -275,8 +326,6 @@ app.all('/api/fhir/*', async (req, res) => {
     });
   }
 
-  // Extract the relative FHIR path after /api/fhir/
-  const fhirPath = req.params[0] || '';
   const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const targetUrl = `${FHIR_BASE_URL.replace(/\/$/, '')}/${fhirPath}${queryString}`;
 

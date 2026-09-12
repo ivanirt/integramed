@@ -13,7 +13,8 @@ export const MENU_CAPABILITY_ITEMS = [
   { id: 'practitioners', path: '/practitioners', labelEs: 'Personal', labelEn: 'Staff' },
   { id: 'inventory', path: '/inventario', labelEs: 'Farmacia', labelEn: 'Pharmacy' },
   { id: 'labs', path: '/laboratorios', labelEs: 'Laboratorios', labelEn: 'Laboratories' },
-  { id: 'prescriptions', path: '/recetas', labelEs: 'Recetas', labelEn: 'Prescriptions' }
+  { id: 'prescriptions', path: '/recetas', labelEs: 'Recetas', labelEn: 'Prescriptions' },
+  { id: 'vault', path: '/boveda', labelEs: 'Bóveda de contexto', labelEn: 'Context vault' }
 ];
 
 function defaultCapabilities() {

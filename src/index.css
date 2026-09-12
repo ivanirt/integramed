@@ -400,3 +400,16 @@ body {
   gap: 0.75rem;
   background-color: #f8fafc;
 }
+
+.vault-catalog {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .vault-catalog {
+    grid-template-columns: 1fr;
+  }
+}

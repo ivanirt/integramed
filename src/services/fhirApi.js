@@ -1319,13 +1319,13 @@ export async function deletePractitionerResource(id) {
 /**
  * Update runtime FHIR Proxy server settings.
  */
-export async function updateProxyConfig(fhirBaseUrl, fhirAuthToken) {
+export async function updateProxyConfig(fhirBaseUrl, fhirAuthToken, fhirMode) {
   const response = await fetch(`${API_BASE}/config`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ fhirBaseUrl, fhirAuthToken })
+    body: JSON.stringify({ fhirBaseUrl, fhirAuthToken, fhirMode })
   });
 
   if (!response.ok) {

@@ -20,6 +20,8 @@ import {
 import {
   loadVaultSourceSettings,
   setSourceEnabled,
+  setManySourcesEnabled,
+  setExclusiveSources,
   noteIsEnabled
 } from './vaultSettings.js';
 import { importVaultDocuments } from './vaultImport.js';
@@ -91,7 +93,30 @@ export function registerVaultRoutes(app, { PROJECT_ROOT }) {
         ...source,
         enabled: !disabled.includes(source.id)
       }));
-      res.json({ language, sources, disabled });
+      const tags = [...new Set(sources.flatMap((source) => source.tags || []))].sort((a, b) => a.localeCompare(b));
+      res.json({ language, sources, tags, disabled });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/vault/sources', (req, res) => {
+    try {
+      const language = languageFrom(req);
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+      const mode = req.body?.mode === 'only' || req.body?.only === true
+        ? 'only'
+        : (req.body?.enabled === false ? 'disable' : 'enable');
+      const { notes } = loadEnabledNotes(PROJECT_ROOT, language);
+      const allIds = collectSources(notes).map((source) => source.id);
+      let settings;
+      if (mode === 'only') {
+        settings = setExclusiveSources(PROJECT_ROOT, language, ids, allIds);
+      } else {
+        settings = setManySourcesEnabled(PROJECT_ROOT, language, ids, mode === 'enable');
+      }
+      invalidateVaultCache();
+      res.json({ ok: true, language, disabled: settings[language].disabled, mode, count: ids.length });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

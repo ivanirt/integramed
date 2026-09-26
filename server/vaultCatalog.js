@@ -7,6 +7,7 @@ import {
   rankVaultNotes
 } from './clinicalVault.js';
 import { noteIsEnabled } from './vaultSettings.js';
+import { inferSourceKind, tagsForSource, mergeSourceTags } from './vaultSourceTags.js';
 
 const SKIP_AUTOLINK_TITLES = new Set([
   'vault', 'playbook', 'readme', 'index', 'fuente', 'source', 'tono', 'disclaimer'
@@ -31,6 +32,7 @@ export function collectSources(notes) {
   notes.forEach((note) => {
     (note.sources || []).forEach((source) => {
       if (!source?.id) return;
+      const kind = source.kind || inferSourceKind(source);
       const current = map.get(source.id) || {
         id: source.id,
         title: source.title,
@@ -38,13 +40,17 @@ export function collectSources(notes) {
         date: source.date,
         url: source.url,
         resource: source.resource,
+        kind,
         topics: new Set(),
+        tags: [],
         noteCount: 0
       };
       current.title = current.title || source.title;
       current.author = current.author || source.author;
       current.date = current.date || source.date;
       current.url = current.url || source.url;
+      current.kind = current.kind || kind;
+      current.tags = mergeSourceTags(current.tags, tagsForSource({ kind: current.kind, noteTags: note.tags }));
       if (note.topic) current.topics.add(note.topic);
       current.noteCount += 1;
       map.set(source.id, current);

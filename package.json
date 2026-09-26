@@ -1,29 +1,35 @@
 {
-  "name": "integramed-fhir-app",
+  "name": "integramed-clinic",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev:server": "node --use-system-ca server/index.js",
-    "dev:client": "vite",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build": "vite build",
-    "start": "node --use-system-ca server/index.js"
+    "dev": "concurrently -n fhir,web -c cyan,magenta \"npm run dev:fhir\" \"npm run dev:web\"",
+    "dev:fhir": "node --use-system-ca server/index.js",
+    "dev:web": "node ./node_modules/next/dist/bin/next dev --turbopack -p 3000",
+    "build": "node ./node_modules/next/dist/bin/next build",
+    "start": "concurrently -n fhir,web \"npm run start:fhir\" \"node ./node_modules/next/dist/bin/next start -p 3000\"",
+    "start:fhir": "node --use-system-ca server/index.js",
+    "lint": "eslint"
   },
   "dependencies": {
+    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "lucide-react": "^1.16.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.18.3"
+    "next": "^15.5.25",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
-    "concurrently": "^9.1.2",
-    "vite": "^6.1.0"
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.25",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5"
   }
 }

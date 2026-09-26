@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { inferSourceKind } from './vaultSourceTags.js';
 
 const STOPWORDS = new Set([
   'de', 'la', 'el', 'en', 'y', 'a', 'del', 'las', 'los', 'un', 'una', 'con', 'por', 'para',
@@ -180,17 +181,21 @@ export function extractClinicalCard(meta = {}, body = '', title = '') {
 function normalizeSourceEntry(entry, fallbackId) {
   if (!entry) return null;
   if (typeof entry === 'string') {
-    return { id: fallbackId, title: entry, author: '', date: '', url: '', resource: '' };
+    const kind = inferSourceKind({ title: entry, id: fallbackId });
+    return { id: fallbackId, title: entry, author: '', date: '', url: '', resource: '', kind };
   }
   const id = entry.id || fallbackId || '';
-  return {
+  const normalized = {
     id,
     title: entry.title || entry.resource || id,
     author: entry.author || '',
     date: entry.last_modified || entry.date || '',
     url: entry.url || entry.link || (/^https?:\/\//i.test(String(entry.resource || '')) ? entry.resource : ''),
-    resource: entry.resource || ''
+    resource: entry.resource || '',
+    kind: entry.kind || ''
   };
+  normalized.kind = inferSourceKind(normalized);
+  return normalized;
 }
 
 function walkMarkdownFiles(dir, acc = []) {

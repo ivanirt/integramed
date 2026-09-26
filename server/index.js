@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
 import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
+import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -208,7 +209,10 @@ app.post('/api/ai/consult', async (req, res) => {
   }
 
   const disabled = loadVaultSourceSettings(PROJECT_ROOT)[language]?.disabled || [];
-  const considered = notes.filter((note) => noteIsEnabled(note, disabled));
+  const requestedIds = Array.isArray(req.body?.sourceIds) ? req.body.sourceIds.filter(Boolean) : [];
+  const considered = requestedIds.length
+    ? notes.filter((note) => noteUsesSources(note, requestedIds))
+    : notes.filter((note) => noteIsEnabled(note, disabled));
   const ranked = rankVaultNotes(considered, diagnosisText, modalities, 5);
   const sources = ranked.map((note) => ({
     file: note.file,

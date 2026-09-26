@@ -37,12 +37,28 @@ export function saveVaultSourceSettings(projectRoot, next) {
 }
 
 export function setSourceEnabled(projectRoot, language, sourceId, enabled) {
+  return setManySourcesEnabled(projectRoot, language, [sourceId], enabled);
+}
+
+export function setManySourcesEnabled(projectRoot, language, sourceIds, enabled) {
   const settings = loadVaultSourceSettings(projectRoot);
   const lang = language === 'en' ? 'en' : 'es';
   const disabled = new Set(settings[lang].disabled);
-  if (enabled) disabled.delete(sourceId);
-  else disabled.add(sourceId);
+  (sourceIds || []).forEach((sourceId) => {
+    if (!sourceId) return;
+    if (enabled) disabled.delete(sourceId);
+    else disabled.add(sourceId);
+  });
   settings[lang].disabled = [...disabled];
+  return saveVaultSourceSettings(projectRoot, settings);
+}
+
+export function setExclusiveSources(projectRoot, language, keepIds, allIds) {
+  const keep = new Set((keepIds || []).filter(Boolean));
+  const disabled = (allIds || []).filter((id) => id && !keep.has(id));
+  const settings = loadVaultSourceSettings(projectRoot);
+  const lang = language === 'en' ? 'en' : 'es';
+  settings[lang].disabled = disabled;
   return saveVaultSourceSettings(projectRoot, settings);
 }
 

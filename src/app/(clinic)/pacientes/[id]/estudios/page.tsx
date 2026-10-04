@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { fhirSearch } from "@/lib/fhir";
 import { createServiceRequestAction, saveDiagnosticReportAction } from "@/lib/actions";
 import { Button, Field, Input, Textarea } from "@/components/ui";
@@ -10,6 +11,12 @@ export default async function EstudiosPage({ params }: { params: Promise<{ id: s
   ]);
   return (
     <div className="space-y-10">
+      <p className="text-sm text-[#6D5E52]">
+        <Link href={`/iris?paciente=${id}`} className="underline">
+          Abrir diagnóstico del iris
+        </Link>
+        . La foto se queda en el navegador; si anotas la ficha, Estudios solo recibe el texto.
+      </p>
       <section>
         <h2 className="font-serif text-2xl">Estudios pedidos</h2>
         <p className="mt-2 text-sm text-[#6D5E52]">ServiceRequest para el pedido, DiagnosticReport para el resultado.</p>

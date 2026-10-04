@@ -8,7 +8,7 @@ import { upsertStaff } from "./staff";
 import type { RoleId } from "./roles";
 import { SYSTEMS } from "./roles";
 import { VITAL_FIELDS } from "./vitals";
-import { requireAdmin, requireSelfOrAdmin } from "./require";
+import { requireAdmin, requireScreen, requireSelfOrAdmin } from "./require";
 import { addMinutesToFhirDateTime, toFhirDateTime } from "./agenda";
 
 export async function createPatientAction(formData: FormData) {
@@ -284,6 +284,41 @@ export async function saveDiagnosticReportAction(formData: FormData) {
     resourceType: "DiagnosticReport",
     status: "final",
     code: { text: title },
+    subject: { reference: `Patient/${patientId}` },
+    issued: new Date().toISOString(),
+    conclusion,
+  });
+  revalidatePath(`/pacientes/${patientId}/estudios`);
+}
+
+export async function saveIrisNoteAction(input: {
+  patientId: string;
+  eye: "right" | "left";
+  organ?: string;
+  kind?: string;
+  inferred?: boolean;
+  mapLabel?: string;
+}) {
+  await requireScreen("iris");
+  const patientId = input.patientId.trim();
+  if (!patientId) throw new Error("Falta el paciente.");
+  const eye = input.eye === "left" ? "izquierdo" : "derecho";
+  const organ = input.organ?.trim();
+  const conclusion = [
+    "Técnica complementaria no validada. Esta nota no es un diagnóstico médico.",
+    `Ojo ${eye}.`,
+    organ
+      ? `Región señalada en el mapa: ${organ}${input.kind ? ` (${input.kind})` : ""}${input.inferred ? ". La ubicación está marcada como inferida en el mapa." : "."}`
+      : "Sin región seleccionada.",
+    input.mapLabel ? `Mapa: ${input.mapLabel}.` : "",
+    "La fotografía se quedó en el navegador y no se adjuntó.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  await fhirCreate({
+    resourceType: "DiagnosticReport",
+    status: "final",
+    code: { text: "Nota de iridología (no diagnóstica)" },
     subject: { reference: `Patient/${patientId}` },
     issued: new Date().toISOString(),
     conclusion,

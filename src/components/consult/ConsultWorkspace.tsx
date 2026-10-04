@@ -495,6 +495,11 @@ export function ConsultWorkspace(props: ConsultWorkspaceProps) {
                   Editar catálogo
                 </Link>
               ) : null}
+              {modalities.includes("iridology") ? (
+                <Link href={`/iris?paciente=${props.patient.id}`} className="mt-3 block text-sm underline">
+                  Abrir diagnóstico del iris
+                </Link>
+              ) : null}
               <div className="mt-6 space-y-2">
                 <button
                   type="button"

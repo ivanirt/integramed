@@ -10,7 +10,8 @@
     "build": "node ./node_modules/next/dist/bin/next build",
     "start": "concurrently -n fhir,web \"npm run start:fhir\" \"node ./node_modules/next/dist/bin/next start -p 3000\"",
     "start:fhir": "node --use-system-ca server/index.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx --test src/lib/iris-map.test.ts src/lib/iris-path.test.ts src/lib/iris-fit.test.ts"
   },
   "dependencies": {
     "concurrently": "^9.1.2",
@@ -30,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

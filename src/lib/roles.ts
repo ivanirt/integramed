@@ -38,15 +38,16 @@ export const DEFAULT_MODULES: Record<string, boolean> = {
   farmacia: true,
   personal: true,
   boveda: true,
+  iris: true,
 };
 
 export const ROLE_SCREENS: Record<RoleId, string[]> = {
-  doctor: ["home", "agenda", "patients", "consulta", "horario", "ausencias", "boveda", "perfil"],
-  therapist: ["home", "agenda", "patients", "consulta", "horario", "ausencias", "boveda", "perfil"],
-  nurse: ["home", "agenda", "patients", "consulta", "horario", "ausencias", "boveda", "perfil"],
+  doctor: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "boveda", "perfil"],
+  therapist: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "boveda", "perfil"],
+  nurse: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "boveda", "perfil"],
   receptionist: ["home", "agenda", "patients", "perfil"],
-  admin: ["home", "agenda", "patients", "consulta", "horario", "ausencias", "farmacia", "personal", "boveda", "config", "perfil"],
-  lab: ["home", "patients", "boveda", "perfil"],
+  admin: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "farmacia", "personal", "boveda", "config", "perfil"],
+  lab: ["home", "patients", "iris", "boveda", "perfil"],
   pharmacist: ["home", "farmacia", "patients", "perfil"],
 };
 

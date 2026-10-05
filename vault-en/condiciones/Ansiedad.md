@@ -17,9 +17,9 @@ sources:
     last_modified: 2026-09-09T05:18:00Z
 ---
 
-# Anxiety
+> If you are in crisis or thinking about harming yourself, call the Línea de la Vida (Mexico): [800 911 2000](tel:8009112000) (free, 24/7). If there is immediate danger, call 911.
 
-**Red flag:** Riesgo suicida: 988.
+# Anxiety
 
 ## Vault links
 - Acupuntura shen: [[acupuntura/puntos/3C-Shenmen]] [[acupuntura/puntos/6MC-Neiguan]]

@@ -4,7 +4,8 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n fhir,web -c cyan,magenta \"npm run dev:fhir\" \"npm run dev:web\"",
+    "dev": "node scripts/dev.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "dev:fhir": "node --use-system-ca server/index.js",
     "dev:web": "node ./node_modules/next/dist/bin/next dev --turbopack -p 3000",
     "build": "node ./node_modules/next/dist/bin/next build",

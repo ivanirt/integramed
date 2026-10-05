@@ -29,8 +29,7 @@ function AccesoForm() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="font-serif text-4xl">IntegraMed</h1>
       <p className="mt-2 text-sm text-[#6D5E52]">
-        Entra con el identificador del Practitioner. La contraseña maestra de demostración es IntegraMed27.
-        El primer acceso crea a Ivan Renteria si el FHIR está vacío.
+        Entra con el identificador del Practitioner. El primer acceso crea a Ivan Renteria si el FHIR está vacío.
       </p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <label className="block text-sm">

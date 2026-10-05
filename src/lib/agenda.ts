@@ -1,15 +1,4 @@
-import { displayName } from "./display-name";
-
-type AppointmentResource = {
-  id?: string;
-  name?: unknown;
-  participant?: { actor?: { reference?: string; display?: string } }[];
-  start?: string;
-  period?: { start?: string };
-  description?: string;
-  reasonCode?: { text?: string }[];
-  status?: string;
-};
+import { displayName, type FhirResource } from "./fhir";
 
 export type AgendaItem = {
   id: string;
@@ -75,7 +64,7 @@ export function snapTime(hours: number, minutes: number) {
 }
 
 function participant(
-  resource: AppointmentResource,
+  resource: FhirResource,
   prefix: "Patient/" | "Practitioner/",
 ) {
   const parts = (resource.participant as { actor?: { reference?: string; display?: string } }[]) || [];
@@ -87,7 +76,7 @@ function participant(
   };
 }
 
-export function mapAppointment(resource: AppointmentResource): AgendaItem | null {
+export function mapAppointment(resource: FhirResource): AgendaItem | null {
   if (!resource.id) return null;
   const start = String(resource.start || (resource.period as { start?: string } | undefined)?.start || "");
   const date = start.includes("T") ? start.slice(0, 10) : start.slice(0, 10);

@@ -1,8 +1,8 @@
 import { requireScreen } from "@/lib/require";
-import { proxyFetch } from "@/lib/proxy";
 
 async function vaultNotes() {
-  const res = await proxyFetch("/api/vault/notes?language=es");
+  const proxy = process.env.FHIR_PROXY_URL || "http://localhost:3001";
+  const res = await fetch(`${proxy}/api/vault/notes?language=es`, { cache: "no-store" });
   if (!res.ok) return { notes: [], error: await res.text() };
   return res.json();
 }

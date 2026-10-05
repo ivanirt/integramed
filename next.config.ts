@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const fhir = process.env.FHIR_PROXY_URL || "http://localhost:3001";
+
 const nextConfig: NextConfig = {
   async redirects() {
     return [
@@ -28,6 +30,16 @@ const nextConfig: NextConfig = {
       { source: "/login", destination: "/acceso", permanent: false },
     ];
   },
+  async rewrites() {
+    return [
+      { source: "/api/fhir/:path*", destination: `${fhir}/api/fhir/:path*` },
+      { source: "/api/health", destination: `${fhir}/api/health` },
+      { source: "/api/config", destination: `${fhir}/api/config` },
+      { source: "/api/vault/:path*", destination: `${fhir}/api/vault/:path*` },
+      { source: "/api/ai/:path*", destination: `${fhir}/api/ai/:path*` },
+      { source: "/fhir/:path*", destination: `${fhir}/fhir/:path*` }
+    ];
+  }
 };
 
 export default nextConfig;

@@ -8,7 +8,6 @@ import {
 } from './clinicalVault.js';
 import { noteIsEnabled } from './vaultSettings.js';
 import { inferSourceKind, tagsForSource, mergeSourceTags } from './vaultSourceTags.js';
-import { resolveInsideVault } from './vaultPath.js';
 
 const SKIP_AUTOLINK_TITLES = new Set([
   'vault', 'playbook', 'readme', 'index', 'fuente', 'source', 'tono', 'disclaimer'
@@ -162,16 +161,14 @@ export function applyAutoLinks(vaultPath, notes, selected) {
   const byFile = new Map(notes.map((note) => [note.file, note]));
   const grouped = new Map();
   (selected || []).forEach((item) => {
-    const relative = String(item?.file || '');
-    resolveInsideVault(vaultPath, relative);
-    if (!grouped.has(relative)) grouped.set(relative, []);
-    grouped.get(relative).push(item);
+    if (!grouped.has(item.file)) grouped.set(item.file, []);
+    grouped.get(item.file).push(item);
   });
 
   const written = [];
   grouped.forEach((items, relative) => {
-    const { abs } = resolveInsideVault(vaultPath, relative);
-    if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return;
+    const abs = path.join(vaultPath, relative);
+    if (!fs.existsSync(abs)) return;
     let raw = fs.readFileSync(abs, 'utf8');
     items.forEach((item) => {
       const link = `[[${item.target}|${item.phrase}]]`;
@@ -272,13 +269,15 @@ export function searchVault(notes, query, disabledIds) {
 }
 
 export function readNoteFile(vaultPath, relative) {
-  const located = resolveInsideVault(vaultPath, relative);
-  if (!fs.existsSync(located.abs)) return null;
-  const stat = fs.statSync(located.abs);
-  if (!stat.isFile()) return null;
+  const safe = String(relative || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!safe || safe.includes('..')) throw new Error('Ruta de nota no válida');
+  const abs = path.join(vaultPath, safe);
+  const resolved = path.resolve(abs);
+  if (!resolved.startsWith(path.resolve(vaultPath))) throw new Error('Ruta de nota no válida');
+  if (!fs.existsSync(resolved)) return null;
   return {
-    file: located.relative,
-    content: fs.readFileSync(located.abs, 'utf8')
+    file: safe,
+    content: fs.readFileSync(resolved, 'utf8')
   };
 }
 

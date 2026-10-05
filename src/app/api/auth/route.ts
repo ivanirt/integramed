@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { clearSession, createSession, getSession } from "@/lib/session";
+import { lookupStaffForAuth } from "@/lib/staff-lookup";
 import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
@@ -46,17 +47,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Usuario y contraseña son necesarios." }, { status: 400 });
   }
 
-  let staff: Awaited<ReturnType<typeof listStaff>> = [];
+  let user;
   try {
-    staff = await listStaff();
+    user = await lookupStaffForAuth(login);
   } catch (err) {
-    console.error("listStaff", err);
+    console.error("lookupStaffForAuth", err instanceof Error ? err.message : "failed");
     return NextResponse.json(
       { error: "No se pudo consultar el personal. Inténtalo más tarde." },
       { status: 503 },
     );
   }
-  const user = staff.find((s) => s.login.toLowerCase() === login || s.email.toLowerCase() === login);
   if (!user) {
     return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
   }

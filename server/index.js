@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
-import { isAcceptableSecret, requireClinicAccess } from './sessionAuth.js';
+import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessionAuth.js';
+import { findAuthStaff } from './staffLookup.js';
 import { resolveAiBaseUrl } from './aiAllowlist.js';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
@@ -62,7 +63,6 @@ app.use(express.json({
   type: ['application/json', 'application/fhir+json', 'application/*+json'],
   limit: '10mb'
 }));
-app.use(requireClinicAccess);
 
 // Config
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
@@ -70,12 +70,80 @@ let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
 let FHIR_MODE = String(process.env.FHIR_MODE || '').toLowerCase() === 'local' ? 'local' : 'proxy';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
+const DATA_ROOT = process.env.INTEGRAMED_DATA_ROOT
+  ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
+  : PROJECT_ROOT;
 const LOCAL_FHIR_PUBLIC = `http://127.0.0.1:${process.env.PORT || 3001}/fhir`;
-const localFhir = createLocalFhirHandler(PROJECT_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
+const localFhir = createLocalFhirHandler(DATA_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
 
 function isLocalFhirMode() {
   return FHIR_MODE === 'local';
 }
+
+function bundleResources(data) {
+  if (!data) return [];
+  if (data.resourceType === 'Bundle') {
+    return (data.entry || []).map((item) => item?.resource).filter(Boolean);
+  }
+  if (data.resourceType) return [data];
+  return [];
+}
+
+async function remoteSearch(relativePath) {
+  if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
+    throw new Error('FHIR_BASE_URL and FHIR_AUTH_TOKEN must be configured on the proxy server.');
+  }
+  const targetUrl = `${FHIR_BASE_URL.replace(/\/$/, '')}/${relativePath}`;
+  const response = await fetchFhirWithRetry(targetUrl, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${FHIR_AUTH_TOKEN}`,
+      Accept: 'application/fhir+json, application/json'
+    }
+  });
+  if (!response.ok) return [];
+  return bundleResources(await response.json());
+}
+
+// Pre-auth identity lookup. The proxy secret is required. A session is not.
+// Clinical routes stay behind requireClinicAccess and still need both.
+app.post('/api/internal/staff-lookup', async (req, res) => {
+  if (!proxySecretOk(req)) return res.status(401).json({ error: 'No autorizado' });
+  const q = String(req.body?.q || '').trim();
+  if (!q || q.length > 320) return res.status(400).json({ error: 'Consulta inválida' });
+  try {
+    let practitioners = [];
+    let roles = [];
+    if (isLocalFhirMode()) {
+      practitioners = localFhir.store.listType('Practitioner');
+      roles = localFhir.store.listType('PractitionerRole');
+    } else {
+      const encoded = encodeURIComponent(q);
+      const [byLogin, byEmail] = await Promise.all([
+        remoteSearch(`Practitioner?identifier=${encodeURIComponent(`https://integramed.app/fhir/login|${q}`)}&_count=20`),
+        remoteSearch(`Practitioner?email=${encoded}&_count=20`)
+      ]);
+      const seen = new Set();
+      practitioners = [...byLogin, ...byEmail].filter((item) => {
+        if (!item?.id || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return item.resourceType === 'Practitioner';
+      });
+      const roleLists = await Promise.all(
+        practitioners.map((item) => remoteSearch(`PractitionerRole?practitioner=${encodeURIComponent(`Practitioner/${item.id}`)}&_count=20`))
+      );
+      roles = roleLists.flat();
+    }
+    const staff = findAuthStaff(practitioners, roles, q);
+    if (!staff) return res.status(404).json({ error: 'No encontrado' });
+    return res.json(staff);
+  } catch (err) {
+    console.error('[staff-lookup]', err instanceof Error ? err.message : 'failed');
+    return res.status(503).json({ error: 'No se pudo consultar el personal' });
+  }
+});
+
+app.use(requireClinicAccess);
 
 console.log(`[FHIR] Mode: ${FHIR_MODE}${isLocalFhirMode() ? ` (${LOCAL_FHIR_PUBLIC})` : FHIR_BASE_URL ? ` → ${FHIR_BASE_URL}` : ''}`);
 console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);

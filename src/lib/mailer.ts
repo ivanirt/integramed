@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 
 export const RESET_LINK_LOG_FLAG = "PASSWORD_RESET_LOG_LINK";
 const SMTP_UNAVAILABLE_LOG =
-  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento.";
+  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.";
 
 function redactSecrets(text: string, secrets: string[]): string {
   let out = String(text);

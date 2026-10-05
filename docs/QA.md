@@ -34,7 +34,7 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 
 - En `/acceso`, «¿Olvidaste tu contraseña?» abre `/acceso/recuperar`.
 - Cualquier correo bien formado recibe el mismo texto: «Si la cuenta existe, enviamos un enlace para restablecer la contraseña.»
-- Sin SMTP, la respuesta es la misma. En producción no se imprime el enlace. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El enlace dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
+- Sin SMTP, la respuesta es la misma y no se genera enlace. En producción no se imprime. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El arranque avisa que el correo no está configurado. `npm run set-password -- <correo>` con `SET_PASSWORD` en el entorno asigna o reemplaza la contraseña sin escribirla en un archivo ni en el registro. El enlace, cuando existe, dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
 - `/acceso/restablecer?token=…` pide contraseña y confirmación (8 caracteres, una letra y un número).
 - Después se entra con la clave nueva. La cookie anterior deja de servir.
 

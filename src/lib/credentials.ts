@@ -13,7 +13,11 @@ export type CredentialAccount = {
   resetExpiresAt: number | null;
 };
 
-export function credentialFile(root = process.cwd()): string {
+function defaultAuthRoot(): string {
+  return process.env.INTEGRAMED_AUTH_ROOT || process.cwd();
+}
+
+export function credentialFile(root = defaultAuthRoot()): string {
   return path.join(root, "data", "auth", "accounts.json");
 }
 
@@ -30,7 +34,7 @@ function normalize(raw: Partial<CredentialAccount> | null | undefined): Credenti
   };
 }
 
-export function readAccounts(root = process.cwd()): CredentialAccount[] {
+export function readAccounts(root = defaultAuthRoot()): CredentialAccount[] {
   try {
     const parsed = JSON.parse(fs.readFileSync(credentialFile(root), "utf8")) as {
       accounts?: Partial<CredentialAccount>[];
@@ -42,7 +46,7 @@ export function readAccounts(root = process.cwd()): CredentialAccount[] {
   }
 }
 
-export function writeAccounts(accounts: CredentialAccount[], root = process.cwd()): void {
+export function writeAccounts(accounts: CredentialAccount[], root = defaultAuthRoot()): void {
   const file = credentialFile(root);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
@@ -64,7 +68,7 @@ export function blankAccount(practitionerId: string, email: string, passwordRequ
 
 export function mutateAccounts(
   mutate: (accounts: CredentialAccount[]) => void,
-  root = process.cwd(),
+  root = defaultAuthRoot(),
 ): CredentialAccount[] {
   const accounts = readAccounts(root);
   mutate(accounts);

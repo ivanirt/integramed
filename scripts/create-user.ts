@@ -154,7 +154,7 @@ async function main() {
     writeAccounts(accounts, root);
     passwordNote = passwordHash
       ? "Contraseña definida desde CREATE_USER_PASSWORD (no quedó escrita en el repositorio)."
-      : "Contraseña: sin definir. La contraseña maestra de la clínica no sirve para esta cuenta.";
+      : "Contraseña: sin definir. Usa npm run set-password o el correo de restablecimiento.";
   } else {
     const account = accounts[index];
     account.practitionerId = practitionerId;
@@ -170,7 +170,7 @@ async function main() {
       passwordNote = "La contraseña ya existente no se modificó.";
     } else {
       account.passwordRequired = true;
-      passwordNote = "Sigue sin contraseña usable. Usa «¿Olvidaste tu contraseña?» para definirla.";
+      passwordNote = "Sigue sin contraseña usable. Usa npm run set-password o «¿Olvidaste tu contraseña?».";
     }
     accounts[index] = account;
     writeAccounts(accounts, root);
@@ -184,11 +184,10 @@ async function main() {
   console.log(passwordNote);
   if (!passwordHash || passwordNote.includes("no se modificó") || passwordNote.includes("Sigue sin")) {
     console.log("");
-    console.log("Para elegir la contraseña, con la app en marcha (npm run dev):");
-    console.log("1. Abre http://localhost:3000/acceso");
-    console.log("2. Pulsa «¿Olvidaste tu contraseña?»");
-    console.log(`3. Escribe ${options.email}`);
-    console.log("4. Abre el enlace del correo. Si SMTP no está configurado, cópialo de la consola del proceso web.");
+    console.log("Para definirla sin escribirla en un archivo ni en el registro:");
+    console.log(`SET_PASSWORD='…' npm run set-password -- ${options.email}`);
+    console.log("O, con SMTP configurado, usa «¿Olvidaste tu contraseña?» en /acceso.");
+    console.log("En desarrollo, PASSWORD_RESET_LOG_LINK=1 imprime el enlace en la consola del proceso web.");
   } else {
     console.log("Ya puede entrar en http://localhost:3000/acceso con ese correo.");
   }

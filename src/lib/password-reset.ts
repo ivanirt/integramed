@@ -118,7 +118,7 @@ export function authorizeLogin(input: {
 }
 
 export const SMTP_UNAVAILABLE_LOG =
-  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento.";
+  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.";
 
 const RESET_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

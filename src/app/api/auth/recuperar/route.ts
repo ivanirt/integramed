@@ -10,7 +10,7 @@ import {
   RESET_IP_LIMIT,
   RESET_IP_WINDOW_MS,
 } from "@/lib/password-reset";
-import { listStaff, type StaffMember } from "@/lib/staff";
+import { lookupStaffForAuth } from "@/lib/staff-lookup";
 
 const emailBuckets = new Map<string, number[]>();
 const ipBuckets = new Map<string, number[]>();
@@ -21,10 +21,6 @@ function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0]?.trim() || "local";
   return request.headers.get("x-real-ip") || "local";
-}
-
-function findStaff(staff: StaffMember[], email: string): StaffMember | undefined {
-  return staff.find((member) => member.email.toLowerCase() === email || member.login.toLowerCase() === email);
 }
 
 export async function POST(request: Request) {
@@ -57,8 +53,7 @@ export async function POST(request: Request) {
   const result = await processForgotPassword({
     mode: resetDeliveryMode(),
     lookup: async () => {
-      const staff = await listStaff();
-      const user = findStaff(staff, email);
+      const user = await lookupStaffForAuth(email);
       if (!user) return null;
       return { id: user.id, email: user.email || "" };
     },

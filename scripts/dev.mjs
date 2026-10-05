@@ -36,6 +36,12 @@ function ensure(name) {
 ensure('SESSION_SECRET');
 ensure('FHIR_PROXY_SECRET');
 
+if (!process.env.SMTP_HOST || !process.env.MAIL_FROM) {
+  console.warn(
+    '[IntegraMed] El correo de restablecimiento no está configurado (faltan SMTP_HOST o MAIL_FROM). La solicitud responde igual y no genera enlace, salvo PASSWORD_RESET_LOG_LINK=1 en desarrollo. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.'
+  );
+}
+
 const concurrently = path.join(root, 'node_modules', 'concurrently', 'dist', 'bin', 'concurrently.js');
 const child = spawn(
   process.execPath,

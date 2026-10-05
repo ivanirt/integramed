@@ -30,15 +30,23 @@ Crea el Practitioner del propietario sin contraseña (el comando es idempotente 
 npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin
 ```
 
-Con `npm run dev` en marcha:
+Para asignar la contraseña desde el servidor, sin escribirla en un archivo ni en el registro:
+
+```bash
+SET_PASSWORD='…' npm run set-password -- ivanirt@gmail.com
+```
+
+La contraseña se lee de `SET_PASSWORD` (o de una línea en stdin). No la pongas como argumento del comando. El mismo comando la reemplaza si ya existía. `CREATE_USER_PASSWORD` en el entorno hace lo mismo solo al crear, y no pisa una contraseña que ya esté guardada.
+
+Con SMTP configurado, o en local con `PASSWORD_RESET_LOG_LINK=1`:
 
 1. Abre [http://localhost:3000/acceso](http://localhost:3000/acceso).
 2. Pulsa «¿Olvidaste tu contraseña?».
 3. Escribe `ivanirt@gmail.com`.
-4. En local, sin SMTP, el enlace no se imprime salvo que `.env` tenga `PASSWORD_RESET_LOG_LINK=1`. Sale en la consola del proceso `web` (no en la del proxy FHIR). Dura 45 minutos y es de un solo uso.
+4. Sin SMTP el enlace no se imprime, salvo ese flag en desarrollo. Sale en la consola del proceso `web` (no en la del proxy FHIR). Dura 45 minutos y es de un solo uso.
 5. Ábrelo, elige la contraseña y entra con ese correo.
 
-Opcional, solo en la terminal: `CREATE_USER_PASSWORD='una-clave-larga-1' npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin`. No guardes esa variable en un archivo que se suba al repositorio.
+Si faltan `SMTP_HOST` o `MAIL_FROM`, `npm run dev` y el arranque de producción avisan en el registro. La respuesta al usuario sigue siendo la misma y no incluye enlace.
 
 ## Correo con Gmail
 
@@ -55,7 +63,7 @@ APP_BASE_URL=http://localhost:3000
 
 `SMTP_PASS` no es la contraseña normal de Google. En la cuenta: Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones → crear una para Correo. Pega los 16 caracteres en `SMTP_PASS`. `MAIL_FROM` debe ser esa misma cuenta.
 
-En producción, si faltan `SMTP_HOST` o `MAIL_FROM`, la solicitud responde igual que si el correo existiera y no escribe el enlace en ningún registro. Un fallo de SMTP tampoco escribe el enlace.
+En producción, si faltan `SMTP_HOST` o `MAIL_FROM`, el proceso avisa al arrancar. La solicitud responde igual que si el correo existiera y no escribe el enlace en ningún registro. Un fallo de SMTP tampoco escribe el enlace. En ese caso la contraseña se asigna con `npm run set-password`.
 
 ## Usuarios de prueba por rol
 

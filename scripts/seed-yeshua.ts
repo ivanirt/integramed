@@ -2,17 +2,20 @@
  * Idempotent FHIR seed for Clínica Yeshua (Naucalpan).
  *
  * Writes Organization, Location, HealthcareService, Practitioner and
- * PractitionerRole through the app proxy (`FHIR_PROXY_URL`, default
- * http://localhost:3001). Re-running updates the same records.
- * Staff entries carry name, email and role only — no passwords.
+ * PractitionerRole through the loopback FHIR proxy. Re-running updates the
+ * same records. Staff entries carry name, email and role only — no passwords.
+ *
+ * The proxy requires `x-integramed-proxy-secret` and a signed session cookie.
+ * This script signs a short-lived admin session with SESSION_SECRET, the same
+ * way server/sessionAuth.js signs sessions for the proxy.
  *
  * Usage: npm run seed:yeshua
  */
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import dotenv from "dotenv";
-import { fhirCreate, fhirSearch, fhirUpdate, identifierValue, type FhirResource } from "../src/lib/fhir";
-import { ROLE_LABELS, SYSTEMS, type RoleId } from "../src/lib/roles";
+import { isAcceptableSecret, SESSION_COOKIE, signSession } from "../server/sessionAuth.js";
+import { ROLE_LABELS, SYSTEMS, type RoleId } from "../src/lib/roles.ts";
 
 export const YESHUA_ORG_ID = "org-clinica-yeshua";
 export const YESHUA_SITE_ID = "loc-yeshua-naucalpan";
@@ -29,6 +32,14 @@ export const YESHUA_ID = {
 
 const LOCATION_SERVICES_URL = "https://integramed.app/fhir/StructureDefinition/location-services";
 const SECRET_KEYS = new Set(["password", "newPassword", "lastPasswordChange", "aiApiKey"]);
+const SECRET_HINT = "Generate one with: openssl rand -base64 48";
+const SERVICE_SESSION_MS = 10 * 60 * 1000;
+
+export type FhirResource = {
+  resourceType: string;
+  id?: string;
+  [key: string]: unknown;
+};
 
 const ADDRESS = {
   line: "Oficinas Naucalpan LC Corporativo, Av. México 46, piso 2",
@@ -214,6 +225,91 @@ function prepareWrite(resource: FhirResource): FhirResource {
   delete copy.meta;
   assertNoSecrets(copy);
   return copy;
+}
+
+function identifierValue(resource: FhirResource | undefined, system: string) {
+  const ids = (resource?.identifier as { system?: string; value?: string }[]) || [];
+  return ids.find((id) => id.system === system)?.value || "";
+}
+
+export function proxyOriginFromEnv(raw = process.env.FHIR_PROXY_URL || "http://127.0.0.1:3001") {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("FHIR_PROXY_URL is not a valid URL");
+  }
+  const host = url.hostname;
+  if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]" && host !== "::1") {
+    throw new Error("FHIR_PROXY_URL must point at the loopback proxy");
+  }
+  return url.origin;
+}
+
+export function seedProxyHeaders(env: NodeJS.ProcessEnv = process.env) {
+  const proxySecret = String(env.FHIR_PROXY_SECRET || "").trim();
+  const sessionSecret = String(env.SESSION_SECRET || "").trim();
+  if (!isAcceptableSecret(proxySecret)) {
+    throw new Error(`FHIR_PROXY_SECRET must be set to a unique value of at least 32 characters. ${SECRET_HINT}`);
+  }
+  if (!isAcceptableSecret(sessionSecret)) {
+    throw new Error(`SESSION_SECRET must be set to a unique value of at least 32 characters. ${SECRET_HINT}`);
+  }
+  const token = signSession(
+    { id: "seed-yeshua", name: "Seed Clínica Yeshua", login: "seed-yeshua", role: "admin" },
+    sessionSecret,
+    Date.now() + SERVICE_SESSION_MS,
+  );
+  return {
+    "x-integramed-proxy-secret": proxySecret,
+    cookie: `${SESSION_COOKIE}=${token}`,
+  };
+}
+
+export function createSeedFhirClient(env: NodeJS.ProcessEnv = process.env): FhirClient {
+  const origin = proxyOriginFromEnv(env.FHIR_PROXY_URL || "http://127.0.0.1:3001");
+
+  async function request(path: string, init: RequestInit = {}): Promise<unknown> {
+    const headers = new Headers(init.headers);
+    const auth = seedProxyHeaders(env);
+    headers.set("x-integramed-proxy-secret", auth["x-integramed-proxy-secret"]);
+    headers.set("cookie", auth.cookie);
+    if (!headers.has("Accept")) headers.set("Accept", "application/fhir+json, application/json");
+    if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/fhir+json");
+    const res = await fetch(`${origin}/api/fhir/${path.replace(/^\//, "")}`, { ...init, headers, cache: "no-store" });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      const fail = data as { issue?: { diagnostics?: string }[]; message?: string; error?: string } | null;
+      const diag = fail?.issue?.[0]?.diagnostics || fail?.message || fail?.error || `FHIR ${res.status}`;
+      throw new Error(diag);
+    }
+    return data;
+  }
+
+  return {
+    async search(type, params = {}) {
+      const qs = new URLSearchParams({ _count: "200", ...params });
+      const data = (await request(`${type}?${qs}`)) as { resourceType?: string; entry?: { resource?: FhirResource }[] } | FhirResource;
+      if (data?.resourceType === type) return [data as FhirResource];
+      if (data?.resourceType === "Bundle") {
+        return ((data as { entry?: { resource?: FhirResource }[] }).entry || [])
+          .map((entry) => entry.resource)
+          .filter((resource): resource is FhirResource => Boolean(resource && resource.resourceType === type));
+      }
+      return [];
+    },
+    async create(resource) {
+      return (await request(resource.resourceType, { method: "POST", body: JSON.stringify(resource) })) as FhirResource;
+    },
+    async update(resource) {
+      if (!resource.id) throw new Error("Resource id required");
+      return (await request(`${resource.resourceType}/${encodeURIComponent(resource.id)}`, {
+        method: "PUT",
+        body: JSON.stringify(resource),
+      })) as FhirResource;
+    },
+  };
 }
 
 function identifiersOf(resource: FhirResource): Identifier[] {
@@ -749,12 +845,9 @@ function isDirectRun() {
 }
 
 async function main() {
-  dotenv.config();
-  const result = await seedClinicaYeshua({
-    search: (type, params) => fhirSearch(type, params),
-    create: (resource) => fhirCreate(resource),
-    update: (resource) => fhirUpdate(resource),
-  });
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+  dotenv.config({ path: path.join(root, ".env") });
+  const result = await seedClinicaYeshua(createSeedFhirClient());
   console.log("Clínica Yeshua");
   for (const [type, stats] of Object.entries(result.byType)) {
     console.log(`${type} — creados: ${stats.created}, actualizados: ${stats.updated}`);
@@ -766,7 +859,7 @@ if (isDirectRun()) {
   main().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
-    console.error("Comprueba que el proxy FHIR esté en marcha (npm run dev:fhir) y que FHIR_PROXY_URL apunte a él.");
+    console.error("El proxy tiene que estar en marcha y compartir SESSION_SECRET y FHIR_PROXY_SECRET (archivo .env). FHIR_PROXY_URL debe ser loopback.");
     process.exit(1);
   });
 }

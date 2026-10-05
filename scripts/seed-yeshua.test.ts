@@ -1,19 +1,45 @@
 import assert from "node:assert/strict";
+import http from "node:http";
 import { describe, it } from "node:test";
-import { identifierValue, type FhirResource } from "../src/lib/fhir";
-import { SYSTEMS } from "../src/lib/roles";
+import { verifySessionToken } from "../server/sessionAuth.js";
+import { SYSTEMS } from "../src/lib/roles.ts";
 import {
   YESHUA_ID,
   YESHUA_ORG_ID,
   YESHUA_SERVICES,
   YESHUA_SITE_ID,
   YESHUA_STAFF,
+  createSeedFhirClient,
+  proxyOriginFromEnv,
   seedClinicaYeshua,
+  seedProxyHeaders,
   yeshuaServiceId,
   type FhirClient,
-} from "./seed-yeshua";
+  type FhirResource,
+} from "./seed-yeshua.ts";
 
 const SECRET = "should-not-persist";
+const SESSION_SECRET = "s".repeat(48);
+const FHIR_PROXY_SECRET = "p".repeat(48);
+
+function identifierValue(resource: FhirResource | undefined, system: string) {
+  const ids = (resource?.identifier as { system?: string; value?: string }[]) || [];
+  return ids.find((id) => id.system === system)?.value || "";
+}
+
+function listen(handler: http.RequestListener) {
+  return new Promise<http.Server>((resolve, reject) => {
+    const server = http.createServer(handler);
+    server.listen(0, "127.0.0.1", () => resolve(server));
+    server.on("error", reject);
+  });
+}
+
+function stop(server: http.Server) {
+  return new Promise<void>((resolve, reject) => {
+    server.close((err) => (err ? reject(err) : resolve()));
+  });
+}
 
 function createMemoryFhir(seed: FhirResource[] = []): FhirClient & { all(type: string): FhirResource[]; writes: FhirResource[] } {
   const buckets = new Map<string, FhirResource[]>();
@@ -221,5 +247,54 @@ describe("seedClinicaYeshua", () => {
       fhir.all("PractitionerRole").filter((role) => (role.practitioner as { reference?: string }).reference === "Practitioner/existing-ivan").length,
       2,
     );
+  });
+});
+
+describe("seed proxy auth", () => {
+  it("signs a short-lived admin session and refuses a non-loopback proxy", () => {
+    const headers = seedProxyHeaders({ SESSION_SECRET, FHIR_PROXY_SECRET });
+    assert.equal(headers["x-integramed-proxy-secret"], FHIR_PROXY_SECRET);
+    const token = headers.cookie.slice("integramed_session=".length);
+    const user = verifySessionToken(token, SESSION_SECRET);
+    assert.ok(user);
+    assert.equal(user.role, "admin");
+    assert.equal(user.login, "seed-yeshua");
+    assert.ok(user.exp > Date.now());
+    assert.ok(user.exp - Date.now() <= 10 * 60 * 1000);
+    assert.throws(() => seedProxyHeaders({ SESSION_SECRET: "short", FHIR_PROXY_SECRET }));
+    assert.throws(() => proxyOriginFromEnv("https://fhir.example.test/fhir"));
+    assert.equal(proxyOriginFromEnv("http://127.0.0.1:3001"), "http://127.0.0.1:3001");
+  });
+
+  it("writes the clinic through the authenticated proxy and does not duplicate it", async () => {
+    process.env.SESSION_SECRET = SESSION_SECRET;
+    process.env.FHIR_PROXY_SECRET = FHIR_PROXY_SECRET;
+    process.env.FHIR_MODE = "local";
+    process.env.FHIR_PROXY_NO_LISTEN = "1";
+    process.env.CLINICAL_AI_KEY = "";
+    const { app } = await import("../server/index.js");
+    const server = await listen(app);
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("missing port");
+    const origin = `http://127.0.0.1:${address.port}`;
+    try {
+      const open = await fetch(`${origin}/api/fhir/Organization`);
+      assert.equal(open.status, 401);
+      const client = createSeedFhirClient({
+        ...process.env,
+        FHIR_PROXY_URL: origin,
+        SESSION_SECRET,
+        FHIR_PROXY_SECRET,
+      });
+      const first = await seedClinicaYeshua(client);
+      const second = await seedClinicaYeshua(client);
+      assert.equal(first.created + first.updated, 22);
+      assert.equal(second.created, 0);
+      assert.equal(second.updated, 22);
+      const orgs = await client.search("Organization");
+      assert.equal(orgs.filter((org) => identifierValue(org, YESHUA_ID.organization) === YESHUA_ORG_ID).length, 1);
+    } finally {
+      await stop(server);
+    }
   });
 });

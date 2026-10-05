@@ -27,13 +27,13 @@ Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el 
 
 ## Clínica Yeshua
 
-Con el proxy en marcha (`npm run dev:fhir`):
+Con el proxy en marcha y el mismo `.env` (`SESSION_SECRET`, `FHIR_PROXY_SECRET`, `FHIR_PROXY_URL` en loopback):
 
 ```bash
 npm run seed:yeshua
 ```
 
-Crea la organización, la sede de Naucalpan, los consultorios, los servicios y los profesionales (correo y rol). No guarda contraseñas. Lee `FHIR_PROXY_URL` (por defecto `http://localhost:3001`). Si el recurso ya existe, lo actualiza sin duplicarlo.
+Crea la organización, la sede de Naucalpan, los consultorios, los servicios y los profesionales (correo y rol). No guarda contraseñas. Firma una sesión corta de administración con `SESSION_SECRET` y la envía al proxy junto con `FHIR_PROXY_SECRET`. Si el recurso ya existe, lo actualiza sin duplicarlo.
 
 ## Navegación
 

@@ -1,11 +1,19 @@
-FROM node:20-alpine AS builder
+# 22.23.3 satisfies the test runner (>= 22.6, --experimental-strip-types)
+# and `node --use-system-ca` in start:fhir (>= 22.15).
+ARG NODE_VERSION=22.23.3
+
+FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# public/ holds static assets (iris maps and similar). modules/ will hold
+# specialized modules such as iridology. Neither is required in the repo yet;
+# create them when missing so the runtime copy never fails the build.
+RUN mkdir -p public modules
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
@@ -15,5 +23,7 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/vault-es ./vault-es
 COPY --from=builder /app/vault-en ./vault-en
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/modules ./modules
 EXPOSE 3000
 CMD ["npm", "start"]

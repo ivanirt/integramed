@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 function AccesoForm() {
   const params = useSearchParams();
-  const [login, setLogin] = useState("ivan");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 

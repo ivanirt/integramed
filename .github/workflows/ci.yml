@@ -60,8 +60,8 @@ jobs:
           echo "Node ${node_version}"
           docker run --rm --entrypoint node integramed:ci -e '
             const [major, minor] = process.versions.node.split(".").map(Number);
-            if (major < 22 || (major === 22 && minor < 15)) {
-              console.error("Node must be >= 22.15 for --use-system-ca");
+            if (major < 22 || (major === 22 && minor < 6)) {
+              console.error("Node must be >= 22.6");
               process.exit(1);
             }
           '
@@ -102,6 +102,14 @@ jobs:
                   process.exit(1);
                 }
               '
+              logs="$(docker logs integramed-ci 2>&1)"
+              echo "${logs}" | grep -F "TLS: using Node default CAs plus the OS certificate store"
+              procs="$(docker exec integramed-ci ps)"
+              echo "${procs}" | grep -F "node server/index.js"
+              if echo "${procs}" | grep -q "use-system-ca"; then
+                echo "proxy still started with --use-system-ca"
+                exit 1
+              fi
               exit 0
             fi
             sleep 3

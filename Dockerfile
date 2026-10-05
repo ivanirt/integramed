@@ -1,5 +1,5 @@
-# 22.23.3 satisfies the test runner (>= 22.6, --experimental-strip-types)
-# and `node --use-system-ca` in start:fhir (>= 22.15).
+# Tests need Node >= 22.6 (--experimental-strip-types).
+# OS CAs are applied in server/index.js when tls.setDefaultCACertificates exists (Node >= 22.19).
 ARG NODE_VERSION=22.23.3
 
 FROM node:${NODE_VERSION}-alpine AS builder

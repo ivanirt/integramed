@@ -16,9 +16,9 @@ sources:
     last_modified: 2026-09-09T05:18:00Z
 ---
 
-# Ansiedad
+> Si estás en crisis o piensas en hacerte daño, llama a la Línea de la Vida: [800 911 2000](tel:8009112000) (gratuita, 24/7). Si hay peligro inmediato, llama al 911.
 
-**Alarma:** Riesgo suicida: 988.
+# Ansiedad
 
 ## Enlaces del vault
 - Acupuntura shen: [[acupuntura/puntos/3C-Shenmen]] [[acupuntura/puntos/6MC-Neiguan]]

@@ -97,11 +97,88 @@ export function rateLimitAllow(
   return true;
 }
 
-/** How a login password is checked. Personal hashes replace the shared clinic password. */
+/**
+ * Personal password only. A missing hash never falls back to a shared clinic password,
+ * whether or not passwordRequired is set.
+ */
 export function loginStrategy(
-  account: { passwordHash: string | null; passwordRequired: boolean } | null | undefined,
-): "hash" | "unset" | "master" {
+  account: { passwordHash: string | null; passwordRequired?: boolean } | null | undefined,
+): "hash" | "unset" {
   if (account?.passwordHash) return "hash";
-  if (account?.passwordRequired) return "unset";
-  return "master";
+  return "unset";
+}
+
+export function authorizeLogin(input: {
+  account: { passwordHash: string | null; passwordRequired?: boolean; passwordChangedAt?: number } | null | undefined;
+  hashMatches: boolean;
+}): { ok: true; pwdAt: number } | { ok: false; reason: "unset" | "reject" } {
+  if (loginStrategy(input.account) !== "hash") return { ok: false, reason: "unset" };
+  if (!input.hashMatches) return { ok: false, reason: "reject" };
+  return { ok: true, pwdAt: Number(input.account?.passwordChangedAt || 0) };
+}
+
+export const SMTP_UNAVAILABLE_LOG =
+  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento.";
+
+const RESET_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function redactSecrets(text: string, secrets: string[]): string {
+  let out = String(text);
+  const sorted = secrets.filter((item) => item && item.length >= 8).sort((a, b) => b.length - a.length);
+  for (const secret of sorted) out = out.split(secret).join("[redacted]");
+  return out;
+}
+
+export type ForgotPasswordUser = { id: string; email: string };
+
+export type ForgotPasswordResult = {
+  status: number;
+  body: { message?: string; error?: string };
+};
+
+/**
+ * Asks for a reset link. The HTTP body is the same whether or not the mailbox exists.
+ * Without a way to deliver the link, no token is created and nothing about the link is logged.
+ */
+export async function processForgotPassword(options: {
+  mode: "smtp" | "dev-log" | "unavailable";
+  lookup: () => Promise<ForgotPasswordUser | null>;
+  issue: () => { token: string; record: ResetRecord };
+  save: (user: ForgotPasswordUser, record: ResetRecord) => void;
+  deliver: (to: string, link: string) => Promise<void>;
+  linkFor: (token: string) => string;
+  log: (line: string) => void;
+}): Promise<ForgotPasswordResult> {
+  if (options.mode === "unavailable") {
+    options.log(SMTP_UNAVAILABLE_LOG);
+    return { status: 200, body: { message: RESET_REQUEST_MESSAGE } };
+  }
+
+  let user: ForgotPasswordUser | null = null;
+  try {
+    user = await options.lookup();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    options.log(`[IntegraMed] No se pudo consultar el personal para restablecer la contraseña: ${detail}`);
+    return {
+      status: 503,
+      body: { error: "No se pudo procesar la solicitud. Inténtalo más tarde." },
+    };
+  }
+
+  const destination = user?.email?.trim().toLowerCase() || "";
+  if (!user || !RESET_EMAIL.test(destination)) {
+    return { status: 200, body: { message: RESET_REQUEST_MESSAGE } };
+  }
+
+  const issued = options.issue();
+  options.save({ id: user.id, email: destination }, issued.record);
+  const link = options.linkFor(issued.token);
+  try {
+    await options.deliver(destination, link);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    options.log(redactSecrets(`[IntegraMed] No se pudo enviar el correo de restablecimiento: ${detail}`, [issued.token, link]));
+  }
+  return { status: 200, body: { message: RESET_REQUEST_MESSAGE } };
 }

@@ -20,13 +20,13 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 | Configuración `/config` | no | no | no | no | sí | no | no |
 | Perfil `/perfil` | sí | sí | sí | sí | sí | sí | sí |
 
-«No» en una ruta directa redirige a `/?aviso=…` con el texto de que la pantalla no está disponible. El middleware solo exige la cookie de sesión; el rol lo revisa cada página con `requireScreen`.
+«No» en una ruta directa redirige a `/?aviso=…` con el texto de que la pantalla no está disponible. El middleware comprueba la firma de la cookie y el rol conocido; cada página vuelve a mirar la pantalla con `requireScreen`.
 
 ## Login y logout
 
-- Con la contraseña del archivo, el correo entra y el rol de la sesión es el de esa fila.
-- Un correo que no existe responde «Contraseña incorrecta.» si la clave no es la maestra de la clínica, igual que antes.
-- Estos usuarios de prueba tienen contraseña propia: la clave maestra no les sirve.
+- Con la contraseña del archivo, el correo entra y el rol de la sesión es el de esa fila. La cookie va firmada; el proxy FHIR la exige igual que el middleware.
+- Un correo que no existe responde «Contraseña incorrecta.»
+- No hay contraseña compartida. Una cuenta sin hash personal, tenga o no `passwordRequired`, responde que hay que definirla con «¿Olvidaste tu contraseña?». `CLINIC_MASTER_PASSWORD` no abre sesión.
 - «Salir» en el pie llama `POST /api/auth` con `action: logout`, borra la cookie y vuelve a `/acceso`.
 - El selector de rol solo aparece si el Practitioner tiene más de un rol. Cada usuario de prueba tiene uno, así que no debe aparecer.
 
@@ -34,7 +34,7 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 
 - En `/acceso`, «¿Olvidaste tu contraseña?» abre `/acceso/recuperar`.
 - Cualquier correo bien formado recibe el mismo texto: «Si la cuenta existe, enviamos un enlace para restablecer la contraseña.»
-- Con SMTP vacío, el enlace sale en la consola del proceso `web`. Dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
+- Sin SMTP, la respuesta es la misma. En producción no se imprime el enlace. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El enlace dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
 - `/acceso/restablecer?token=…` pide contraseña y confirmación (8 caracteres, una letra y un número).
 - Después se entra con la clave nueva. La cookie anterior deja de servir.
 
@@ -60,11 +60,11 @@ Lo que sí hay es la modalidad `iridology` («Iridología»), apagada por defect
 
 ## FHIR
 
-Las escrituras clínicas van al proxy (`FHIR_PROXY_URL`, por defecto `http://localhost:3001`): Patient, Appointment, Encounter, Composition, Observation, MedicationRequest, ServiceRequest, DiagnosticReport, Schedule, Basic. Con `FHIR_MODE=local` quedan en `data/fhir/`.
+Las escrituras clínicas van al proxy (`FHIR_PROXY_URL`, `http://127.0.0.1:3001`): Patient, Appointment, Encounter, Composition, Observation, MedicationRequest, ServiceRequest, DiagnosticReport, Schedule, Basic. Con `FHIR_MODE=local` quedan en `data/fhir/`.
 
-Quien tiene pacientes puede abrir la ficha. Recetas y estudios están en esa ficha (`/pacientes/:id/recetas`, `/pacientes/:id/estudios`). Guardar un estudio crea DiagnosticReport. Pedir un estudio crea ServiceRequest. La farmacia guarda inventario en Basic. Nada de eso vuelve a comprobar el rol dentro de la server action: la puerta es la página.
+Quien tiene pacientes puede abrir la ficha. Recetas y estudios están en esa ficha (`/pacientes/:id/recetas`, `/pacientes/:id/estudios`). Guardar un estudio crea DiagnosticReport. Pedir un estudio crea ServiceRequest. La farmacia guarda inventario en Basic. Nada de eso vuelve a comprobar el rol dentro de la server action: la puerta es la página y, en el proxy, la sesión firmada.
 
-El proxy en sí no mira el rol. El middleware de Next deja pasar `/api/fhir` y `/api/health` sin cookie.
+El proxy escucha solo en loopback y pide el secreto interno más una sesión firmada de un rol de clínica. Next ya no deja pasar `/api/fhir` ni `/api/health` sin esa cookie. Las escrituras de la bóveda piden rol `admin`.
 
 ## Pacientes
 
@@ -89,7 +89,7 @@ El proxy en sí no mira el rol. El middleware de Next deja pasar `/api/fhir` y `
 3. El resumen del paciente muestra «Nueva consulta» a recepción, lab y farmacia, que no tienen `consulta`.
 4. `/pacientes/nuevo` y `createPatientAction` no comprueban la pantalla `patients`. Apagar el módulo no cierra el alta.
 5. `startConsultFromAppointment`, `saveSoapAction`, recetas, estudios, inventario, módulos, sedes y servicios no vuelven a aplicar el rol. La protección está en la página, no en la action ni en el proxy.
-6. `/api/fhir` es público para quien alcance el servidor Next. No aplica `canAccess`.
+6. El proxy exige sesión firmada y rol conocido, pero no aplica `canAccess` pantalla por pantalla. Una sesión de laboratorio puede llamar al proxy si tiene el secreto interno (solo el servidor lo tiene).
 7. `canAccess` deja pasar `consulta`, `horario` y `ausencias` aunque el mapa de módulos los quisiera apagar. Esos tres ni siquiera están en `DEFAULT_MODULES`.
 8. Si se apaga el módulo Inicio, `requireScreen` redirige a `/`, que también exige inicio: la navegación puede entrar en bucle.
 9. Enfermería puede saltarse el triaje con `?forzar=1` y usar la misma nota e IA que el médico. Terapeuta tiene las mismas pantallas que el médico, incluida la consulta.

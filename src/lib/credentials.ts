@@ -5,7 +5,7 @@ export type CredentialAccount = {
   practitionerId: string;
   email: string;
   passwordHash: string | null;
-  /** When true and there is no hash, the shared clinic password is rejected. */
+  /** Account must use a personal password. There is no shared-password fallback. */
   passwordRequired: boolean;
   /** Epoch ms of the last password change. Older sessions are rejected. */
   passwordChangedAt: number;

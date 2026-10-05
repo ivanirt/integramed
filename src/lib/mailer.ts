@@ -1,22 +1,54 @@
 import nodemailer from "nodemailer";
 
-export function smtpConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST && process.env.MAIL_FROM);
+export const RESET_LINK_LOG_FLAG = "PASSWORD_RESET_LOG_LINK";
+const SMTP_UNAVAILABLE_LOG =
+  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento.";
+
+function redactSecrets(text: string, secrets: string[]): string {
+  let out = String(text);
+  const sorted = secrets.filter((item) => item && item.length >= 8).sort((a, b) => b.length - a.length);
+  for (const secret of sorted) out = out.split(secret).join("[redacted]");
+  return out;
 }
 
-export function appBaseUrl(): string {
-  return (process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
+export type ResetDelivery = "smtp" | "dev-log" | "unavailable";
+
+type MailEnv = {
+  NODE_ENV?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: string;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  MAIL_FROM?: string;
+  APP_BASE_URL?: string;
+  PASSWORD_RESET_LOG_LINK?: string;
+};
+
+export function smtpConfigured(env: MailEnv = process.env): boolean {
+  return Boolean(env.SMTP_HOST && env.MAIL_FROM);
 }
 
-export function resetLink(token: string): string {
-  return `${appBaseUrl()}/acceso/restablecer?token=${encodeURIComponent(token)}`;
+/** Production never prints the link. Development prints it only when PASSWORD_RESET_LOG_LINK=1. */
+export function resetDeliveryMode(env: MailEnv = process.env): ResetDelivery {
+  if (smtpConfigured(env)) return "smtp";
+  if (env.NODE_ENV !== "production" && env.PASSWORD_RESET_LOG_LINK === "1") return "dev-log";
+  return "unavailable";
 }
 
-function logResetLink(to: string, link: string, reason: string) {
+export function appBaseUrl(env: MailEnv = process.env): string {
+  return (env.APP_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
+}
+
+export function resetLink(token: string, env: MailEnv = process.env): string {
+  return `${appBaseUrl(env)}/acceso/restablecer?token=${encodeURIComponent(token)}`;
+}
+
+function logResetLink(to: string, link: string, env: MailEnv) {
+  if (env.NODE_ENV === "production" || env.PASSWORD_RESET_LOG_LINK !== "1") return;
   const token = new URL(link).searchParams.get("token") || "";
   console.log("");
   console.log("========== IntegraMed: enlace para restablecer contraseña ==========");
-  console.log(reason);
+  console.log("SMTP no configurado. Enlace visible solo porque PASSWORD_RESET_LOG_LINK=1 y NODE_ENV no es production.");
   console.log(`Para: ${to}`);
   console.log(`Token: ${token}`);
   console.log(link);
@@ -26,24 +58,50 @@ function logResetLink(to: string, link: string, reason: string) {
   console.log("");
 }
 
-export async function sendPasswordResetEmail(to: string, link: string): Promise<void> {
-  if (!smtpConfigured()) {
-    logResetLink(to, link, "SMTP no configurado. El enlace se imprime aquí para poder probar en local.");
-    return;
+type MailTransport = {
+  sendMail: (message: { from?: string; to: string; subject: string; text: string }) => Promise<unknown>;
+};
+
+export async function sendPasswordResetEmail(
+  to: string,
+  link: string,
+  transport?: MailTransport,
+  env: MailEnv = process.env,
+): Promise<"sent" | "logged" | "unavailable"> {
+  const mode = resetDeliveryMode(env);
+  if (mode === "dev-log") {
+    logResetLink(to, link, env);
+    return "logged";
+  }
+  if (mode === "unavailable") {
+    console.error(SMTP_UNAVAILABLE_LOG);
+    return "unavailable";
   }
 
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
+  const port = Number(env.SMTP_PORT || 587);
+  const user = env.SMTP_USER || "";
+  const pass = env.SMTP_PASS || "";
+  const token = (() => {
+    try {
+      return new URL(link).searchParams.get("token") || "";
+    } catch {
+      return "";
+    }
+  })();
   try {
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: port === 465,
-      auth: user ? { user, pass } : undefined,
-    });
-    await transport.sendMail({
-      from: process.env.MAIL_FROM,
+    const active =
+      transport ||
+      nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port,
+        secure: port === 465,
+        auth: user ? { user, pass } : undefined,
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 10_000,
+      });
+    await active.sendMail({
+      from: env.MAIL_FROM,
       to,
       subject: "IntegraMed: restablece tu contraseña",
       text: [
@@ -55,13 +113,13 @@ export async function sendPasswordResetEmail(to: string, link: string): Promise<
         "Si no fuiste tú, ignora este mensaje.",
       ].join("\n"),
     });
+    return "sent";
   } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     console.error(
       "[IntegraMed] No se pudo enviar el correo de restablecimiento:",
-      err instanceof Error ? err.message : err,
+      redactSecrets(detail, [link, token]),
     );
-    if (process.env.NODE_ENV !== "production") {
-      logResetLink(to, link, "El envío SMTP falló. En desarrollo el enlace se imprime aquí.");
-    }
+    return "unavailable";
   }
 }

@@ -15,5 +15,5 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/vault-es ./vault-es
 COPY --from=builder /app/vault-en ./vault-en
-EXPOSE 3000 3001
+EXPOSE 3000
 CMD ["npm", "start"]

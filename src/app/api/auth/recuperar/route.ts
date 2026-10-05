@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { blankAccount, mutateAccounts } from "@/lib/credentials";
-import { listStaff, type StaffMember } from "@/lib/staff";
-import { resetLink, sendPasswordResetEmail } from "@/lib/mailer";
+import { resetDeliveryMode, resetLink, sendPasswordResetEmail } from "@/lib/mailer";
 import {
+  issueReset,
+  processForgotPassword,
+  rateLimitAllow,
   RESET_EMAIL_LIMIT,
   RESET_EMAIL_WINDOW_MS,
   RESET_IP_LIMIT,
   RESET_IP_WINDOW_MS,
-  RESET_REQUEST_MESSAGE,
-  issueReset,
-  rateLimitAllow,
 } from "@/lib/password-reset";
+import { listStaff, type StaffMember } from "@/lib/staff";
 
 const emailBuckets = new Map<string, number[]>();
 const ipBuckets = new Map<string, number[]>();
@@ -54,33 +54,33 @@ export async function POST(request: Request) {
     );
   }
 
-  let staff: StaffMember[] = [];
-  try {
-    staff = await listStaff();
-  } catch (err) {
-    console.error("[IntegraMed] No se pudo consultar el personal para restablecer la contraseña:", err);
-    return NextResponse.json(
-      { error: "No se pudo procesar la solicitud. Inténtalo más tarde." },
-      { status: 503 },
-    );
-  }
+  const result = await processForgotPassword({
+    mode: resetDeliveryMode(),
+    lookup: async () => {
+      const staff = await listStaff();
+      const user = findStaff(staff, email);
+      if (!user) return null;
+      return { id: user.id, email: user.email || "" };
+    },
+    issue: () => issueReset(now),
+    save: (user, record) => {
+      mutateAccounts((accounts) => {
+        let account = accounts.find((item) => item.practitionerId === user.id);
+        if (!account) {
+          account = blankAccount(user.id, user.email, false);
+          accounts.push(account);
+        }
+        account.email = user.email;
+        account.resetTokenHash = record.tokenHash;
+        account.resetExpiresAt = record.expiresAt;
+      });
+    },
+    deliver: async (to, link) => {
+      await sendPasswordResetEmail(to, link);
+    },
+    linkFor: (token) => resetLink(token),
+    log: (line) => console.error(line),
+  });
 
-  const user = findStaff(staff, email);
-  const destination = user?.email?.trim().toLowerCase() || "";
-  if (user && EMAIL.test(destination)) {
-    const issued = issueReset(now);
-    mutateAccounts((accounts) => {
-      let account = accounts.find((item) => item.practitionerId === user.id);
-      if (!account) {
-        account = blankAccount(user.id, destination, false);
-        accounts.push(account);
-      }
-      account.email = destination;
-      account.resetTokenHash = issued.record.tokenHash;
-      account.resetExpiresAt = issued.record.expiresAt;
-    });
-    await sendPasswordResetEmail(destination, resetLink(issued.token));
-  }
-
-  return NextResponse.json({ message: RESET_REQUEST_MESSAGE });
+  return NextResponse.json(result.body, { status: result.status });
 }

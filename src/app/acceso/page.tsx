@@ -30,9 +30,8 @@ function AccesoForm() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="font-serif text-4xl">IntegraMed</h1>
       <p className="mt-2 text-sm text-[#6D5E52]">
-        Entra con el usuario o el correo del Practitioner. La cuenta de demostración ivan usa la contraseña maestra
-        IntegraMed27. El primer acceso crea a Ivan Renteria si el FHIR está vacío. Si tu cuenta aún no tiene
-        contraseña, usa el enlace de abajo.
+        Entra con el usuario o el correo del Practitioner y tu contraseña personal. Si aún no tienes una, usa el enlace
+        de abajo.
       </p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <label className="block text-sm">

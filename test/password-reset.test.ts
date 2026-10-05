@@ -10,6 +10,7 @@ import {
   generateResetToken,
   hashResetToken,
   issueReset,
+  authorizeLogin,
   loginStrategy,
   rateLimitAllow,
   validateNewPassword,
@@ -81,11 +82,35 @@ test("reset requests are rate limited per key and window", () => {
   assert.equal(rateLimitAllow(buckets, "ivanirt@gmail.com", start + 1_001, 5, 1_000), true);
 });
 
-test("login uses a personal hash, blocks an unset password, and otherwise keeps the clinic password", () => {
-  assert.equal(loginStrategy(null), "master");
-  assert.equal(loginStrategy({ passwordHash: null, passwordRequired: false }), "master");
+test("login uses a personal hash and never falls back to a shared clinic password", () => {
+  assert.equal(loginStrategy(null), "unset");
+  assert.equal(loginStrategy({ passwordHash: null, passwordRequired: false }), "unset");
   assert.equal(loginStrategy({ passwordHash: null, passwordRequired: true }), "unset");
   assert.equal(loginStrategy({ passwordHash: "$2a$12$hash", passwordRequired: true }), "hash");
+
+  assert.deepEqual(authorizeLogin({ account: null, hashMatches: false }), { ok: false, reason: "unset" });
+  assert.deepEqual(
+    authorizeLogin({ account: { passwordHash: null, passwordRequired: true }, hashMatches: false }),
+    { ok: false, reason: "unset" },
+  );
+  assert.deepEqual(
+    authorizeLogin({ account: { passwordHash: null, passwordRequired: false }, hashMatches: true }),
+    { ok: false, reason: "unset" },
+  );
+  assert.deepEqual(
+    authorizeLogin({
+      account: { passwordHash: "$2a$12$hash", passwordRequired: true, passwordChangedAt: 40 },
+      hashMatches: false,
+    }),
+    { ok: false, reason: "reject" },
+  );
+  assert.deepEqual(
+    authorizeLogin({
+      account: { passwordHash: "$2a$12$hash", passwordRequired: true, passwordChangedAt: 40 },
+      hashMatches: true,
+    }),
+    { ok: true, pwdAt: 40 },
+  );
 });
 
 test("the credential file keeps the hash and drops the token after use", () => {

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveIrisNoteAction } from "@/lib/actions";
-import { EyePane, emptySlot, type LoadedMap, type SlotState } from "@/components/iris/EyePane";
+import { EyePane, emptySlot, slotView, type LoadedMap, type SlotState } from "@/components/iris/EyePane";
 import { exportIrisPairPng, exportIrisPng, type IrisOverlayController, type IrisPngSide } from "@/components/iris/mountIrisOverlay";
+import { cleanedPhotoBlob } from "@/components/iris/paintIrisClean";
+import { clampIrisMask, defaultIrisMask, maskLimit } from "@/lib/iris-mask";
 import { Button, GhostButton } from "@/components/ui";
 import {
   irisMapUrl,
@@ -76,7 +78,7 @@ export function EyeDiagnosis({
   const [patientId, setPatientId] = useState(initialPatientId);
   const [saveState, setSaveState] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<IrisEye | "pair" | null>(null);
+  const [busy, setBusy] = useState<IrisEye | "pair" | "pair-original" | null>(null);
   const [maximized, setMaximized] = useState<null | "both" | IrisEye>(null);
 
   const slotsRef = useRef(slots);
@@ -287,41 +289,80 @@ export function EyeDiagnosis({
     }));
   }
 
-  function sidePayload(eye: IrisEye): IrisPngSide {
+  async function sidePayload(
+    eye: IrisEye,
+    version: "active" | "original",
+  ): Promise<{ side: IrisPngSide; version: "original" | "clean"; revoke?: () => void }> {
     const slot = slotsRef.current[eye];
     const map = mapsRef.current[eye];
+    const chosen = version === "original" ? "original" : slotView(slot);
+    let photoUrl = slot.photo?.url ?? null;
+    let revoke: (() => void) | undefined;
+    if (chosen === "clean" && slot.photo && slot.fit && slot.mask) {
+      const blob = await cleanedPhotoBlob(
+        slot.photo.url,
+        slot.photo.width,
+        slot.photo.height,
+        slot.fit.cx,
+        slot.fit.cy,
+        slot.mask,
+      );
+      photoUrl = URL.createObjectURL(blob);
+      revoke = () => URL.revokeObjectURL(photoUrl!);
+    }
     return {
-      label: EYE_LABEL[eye],
-      photoUrl: slot.photo?.url ?? null,
-      photoWidth: slot.photo?.width ?? map?.geom.viewBox.width ?? 1200,
-      photoHeight: slot.photo?.height ?? map?.geom.viewBox.height ?? 1200,
-      svg: ctrlRef.current[eye]?.svg ?? null,
-      geom: map?.geom ?? null,
-      fit:
-        slot.fit ??
-        (map
-          ? defaultFit(
-              slot.photo?.width ?? map.geom.viewBox.width,
-              slot.photo?.height ?? map.geom.viewBox.height,
-              map.geom,
-            )
-          : null),
-      opacity: slot.opacity,
-      overlayVisible: slot.overlayVisible,
-      pupilBlack: slot.pupilBlack,
+      version: chosen,
+      revoke,
+      side: {
+        label: `${EYE_LABEL[eye]} · ${chosen === "clean" ? "Solo iris" : "Original"}`,
+        photoUrl,
+        photoWidth: slot.photo?.width ?? map?.geom.viewBox.width ?? 1200,
+        photoHeight: slot.photo?.height ?? map?.geom.viewBox.height ?? 1200,
+        svg: ctrlRef.current[eye]?.svg ?? null,
+        geom: map?.geom ?? null,
+        fit:
+          slot.fit ??
+          (map
+            ? defaultFit(
+                slot.photo?.width ?? map.geom.viewBox.width,
+                slot.photo?.height ?? map.geom.viewBox.height,
+                map.geom,
+              )
+            : null),
+        opacity: slot.opacity,
+        overlayVisible: slot.overlayVisible,
+        pupilBlack: slot.pupilBlack,
+      },
     };
   }
 
-  async function onExportEye(eye: IrisEye) {
+  async function onExportEye(eye: IrisEye, which: "active" | "other") {
     const slot = slotsRef.current[eye];
     const map = mapsRef.current[eye];
     const ctrl = ctrlRef.current[eye];
     if (!slot.photo || !slot.fit || !map || !ctrl) return;
+    const active = slotView(slot);
+    const version = which === "active" ? active : active === "clean" ? "original" : "clean";
+    if (version === "clean" && !slot.mask) return;
     setBusy(eye);
     setExportError(null);
+    let revoke: (() => void) | undefined;
     try {
+      let photoUrl = slot.photo.url;
+      if (version === "clean" && slot.mask) {
+        const blob = await cleanedPhotoBlob(
+          slot.photo.url,
+          slot.photo.width,
+          slot.photo.height,
+          slot.fit.cx,
+          slot.fit.cy,
+          slot.mask,
+        );
+        photoUrl = URL.createObjectURL(blob);
+        revoke = () => URL.revokeObjectURL(photoUrl);
+      }
       const blob = await exportIrisPng({
-        photoUrl: slot.photo.url,
+        photoUrl,
         photoWidth: slot.photo.width,
         photoHeight: slot.photo.height,
         svg: ctrl.svg,
@@ -330,27 +371,63 @@ export function EyeDiagnosis({
         opacity: slot.opacity,
         overlayVisible: slot.overlayVisible,
         pupilBlack: slot.pupilBlack,
+        caption: version === "clean" ? "Solo iris" : "Original",
       });
-      downloadBlob(blob, `iris-${eye}-${new Date().toISOString().slice(0, 10)}.png`);
+      const eyeName = eye === "right" ? "derecho" : "izquierdo";
+      downloadBlob(blob, `iris-${eyeName}-${version === "clean" ? "limpia" : "original"}-${fileDate()}.png`);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "No se pudo exportar el PNG.");
     } finally {
+      revoke?.();
       setBusy(null);
     }
   }
 
-  async function onExportPair() {
+  async function onExportPair(version: "active" | "original") {
     if (!mapsRef.current.right && !mapsRef.current.left) return;
-    setBusy("pair");
+    setBusy(version === "original" ? "pair-original" : "pair");
     setExportError(null);
+    const prepared = await Promise.all([sidePayload("right", version), sidePayload("left", version)]);
     try {
-      const blob = await exportIrisPairPng({ right: sidePayload("right"), left: sidePayload("left") });
-      downloadBlob(blob, `iris-ambos-${new Date().toISOString().slice(0, 10)}.png`);
+      const blob = await exportIrisPairPng({ right: prepared[0].side, left: prepared[1].side });
+      const tag = prepared.every((item) => item.version === "clean")
+        ? "limpia"
+        : prepared.every((item) => item.version === "original")
+          ? "original"
+          : "mixta";
+      downloadBlob(blob, `iris-ambos-${tag}-${fileDate()}.png`);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "No se pudo exportar el PNG.");
     } finally {
+      for (const item of prepared) item.revoke?.();
       setBusy(null);
     }
+  }
+
+  function setEyesView(view: "original" | "clean") {
+    setSlots((prev) => {
+      const next = { ...prev };
+      for (const eye of ["right", "left"] as const) {
+        const slot = prev[eye];
+        if (!slot.photo || !slot.fit) continue;
+        if (view === "original") {
+          next[eye] = { ...slot, view: "original" };
+          continue;
+        }
+        const linked = slot.mask ? slot.maskLinked : true;
+        const base = slot.mask ?? defaultIrisMask(slot.fit.ri);
+        next[eye] = {
+          ...slot,
+          view: "clean",
+          maskLinked: linked,
+          mask: clampIrisMask(
+            { ...base, radius: linked ? slot.fit.ri : base.radius },
+            maskLimit(slot.photo.width, slot.photo.height),
+          ),
+        };
+      }
+      return next;
+    });
   }
 
   async function onSaveNote() {
@@ -383,11 +460,13 @@ export function EyeDiagnosis({
 
   const scopeLabel =
     scope === "both" ? "en los dos mapas" : scope === "right" ? "en el ojo derecho" : "en el ojo izquierdo";
+  const canClean = (["right", "left"] as const).some((eye) => slots[eye].photo && slots[eye].fit);
+  const anyClean = (["right", "left"] as const).some((eye) => slotView(slots[eye]) === "clean");
 
   return (
     <div className="mx-auto max-w-[88rem] px-4 py-10">
-      <p className="text-xs uppercase tracking-wide text-[#6D5E52]">Complementaria</p>
-      <h1 className="font-serif text-4xl">Diagnóstico del iris</h1>
+      <p className="text-xs uppercase tracking-wide text-[#6D5E52]">Análisis orientativo</p>
+      <h1 className="font-serif text-4xl">Revisión iridológica</h1>
       <p className="mt-3 max-w-3xl border border-[#EADBCE] bg-white px-4 py-3 text-sm leading-relaxed">
         La iridología es una técnica complementaria y no validada. Lo que muestra este módulo no es un diagnóstico
         médico. La fotografía no sale de este navegador.
@@ -396,12 +475,28 @@ export function EyeDiagnosis({
         Los dos ojos se ven como al mirar la cara del paciente: su ojo derecho queda a la izquierda de la pantalla y su
         ojo izquierdo a la derecha. En pantallas estrechas el ojo derecho queda arriba. Cada foto pertenece a la ranura
         donde la pongas. Si cae en la otra, muévela o intercambia las fotos. Con una sola foto, el otro ojo sigue
-        mostrando su mapa. Ampliar pone un ojo, o los dos, a pantalla completa; Esc o Cerrar vuelve a la página.
+        mostrando su mapa. Ampliar pone un ojo, o los dos, a pantalla completa; Esc o Cerrar vuelve a la página. Limpiar
+        imagen deja solo el anillo del iris sobre un fondo gris; la foto original sigue disponible.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button type="button" disabled={loadingMaps || (!maps.right && !maps.left) || busy === "pair"} onClick={() => void onExportPair()}>
-          {busy === "pair" ? "Exportando…" : "Descargar ambos ojos"}
+        <Button
+          type="button"
+          disabled={loadingMaps || (!maps.right && !maps.left) || busy === "pair"}
+          onClick={() => void onExportPair("active")}
+        >
+          {busy === "pair" ? "Exportando…" : anyClean ? "Descargar ambos (vista actual)" : "Descargar ambos ojos"}
         </Button>
+        {anyClean ? (
+          <GhostButton type="button" disabled={busy === "pair-original"} onClick={() => void onExportPair("original")}>
+            {busy === "pair-original" ? "Exportando…" : "Descargar ambos originales"}
+          </GhostButton>
+        ) : null}
+        <GhostButton type="button" disabled={!canClean} onClick={() => setEyesView("clean")}>
+          Solo iris en ambos
+        </GhostButton>
+        <GhostButton type="button" disabled={!canClean} onClick={() => setEyesView("original")}>
+          Original en ambos
+        </GhostButton>
         <GhostButton type="button" onClick={() => openMaximized("both")}>
           Ampliar ambos ojos
         </GhostButton>
@@ -423,6 +518,12 @@ export function EyeDiagnosis({
               {maximized === "both" ? "Ambos ojos" : EYE_LABEL[maximized]}
             </p>
             <div className="flex flex-wrap gap-2">
+              <GhostButton type="button" disabled={!canClean} onClick={() => setEyesView("clean")}>
+                Solo iris en ambos
+              </GhostButton>
+              <GhostButton type="button" disabled={!canClean} onClick={() => setEyesView("original")}>
+                Original en ambos
+              </GhostButton>
               {maximized !== "both" ? (
                 <GhostButton type="button" onClick={() => openMaximized("both")}>
                   Ampliar ambos ojos
@@ -467,7 +568,7 @@ export function EyeDiagnosis({
             onPick={(key) => choose(eye, key)}
             otherHasPhoto={Boolean(slots[eye === "right" ? "left" : "right"].photo)}
             onSwap={swapPhotos}
-            onExport={() => void onExportEye(eye)}
+            onExport={(which) => void onExportEye(eye, which)}
             busyExport={busy === eye}
             onController={(controller) => onController(eye, controller)}
             expanded={maximized === "both" || maximized === eye}
@@ -682,6 +783,10 @@ function inferredSentence(entry: IrisCatalogEntry) {
   if (right) return "En el ojo derecho la ubicación está marcada como inferida, no leída directamente del gráfico.";
   if (left) return "En el ojo izquierdo la ubicación está marcada como inferida, no leída directamente del gráfico.";
   return "Ubicación inferida en el mapa, no leída directamente del gráfico.";
+}
+
+function fileDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function downloadBlob(blob: Blob, name: string) {

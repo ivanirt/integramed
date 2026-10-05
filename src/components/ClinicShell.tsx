@@ -28,7 +28,7 @@ const DAY = [
 ];
 
 const SECOND: { href: string; label: string; icon: typeof HomeIcon; screen: string }[] = [
-  { href: "/iris", label: "Iris", icon: EyeIcon, screen: "iris" },
+  { href: "/iris", label: "Mapa de iris", icon: EyeIcon, screen: "iris" },
   { href: "/horario", label: "Horario", icon: ClockIcon, screen: "horario" },
   { href: "/ausencias", label: "Días libres", icon: OffDayIcon, screen: "ausencias" },
   { href: "/farmacia", label: "Farmacia", icon: PharmacyIcon, screen: "farmacia" },

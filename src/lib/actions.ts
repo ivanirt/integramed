@@ -327,7 +327,7 @@ export async function saveIrisNoteAction(input: {
   await fhirCreate({
     resourceType: "DiagnosticReport",
     status: "final",
-    code: { text: "Nota de iridología (no diagnóstica)" },
+    code: { text: "Nota de revisión iridológica" },
     subject: { reference: `Patient/${patientId}` },
     issued: new Date().toISOString(),
     conclusion,

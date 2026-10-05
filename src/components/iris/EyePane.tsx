@@ -8,9 +8,11 @@ import {
   type IrisFit,
   type ResolvedIrisGeometry,
 } from "@/lib/iris-fit";
+import { clampIrisMask, defaultIrisMask, maskLimit, type IrisMask } from "@/lib/iris-mask";
 import type { IrisEye, IrisManifestEye, IrisMap } from "@/lib/iris-map";
 import type { IrisOverlayController } from "@/components/iris/mountIrisOverlay";
 import { mountIrisOverlay } from "@/components/iris/mountIrisOverlay";
+import { loadHtmlImage, paintIrisClean } from "@/components/iris/paintIrisClean";
 import { Button, GhostButton } from "@/components/ui";
 
 export type Photo = { url: string; width: number; height: number };
@@ -24,6 +26,8 @@ export type LoadedMap = {
   manifestVersion?: string;
 };
 
+export type IrisView = "original" | "clean";
+
 export type SlotState = {
   photo: Photo | null;
   fit: IrisFit | null;
@@ -35,6 +39,11 @@ export type SlotState = {
   fitNote: string | null;
   photoError: string | null;
   autoSuggest: boolean;
+  /** Derived window. The photo blob itself is never replaced. */
+  view: IrisView;
+  mask: IrisMask | null;
+  /** When true, mask.radius tracks the iris handle. */
+  maskLinked: boolean;
 };
 
 export function emptySlot(): SlotState {
@@ -49,10 +58,17 @@ export function emptySlot(): SlotState {
     fitNote: null,
     photoError: null,
     autoSuggest: false,
+    view: "original",
+    mask: null,
+    maskLinked: true,
   };
 }
 
-type DragMode = "move" | "pupil" | "iris" | "rotate";
+export function slotView(slot: Pick<SlotState, "view" | "mask" | "photo" | "fit">): IrisView {
+  return slot.view === "clean" && slot.mask && slot.photo && slot.fit ? "clean" : "original";
+}
+
+type DragMode = "move" | "pupil" | "iris" | "rotate" | "mask" | "lidTop" | "lidBottom";
 
 export function EyePane({
   eye,
@@ -88,7 +104,7 @@ export function EyePane({
   onPick: (key: string | null) => void;
   otherHasPhoto: boolean;
   onSwap: () => void;
-  onExport: () => void;
+  onExport: (which: "active" | "other") => void;
   busyExport: boolean;
   onController: (controller: IrisOverlayController | null) => void;
   /** This slot is inside the enlarged view, alone or beside the other eye. */
@@ -100,9 +116,12 @@ export function EyePane({
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const measureRef = useRef<HTMLElement | null>(null);
   const ctrlRef = useRef<IrisOverlayController | null>(null);
   const fitRef = useRef<IrisFit | null>(slot.fit);
   const photoRef = useRef<Photo | null>(slot.photo);
+  const maskRef = useRef<IrisMask | null>(slot.mask);
   const pupilTunedRef = useRef(slot.pupilTuned);
   const dragRef = useRef<DragMode | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -118,7 +137,9 @@ export function EyePane({
 
   fitRef.current = slot.fit;
   photoRef.current = slot.photo;
+  maskRef.current = slot.mask;
   pupilTunedRef.current = slot.pupilTuned;
+  measureRef.current = slotView(slot) === "clean" ? canvasRef.current : imgRef.current;
   onSlotRef.current = onSlot;
   onControllerRef.current = onController;
 
@@ -153,6 +174,52 @@ export function EyePane({
     const height = slot.photo?.height ?? loaded.geom.viewBox.height;
     onSlotRef.current({ fit: defaultFit(width, height, loaded.geom) });
   }, [loaded, slot.fit, slot.photo]);
+
+  useEffect(() => {
+    if (!slot.mask || !slot.maskLinked || !slot.fit || !slot.photo) return;
+    const next = clampIrisMask(
+      { ...slot.mask, radius: slot.fit.ri },
+      maskLimit(slot.photo.width, slot.photo.height),
+    );
+    if (
+      Math.abs(next.radius - slot.mask.radius) < 0.5 &&
+      Math.abs(next.feather - slot.mask.feather) < 0.5 &&
+      Math.abs(next.lidTop - slot.mask.lidTop) < 0.5 &&
+      Math.abs(next.lidBottom - slot.mask.lidBottom) < 0.5
+    ) {
+      return;
+    }
+    onSlotRef.current({ mask: next });
+  }, [slot.mask, slot.maskLinked, slot.fit, slot.photo]);
+
+  useEffect(() => {
+    if (slotView(slot) !== "clean" || !slot.photo || !slot.fit || !slot.mask) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const photo = slot.photo;
+    const fit = slot.fit;
+    const mask = slot.maskLinked ? { ...slot.mask, radius: fit.ri } : slot.mask;
+    let cancel = false;
+    const long = Math.max(photo.width, photo.height);
+    const scale = Math.min(1, PREVIEW_LONG_SIDE / long);
+    const width = Math.max(2, Math.round(photo.width * scale));
+    const height = Math.max(2, Math.round(photo.height * scale));
+    void loadHtmlImage(photo.url)
+      .then((image) => {
+        if (cancel) return;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+        paintIrisClean(ctx, image, photo.width, photo.height, fit.cx, fit.cy, mask, () => cancel);
+      })
+      .catch(() => {
+        /* The original photo stays on screen if the derived view cannot be painted. */
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [slot]);
 
   useEffect(() => {
     const ctrl = ctrlRef.current;
@@ -242,7 +309,7 @@ export function EyePane({
       const currentPhoto = photoRef.current;
       const stage = stageRef.current;
       if (!mode || !current || !currentPhoto || !stage) return;
-      const rect = (imgRef.current ?? stage).getBoundingClientRect();
+      const rect = (measureRef.current ?? stage).getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const x = ((event.clientX - rect.left) / rect.width) * currentPhoto.width;
       const y = ((event.clientY - rect.top) / rect.height) * currentPhoto.height;
@@ -269,6 +336,23 @@ export function EyePane({
           autoSuggest: false,
           pupilTuned: true,
           fit: clampFit({ ...current, rp: radius }, currentPhoto.width, currentPhoto.height),
+        });
+        return;
+      }
+      if (mode === "mask" || mode === "lidTop" || mode === "lidBottom") {
+        const mask = maskRef.current;
+        if (!mask) return;
+        const limit = maskLimit(currentPhoto.width, currentPhoto.height);
+        if (mode === "mask") {
+          onSlotRef.current({
+            maskLinked: false,
+            mask: clampIrisMask({ ...mask, radius }, limit),
+          });
+          return;
+        }
+        const along = mode === "lidTop" ? y - (current.cy - mask.radius) : current.cy + mask.radius - y;
+        onSlotRef.current({
+          mask: clampIrisMask(mode === "lidTop" ? { ...mask, lidTop: along } : { ...mask, lidBottom: along }, limit),
         });
         return;
       }
@@ -311,6 +395,9 @@ export function EyePane({
         autoSuggest: true,
         fitNote: null,
         fit: loaded ? defaultFit(photo.width, photo.height, loaded.geom) : null,
+        view: "original",
+        mask: null,
+        maskLinked: true,
       });
     };
     image.onerror = () => {
@@ -352,6 +439,34 @@ export function EyePane({
     expanded && frameBox.height > 80
       ? Math.max(80, Math.floor(Math.min(frameBox.height, Math.max(frameBox.width, 1)) - 4))
       : undefined;
+  const showingClean = slotView(slot) === "clean";
+  const photoStyle =
+    expanded && frameBox.width > 80 && frameBox.height > 80
+      ? {
+          maxWidth: Math.max(80, Math.floor(frameBox.width) - 4),
+          maxHeight: Math.max(80, Math.floor(frameBox.height) - 4),
+        }
+      : { maxHeight: "58vh" };
+
+  function cleanThisImage() {
+    if (!slot.photo || !slot.fit) return;
+    const limit = maskLimit(slot.photo.width, slot.photo.height);
+    const base = slot.mask ?? defaultIrisMask(slot.fit.ri);
+    const linked = slot.mask ? slot.maskLinked : true;
+    onSlot({
+      view: "clean",
+      maskLinked: linked,
+      mask: clampIrisMask({ ...base, radius: linked ? slot.fit.ri : base.radius }, limit),
+    });
+  }
+
+  function setMask(next: IrisMask, linked = slot.maskLinked) {
+    if (!slot.photo) return;
+    onSlot({
+      maskLinked: linked,
+      mask: clampIrisMask(next, maskLimit(slot.photo.width, slot.photo.height)),
+    });
+  }
 
   return (
     <section
@@ -410,23 +525,29 @@ export function EyePane({
         }}
       >
         {slot.photo ? (
-          // Local blob preview. next/image does not apply.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            ref={imgRef}
-            src={slot.photo.url}
-            alt={`Fotografía del ${label.toLowerCase()}, solo en este navegador`}
-            className="block max-w-full"
-            style={
-              expanded && frameBox.width > 80 && frameBox.height > 80
-                ? {
-                    maxWidth: Math.max(80, Math.floor(frameBox.width) - 4),
-                    maxHeight: Math.max(80, Math.floor(frameBox.height) - 4),
-                  }
-                : { maxHeight: "58vh" }
-            }
-            draggable={false}
-          />
+          <>
+            {/* Local blob preview. next/image does not apply. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={imgRef}
+              src={slot.photo.url}
+              alt={`Fotografía del ${label.toLowerCase()}, solo en este navegador`}
+              aria-hidden={showingClean}
+              className={showingClean ? "hidden" : "block max-w-full"}
+              style={photoStyle}
+              draggable={false}
+            />
+            <canvas
+              ref={canvasRef}
+              width={previewPixels(slot.photo.width, slot.photo.height).width}
+              height={previewPixels(slot.photo.width, slot.photo.height).height}
+              role="img"
+              aria-label={`Iris aislado del ${label.toLowerCase()}, derivado en este navegador`}
+              aria-hidden={!showingClean}
+              className={showingClean ? "block max-w-full" : "hidden"}
+              style={photoStyle}
+            />
+          </>
         ) : (
           <div
             className="aspect-square bg-[#F6F1EA]"
@@ -483,6 +604,52 @@ export function EyePane({
               photo={slot.photo}
               dragRef={dragRef}
             />
+            {showingClean && slot.mask ? (
+              <>
+                {Math.abs(slot.mask.radius - slot.fit.ri) > 1 ? (
+                  <div
+                    className="pointer-events-none absolute rounded-full border border-dashed border-[#3D6B7A]"
+                    style={circleStyle(slot.fit.cx, slot.fit.cy, slot.mask.radius, slot.photo)}
+                  />
+                ) : null}
+                {slot.mask.lidTop > 0 ? (
+                  <div
+                    className="pointer-events-none absolute border-t border-dashed border-[#7A5C3D]"
+                    style={chordStyle(slot.fit.cx, slot.fit.cy, slot.mask.radius, slot.fit.cy - slot.mask.radius + slot.mask.lidTop, slot.photo)}
+                  />
+                ) : null}
+                {slot.mask.lidBottom > 0 ? (
+                  <div
+                    className="pointer-events-none absolute border-t border-dashed border-[#7A5C3D]"
+                    style={chordStyle(slot.fit.cx, slot.fit.cy, slot.mask.radius, slot.fit.cy + slot.mask.radius - slot.mask.lidBottom, slot.photo)}
+                  />
+                ) : null}
+                <FitHandle
+                  mode="mask"
+                  label="Radio de la máscara"
+                  x={slot.fit.cx + slot.mask.radius * Math.sin(-Math.PI / 3)}
+                  y={slot.fit.cy - slot.mask.radius * Math.cos(-Math.PI / 3)}
+                  photo={slot.photo}
+                  dragRef={dragRef}
+                />
+                <FitHandle
+                  mode="lidTop"
+                  label="Recorte del párpado superior"
+                  x={slot.fit.cx}
+                  y={slot.fit.cy - slot.mask.radius + slot.mask.lidTop}
+                  photo={slot.photo}
+                  dragRef={dragRef}
+                />
+                <FitHandle
+                  mode="lidBottom"
+                  label="Recorte del párpado inferior"
+                  x={slot.fit.cx}
+                  y={slot.fit.cy + slot.mask.radius - slot.mask.lidBottom}
+                  photo={slot.photo}
+                  dragRef={dragRef}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -529,6 +696,28 @@ export function EyePane({
             />
             Pupila negra
           </label>
+          {slot.photo && slot.fit ? (
+            <span className="flex items-center gap-2">
+              {showingClean ? (
+                <GhostButton type="button" onClick={() => onSlot({ view: "original" })}>
+                  Original
+                </GhostButton>
+              ) : (
+                <Button type="button" onClick={() => onSlot({ view: "original" })}>
+                  Original
+                </Button>
+              )}
+              {showingClean ? (
+                <Button type="button" onClick={cleanThisImage}>
+                  Solo iris
+                </Button>
+              ) : (
+                <GhostButton type="button" onClick={cleanThisImage}>
+                  Solo iris
+                </GhostButton>
+              )}
+            </span>
+          ) : null}
           <GhostButton type="button" onClick={() => onSlot({ overlayVisible: !slot.overlayVisible })} disabled={!loaded}>
             {slot.overlayVisible ? "Ocultar mapa" : "Mostrar mapa"}
           </GhostButton>
@@ -553,6 +742,20 @@ export function EyePane({
                     ),
                   });
                 }}
+              />
+            </label>
+          ) : null}
+          {showingClean && slot.mask ? (
+            <label className="flex items-center gap-2">
+              Suavizado {Math.round(slot.mask.feather)} px
+              <input
+                className="w-28"
+                type="range"
+                min={0}
+                max={Math.max(1, Math.round(slot.mask.radius * 0.45))}
+                aria-label={`Suavizado del borde, ${label}`}
+                value={Math.round(slot.mask.feather)}
+                onChange={(event) => setMask({ ...slot.mask!, feather: Number(event.target.value) })}
               />
             </label>
           ) : null}
@@ -589,9 +792,14 @@ export function EyePane({
         >
           Sugerir ajuste
         </GhostButton>
-        <GhostButton type="button" disabled={!slot.photo || !slot.fit || busyExport} onClick={onExport}>
-          {busyExport ? "Exportando…" : "Descargar PNG"}
+        <GhostButton type="button" disabled={!slot.photo || !slot.fit || busyExport} onClick={() => onExport("active")}>
+          {busyExport ? "Exportando…" : showingClean ? "Descargar solo iris" : slot.mask ? "Descargar original" : "Descargar PNG"}
         </GhostButton>
+        {slot.mask ? (
+          <GhostButton type="button" disabled={!slot.photo || !slot.fit || busyExport} onClick={() => onExport("other")}>
+            {showingClean ? "Descargar original" : "Descargar solo iris"}
+          </GhostButton>
+        ) : null}
         {slot.photo ? (
           <GhostButton type="button" onClick={onSwap}>
             {otherHasPhoto ? "Intercambiar fotos" : `Mover al ${otherLabel}`}
@@ -622,14 +830,44 @@ export function EyePane({
         }}
       />
 
-      <label className={`mt-3 flex items-center gap-2 text-sm ${expanded ? "hidden" : ""}`}>
-        <input
-          type="checkbox"
-          checked={slot.pupilBlack}
-          onChange={(event) => onSlot({ pupilBlack: event.target.checked })}
-        />
-        Pupila negra
-      </label>
+      <div className={`mt-3 flex flex-wrap items-center gap-2 text-sm ${expanded ? "hidden" : ""}`}>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={slot.pupilBlack}
+            onChange={(event) => onSlot({ pupilBlack: event.target.checked })}
+          />
+          Pupila negra
+        </label>
+        {slot.photo && slot.fit ? (
+          slot.mask ? (
+            <span className="flex items-center gap-2">
+              {showingClean ? (
+                <GhostButton type="button" onClick={() => onSlot({ view: "original" })}>
+                  Original
+                </GhostButton>
+              ) : (
+                <Button type="button" onClick={() => onSlot({ view: "original" })}>
+                  Original
+                </Button>
+              )}
+              {showingClean ? (
+                <Button type="button" onClick={() => onSlot({ view: "clean" })}>
+                  Solo iris
+                </Button>
+              ) : (
+                <GhostButton type="button" onClick={() => onSlot({ view: "clean" })}>
+                  Solo iris
+                </GhostButton>
+              )}
+            </span>
+          ) : (
+            <GhostButton type="button" onClick={cleanThisImage}>
+              Limpiar imagen
+            </GhostButton>
+          )
+        ) : null}
+      </div>
 
       {!expanded && slot.photo && slot.fit ? (
         <div className="mt-4 grid gap-3 border border-[#EADBCE] bg-white p-4 text-sm">
@@ -687,6 +925,74 @@ export function EyePane({
               onChange={(event) => updatePupil(Number(event.target.value))}
             />
           </label>
+          {slot.mask ? (
+            <>
+              <label>
+                Radio de la máscara ({Math.round(slot.mask.radius)} px)
+                <input
+                  className="mt-1 block w-full"
+                  type="range"
+                  min={8}
+                  max={Math.round(maskLimit(slot.photo.width, slot.photo.height))}
+                  aria-label={`Radio de la máscara, ${label}`}
+                  value={Math.round(slot.mask.radius)}
+                  onChange={(event) => setMask({ ...slot.mask!, radius: Number(event.target.value) }, false)}
+                />
+              </label>
+              <label>
+                Suavizado del borde ({Math.round(slot.mask.feather)} px)
+                <input
+                  className="mt-1 block w-full"
+                  type="range"
+                  min={0}
+                  max={Math.round(slot.mask.radius * 0.45)}
+                  aria-label={`Suavizado del borde, ${label}`}
+                  value={Math.round(slot.mask.feather)}
+                  onChange={(event) => setMask({ ...slot.mask!, feather: Number(event.target.value) })}
+                />
+              </label>
+              <label>
+                Párpado superior ({Math.round(slot.mask.lidTop)} px)
+                <input
+                  className="mt-1 block w-full"
+                  type="range"
+                  min={0}
+                  max={Math.round(slot.mask.radius * 0.9)}
+                  aria-label={`Párpado superior, ${label}`}
+                  value={Math.round(slot.mask.lidTop)}
+                  onChange={(event) => setMask({ ...slot.mask!, lidTop: Number(event.target.value) })}
+                />
+              </label>
+              <label>
+                Párpado inferior ({Math.round(slot.mask.lidBottom)} px)
+                <input
+                  className="mt-1 block w-full"
+                  type="range"
+                  min={0}
+                  max={Math.round(slot.mask.radius * 0.9)}
+                  aria-label={`Párpado inferior, ${label}`}
+                  value={Math.round(slot.mask.lidBottom)}
+                  onChange={(event) => setMask({ ...slot.mask!, lidBottom: Number(event.target.value) })}
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={slot.maskLinked}
+                  onChange={(event) => {
+                    const linked = event.target.checked;
+                    setMask({ ...slot.mask!, radius: linked ? slot.fit!.ri : slot.mask!.radius }, linked);
+                  }}
+                />
+                Seguir el borde del iris
+              </label>
+              <p className="text-xs text-[#6D5E52]">
+                La foto original no cambia. Solo iris tapa párpados, pestañas, esclerótica y piel fuera del anillo. El
+                asa de las 10 ajusta el radio de la máscara; las asas de arriba y abajo recortan el párpado. La pupila
+                de la foto sigue ahí, salvo que actives Pupila negra.
+              </p>
+            </>
+          ) : null}
           <p className="text-xs text-[#6D5E52]">
             Arrastra el centro, el asa inferior de la pupila, el asa derecha del iris y el asa de las 12. Si mueves la
             pupila, el mapa —incluida la pupila negra— se estira en radio. Mientras no la muevas, el iris crece de forma
@@ -698,6 +1004,16 @@ export function EyePane({
   );
 }
 
+const PREVIEW_LONG_SIDE = 1400;
+
+function previewPixels(width: number, height: number) {
+  const scale = Math.min(1, PREVIEW_LONG_SIDE / Math.max(width, height));
+  return {
+    width: Math.max(2, Math.round(width * scale)),
+    height: Math.max(2, Math.round(height * scale)),
+  };
+}
+
 function circleStyle(cx: number, cy: number, radius: number, photo: Photo) {
   return {
     left: `${((cx - radius) / photo.width) * 100}%`,
@@ -707,13 +1023,14 @@ function circleStyle(cx: number, cy: number, radius: number, photo: Photo) {
   };
 }
 
-function loadHtmlImage(url: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("No se pudo leer la foto."));
-    image.src = url;
-  });
+function chordStyle(cx: number, cy: number, radius: number, y: number, photo: Photo) {
+  const dy = y - cy;
+  const half = Math.sqrt(Math.max(0, radius * radius - dy * dy));
+  return {
+    left: `${((cx - half) / photo.width) * 100}%`,
+    top: `${(y / photo.height) * 100}%`,
+    width: `${((half * 2) / photo.width) * 100}%`,
+  };
 }
 
 function grayFromImage(image: CanvasImageSource, width: number, height: number) {
@@ -757,7 +1074,11 @@ function FitHandle({
         ? "bg-[#C4A574]"
         : mode === "move"
           ? "bg-white"
-          : "bg-[#241B16]";
+          : mode === "mask"
+            ? "bg-[#3D6B7A]"
+            : mode === "lidTop" || mode === "lidBottom"
+              ? "bg-[#7A5C3D]"
+              : "bg-[#241B16]";
   return (
     <button
       type="button"

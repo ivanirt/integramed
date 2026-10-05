@@ -13,7 +13,7 @@ export default async function EstudiosPage({ params }: { params: Promise<{ id: s
     <div className="space-y-10">
       <p className="text-sm text-[#6D5E52]">
         <Link href={`/iris?paciente=${id}`} className="underline">
-          Abrir diagnóstico del iris
+          Abrir mapa de iris
         </Link>
         . La foto se queda en el navegador; si anotas la ficha, Estudios solo recibe el texto.
       </p>

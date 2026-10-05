@@ -6,7 +6,7 @@ export function PatientNav({ id }: { id: string }) {
     { href: `/pacientes/${id}/consultas`, label: "Consultas" },
     { href: `/pacientes/${id}/recetas`, label: "Recetas" },
     { href: `/pacientes/${id}/estudios`, label: "Estudios" },
-    { href: `/iris?paciente=${id}`, label: "Iris" },
+    { href: `/iris?paciente=${id}`, label: "Mapa de iris" },
   ];
   return (
     <nav className="mt-4 flex flex-wrap gap-4 text-sm text-[#6D5E52]">

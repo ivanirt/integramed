@@ -497,7 +497,7 @@ export function ConsultWorkspace(props: ConsultWorkspaceProps) {
               ) : null}
               {modalities.includes("iridology") ? (
                 <Link href={`/iris?paciente=${props.patient.id}`} className="mt-3 block text-sm underline">
-                  Abrir diagnóstico del iris
+                  Abrir mapa de iris
                 </Link>
               ) : null}
               <div className="mt-6 space-y-2">

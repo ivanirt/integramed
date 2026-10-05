@@ -515,6 +515,7 @@ export async function exportIrisPng(options: {
   opacity: number;
   overlayVisible: boolean;
   pupilBlack: boolean;
+  caption?: string;
 }): Promise<Blob> {
   const photo = await loadHtmlImage(options.photoUrl);
   const canvas = document.createElement("canvas");
@@ -526,7 +527,26 @@ export async function exportIrisPng(options: {
   if (options.overlayVisible) {
     await paintOverlay(ctx, options.svg, options.geom, options.fit, options.opacity, options.pupilBlack);
   }
+  if (options.caption) stampCaption(ctx, options.caption);
   return canvasBlob(canvas);
+}
+
+function stampCaption(ctx: CanvasRenderingContext2D, text: string) {
+  const fontSize = Math.max(18, Math.round(Math.min(ctx.canvas.width, ctx.canvas.height) / 28));
+  ctx.save();
+  ctx.font = `600 ${fontSize}px Georgia, "Times New Roman", serif`;
+  ctx.textBaseline = "top";
+  const padX = Math.round(fontSize * 0.55);
+  const padY = Math.round(fontSize * 0.35);
+  const width = ctx.measureText(text).width + padX * 2;
+  const height = fontSize + padY * 2;
+  const x = Math.round(fontSize * 0.55);
+  const y = Math.round(fontSize * 0.55);
+  ctx.fillStyle = "rgba(250,247,242,0.94)";
+  ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = "#241B16";
+  ctx.fillText(text, x + padX, y + padY);
+  ctx.restore();
 }
 
 const PAIR_HEIGHT = 1000;

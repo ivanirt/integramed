@@ -6,6 +6,7 @@ import {
   groupRegions,
   irisMapUrl,
   lookupRegionInfo,
+  mergeEyeCatalog,
   normalizeOrganKey,
   parseIrisMap,
   parseManifest,
@@ -167,4 +168,50 @@ test("manifest and region notes stay optional", () => {
   assert.deepEqual(lookupRegionInfo(notes, "ESTOMAGO"), { en: "Stomach", note: "Zona del mapa." });
   assert.equal(lookupRegionInfo(notes, "PIEL"), null);
   assert.equal(normalizeOrganKey("RIÑÓN"), "rinon");
+});
+
+test("missing data-inferred stays false and hour layers are kept by name, not id", () => {
+  const svg = `<?xml version="1.0"?>
+    <svg viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
+      <circle class="pupil" cx="600" cy="600" r="100" />
+      <g id="g_hours_custom" inkscape:label="Numeros de las horas"></g>
+      <g id="g_etiquetas_horas" inkscape:label="Numeros de las horas"></g>
+      <g id="capa_notas" inkscape:label="Etiquetas de organos"></g>
+      <g id="reg_a" data-organ="MES" data-kind="organ" data-region="10"></g>
+      <g id="reg_b" data-organ="MES" data-inferred="1" data-kind="organ" data-region="12"></g>
+      <g id="reg_c" data-organ="BAZO" data-kind="organ"></g>
+    </svg>`;
+  const map = parseIrisMap(svg);
+  const mes = map.groups.find((group) => group.organ === "MES");
+  const bazo = map.regions.find((item) => item.organ === "BAZO");
+  assert.equal(map.regions.find((item) => item.id === "reg_a")?.inferred, false);
+  assert.equal(bazo?.inferred, false);
+  assert.ok(mes);
+  assert.equal(mes.inferred, true);
+  assert.deepEqual(mes.ids, ["reg_a", "reg_b"]);
+  assert.equal(map.labelLayerIds.includes("g_hours_custom"), false);
+  assert.equal(map.labelLayerIds.includes("g_etiquetas_horas"), false);
+  assert.equal(map.labelLayerIds.includes("g197"), false);
+  assert.ok(map.labelLayerIds.includes("capa_notas"));
+});
+
+test("the same organ is grouped across both eyes, including names that exist on only one map", () => {
+  const right = parseIrisMap(rightSvg);
+  const left = parseIrisMap(leftSvg);
+  const catalog = mergeEyeCatalog({ right: right.groups, left: left.groups });
+  const mes = catalog.find((entry) => entry.organ === "MES");
+  const sna = catalog.find((entry) => entry.organ === "SISTEMA NERVIOSO AUTONOMO");
+  const liver = catalog.find((entry) => entry.organ === "HIGADO");
+  const heart = catalog.find((entry) => entry.organ === "CORAZON");
+  assert.ok(mes?.eyes.right && mes.eyes.left);
+  assert.ok((mes.eyes.right?.ids.length ?? 0) >= 2);
+  assert.ok((mes.eyes.left?.ids.length ?? 0) >= 2);
+  assert.ok(sna?.eyes.right && sna.eyes.left);
+  assert.ok((sna.eyes.right?.ids.length ?? 0) >= 2);
+  assert.ok((sna.eyes.left?.ids.length ?? 0) >= 2);
+  assert.ok(liver?.eyes.right);
+  assert.equal(liver?.eyes.left, undefined);
+  assert.ok(heart?.eyes.left);
+  assert.equal(heart?.eyes.right, undefined);
+  assert.equal(mergeEyeCatalog({ right: right.groups }).find((entry) => entry.organ === "HIGADO")?.eyes.left, undefined);
 });

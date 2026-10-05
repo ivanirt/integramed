@@ -76,6 +76,51 @@ const KIND_PENALTY: Record<string, number> = {
 
 const LABEL_ID = /^(?:g_leyenda|g_etiquetas(?:_|$)|g_et_)/i;
 const LABEL_NAME = /etiqueta|leyenda|t[ií]tulo/i;
+/** Hour ticks stay visible. Matched by the layer name, never by a generated id. */
+const HOUR_LAYER = /n[uú]meros?\s+de\s+las\s+horas/i;
+
+export type IrisCatalogEntry = {
+  organKey: string;
+  organ: string;
+  eyes: Partial<Record<IrisEye, IrisRegionGroup>>;
+  number: number | null;
+  inferred: boolean;
+  kinds: string[];
+};
+
+/** One row per organ name, merging every part from the right map and the left map. */
+export function mergeEyeCatalog(
+  maps: Partial<Record<IrisEye, IrisRegionGroup[]>>,
+): IrisCatalogEntry[] {
+  const catalog = new Map<string, IrisCatalogEntry>();
+  for (const eye of EYES) {
+    for (const group of maps[eye] ?? []) {
+      let entry = catalog.get(group.organKey);
+      if (!entry) {
+        entry = {
+          organKey: group.organKey,
+          organ: group.organ,
+          eyes: {},
+          number: group.number,
+          inferred: false,
+          kinds: [],
+        };
+        catalog.set(group.organKey, entry);
+      }
+      entry.eyes[eye] = group;
+      if (group.inferred) entry.inferred = true;
+      for (const kind of group.kinds) {
+        if (!entry.kinds.includes(kind)) entry.kinds.push(kind);
+      }
+      if (group.number != null && (entry.number == null || group.number < entry.number)) {
+        entry.number = group.number;
+      }
+    }
+  }
+  return [...catalog.values()].sort(
+    (a, b) => (a.number ?? 9999) - (b.number ?? 9999) || a.organ.localeCompare(b.organ, "es"),
+  );
+}
 
 export function normalizeOrganKey(name: string): string {
   return name
@@ -267,6 +312,7 @@ function discoverLabelLayers(svgText: string): string[] {
     const id = attrs.id || "";
     const label = attrs["inkscape:label"] || "";
     if (!id || seen.has(id)) continue;
+    if (HOUR_LAYER.test(label)) continue;
     if (LABEL_ID.test(id) || LABEL_NAME.test(label)) {
       seen.add(id);
       ids.push(id);

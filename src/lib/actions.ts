@@ -294,6 +294,8 @@ export async function saveDiagnosticReportAction(formData: FormData) {
 export async function saveIrisNoteAction(input: {
   patientId: string;
   eye: "right" | "left";
+  /** Eyes where the selected organ exists. Falls back to `eye` when omitted. */
+  eyes?: ("right" | "left")[];
   organ?: string;
   kind?: string;
   inferred?: boolean;
@@ -302,11 +304,18 @@ export async function saveIrisNoteAction(input: {
   await requireScreen("iris");
   const patientId = input.patientId.trim();
   if (!patientId) throw new Error("Falta el paciente.");
-  const eye = input.eye === "left" ? "izquierdo" : "derecho";
+  const requested = (input.eyes?.length ? input.eyes : [input.eye]).filter(
+    (value): value is "right" | "left" => value === "right" || value === "left",
+  );
+  const unique = [...new Set(requested)];
+  const eyeSentence =
+    unique.includes("right") && unique.includes("left")
+      ? "Ojos derecho e izquierdo del paciente."
+      : `Ojo ${unique[0] === "left" ? "izquierdo" : "derecho"} del paciente.`;
   const organ = input.organ?.trim();
   const conclusion = [
     "Técnica complementaria no validada. Esta nota no es un diagnóstico médico.",
-    `Ojo ${eye}.`,
+    eyeSentence,
     organ
       ? `Región señalada en el mapa: ${organ}${input.kind ? ` (${input.kind})` : ""}${input.inferred ? ". La ubicación está marcada como inferida en el mapa." : "."}`
       : "Sin región seleccionada.",

@@ -25,6 +25,7 @@ export type IrisOverlayController = {
   setOpacity(opacity: number): void;
   setVisible(visible: boolean): void;
   setLabels(visible: boolean): void;
+  setPupilBlack(on: boolean): void;
   setHighlight(selectedKey: string | null, hoverKey: string | null): void;
   pick(clientX: number, clientY: number): string | null;
   element: SVGSVGElement;
@@ -108,7 +109,7 @@ export function mountIrisOverlay(
     throw new Error("El SVG del mapa está mal formado.");
   }
   const svg = doc.documentElement as unknown as SVGSVGElement;
-  svg.classList.add("iris-overlay");
+  svg.classList.add("iris-overlay", "is-pupil-black");
   svg.setAttribute("width", String(geom.viewBox.width));
   svg.setAttribute("height", String(geom.viewBox.height));
   svg.style.position = "absolute";
@@ -119,7 +120,9 @@ export function mountIrisOverlay(
 
   const style = document.createElementNS(SVG_NS, "style");
   style.textContent = `
-    .iris-overlay .pupil { fill: transparent !important; stroke: rgba(36,27,22,0.75); stroke-width: 1.4; }
+    .iris-overlay.is-pupil-black .pupil { fill: #000 !important; stroke: none !important; }
+    .iris-overlay:not(.is-pupil-black) .pupil { fill: transparent !important; stroke: rgba(36,27,22,0.75); stroke-width: 1.4; }
+    .iris-overlay:not(.is-pupil-black) .pupil-letter { opacity: 0; }
     .iris-overlay, .iris-overlay * { pointer-events: none; }
     .iris-overlay .region { pointer-events: fill; cursor: pointer; }
     .iris-overlay .region:hover { fill: #000; fill-opacity: 0; }
@@ -199,10 +202,34 @@ export function mountIrisOverlay(
     }
   });
 
+  const pupil = svg.querySelector(".pupil, #pupila");
+  let pupilLayer: Element | null = pupil;
+  while (pupilLayer?.parentElement && pupilLayer.parentElement.localName !== "svg") {
+    pupilLayer = pupilLayer.parentElement;
+  }
+  const pupilIsolated = Boolean(pupilLayer && !pupilLayer.querySelector(".region, .ring, .minor-tick, .hour-tick"));
+  if (pupilIsolated && pupilLayer) pupilLayer.setAttribute("data-iris-pupil", "1");
+
   let warpKey = "";
   let photoWidth = 0;
   let photoHeight = 0;
   let visible = true;
+  let pupilBlack = true;
+  let chartOpacity = 0.72;
+
+  function applyOpacity() {
+    const value = String(Math.min(1, Math.max(0, chartOpacity)));
+    if (!pupilIsolated || !pupilLayer) {
+      svg.style.opacity = value;
+      return;
+    }
+    svg.style.opacity = "1";
+    for (const child of Array.from(svg.children)) {
+      if (child.localName === "style" || child.localName === "defs") continue;
+      const el = child as SVGElement;
+      el.style.opacity = child === pupilLayer && pupilBlack && chartOpacity > 0 ? "1" : value;
+    }
+  }
 
   function restoreGeometry() {
     for (const path of paths) path.el.setAttribute("d", path.original);
@@ -309,7 +336,13 @@ export function mountIrisOverlay(
       place(fit);
     },
     setOpacity(opacity) {
-      svg.style.opacity = String(Math.min(1, Math.max(0, opacity)));
+      chartOpacity = opacity;
+      applyOpacity();
+    },
+    setPupilBlack(on) {
+      pupilBlack = on;
+      svg.classList.toggle("is-pupil-black", on);
+      applyOpacity();
     },
     setVisible(next) {
       visible = next;
@@ -348,6 +381,130 @@ export function mountIrisOverlay(
   };
 }
 
+export type IrisPngSide = {
+  label: string;
+  photoUrl: string | null;
+  photoWidth: number;
+  photoHeight: number;
+  svg: SVGSVGElement | null;
+  geom: ResolvedIrisGeometry | null;
+  fit: IrisFit | null;
+  opacity: number;
+  overlayVisible: boolean;
+  pupilBlack: boolean;
+};
+
+function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("No se pudo generar el PNG."))), "image/png");
+  });
+}
+
+function loadHtmlImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("No se pudo leer la foto."));
+    image.src = url;
+  });
+}
+
+async function rasterizeSvg(svg: SVGSVGElement, geom: ResolvedIrisGeometry, mutate: (clone: SVGSVGElement) => void) {
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.classList.remove("is-hidden");
+  clone.style.visibility = "visible";
+  clone.style.opacity = "1";
+  clone.style.position = "static";
+  clone.style.left = "0";
+  clone.style.top = "0";
+  clone.style.transform = "none";
+  clone.style.width = `${geom.viewBox.width}px`;
+  clone.style.height = `${geom.viewBox.height}px`;
+  clone.setAttribute("width", String(geom.viewBox.width));
+  clone.setAttribute("height", String(geom.viewBox.height));
+  if (!clone.getAttribute("xmlns")) clone.setAttribute("xmlns", SVG_NS);
+  for (const child of Array.from(clone.children)) {
+    if (child instanceof SVGElement) child.style.opacity = "";
+  }
+  mutate(clone);
+  const xml = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = await loadHtmlImage(url);
+    return { image, revoke: () => URL.revokeObjectURL(url) };
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    throw err;
+  }
+}
+
+function drawOverlayImage(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  geom: ResolvedIrisGeometry,
+  fit: IrisFit,
+  alpha: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+  const scale = fit.ri / geom.irisRadius;
+  ctx.translate(fit.cx, fit.cy);
+  ctx.rotate((fit.rotation * Math.PI) / 180);
+  ctx.scale(scale, scale);
+  ctx.translate(-geom.centerX, -geom.centerY);
+  ctx.drawImage(image, geom.viewBox.minX, geom.viewBox.minY, geom.viewBox.width, geom.viewBox.height);
+  ctx.restore();
+}
+
+async function paintOverlay(
+  ctx: CanvasRenderingContext2D,
+  svg: SVGSVGElement,
+  geom: ResolvedIrisGeometry,
+  fit: IrisFit,
+  opacity: number,
+  pupilBlack: boolean,
+) {
+  if (opacity <= 0) return;
+  const isolatedPupil = Boolean(svg.querySelector("[data-iris-pupil]"));
+  if (isolatedPupil && pupilBlack) {
+    const pupil = await rasterizeSvg(svg, geom, (clone) => {
+      clone.classList.add("is-pupil-black");
+      const keep = clone.querySelector("[data-iris-pupil]");
+      keep?.querySelectorAll(".pupil, #pupila").forEach((node) => {
+        node.setAttribute("fill", "#000");
+        node.setAttribute("stroke", "none");
+      });
+      for (const child of Array.from(clone.children)) {
+        if (child === keep || child.localName === "style" || child.localName === "defs") continue;
+        child.setAttribute("display", "none");
+      }
+    });
+    try {
+      drawOverlayImage(ctx, pupil.image, geom, fit, 1);
+    } finally {
+      pupil.revoke();
+    }
+    const chart = await rasterizeSvg(svg, geom, (clone) => {
+      clone.querySelector("[data-iris-pupil]")?.setAttribute("display", "none");
+    });
+    try {
+      drawOverlayImage(ctx, chart.image, geom, fit, opacity);
+    } finally {
+      chart.revoke();
+    }
+    return;
+  }
+  const overlay = await rasterizeSvg(svg, geom, (clone) => {
+    clone.classList.toggle("is-pupil-black", pupilBlack);
+  });
+  try {
+    drawOverlayImage(ctx, overlay.image, geom, fit, opacity);
+  } finally {
+    overlay.revoke();
+  }
+}
+
 export async function exportIrisPng(options: {
   photoUrl: string;
   photoWidth: number;
@@ -357,59 +514,70 @@ export async function exportIrisPng(options: {
   fit: IrisFit;
   opacity: number;
   overlayVisible: boolean;
+  pupilBlack: boolean;
 }): Promise<Blob> {
-  const photo = new Image();
-  photo.src = options.photoUrl;
-  await photo.decode();
+  const photo = await loadHtmlImage(options.photoUrl);
   const canvas = document.createElement("canvas");
   canvas.width = options.photoWidth;
   canvas.height = options.photoHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo crear el lienzo de exportación.");
   ctx.drawImage(photo, 0, 0, options.photoWidth, options.photoHeight);
-
-  if (options.overlayVisible && options.opacity > 0) {
-    const clone = options.svg.cloneNode(true) as SVGSVGElement;
-    clone.classList.remove("is-hidden");
-    clone.style.visibility = "visible";
-    clone.style.opacity = "1";
-    clone.style.position = "static";
-    clone.style.left = "0";
-    clone.style.top = "0";
-    clone.style.transform = "none";
-    clone.style.width = `${options.geom.viewBox.width}px`;
-    clone.style.height = `${options.geom.viewBox.height}px`;
-    clone.setAttribute("width", String(options.geom.viewBox.width));
-    clone.setAttribute("height", String(options.geom.viewBox.height));
-    if (!clone.getAttribute("xmlns")) clone.setAttribute("xmlns", SVG_NS);
-    const xml = new XMLSerializer().serializeToString(clone);
-    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    try {
-      const overlay = new Image();
-      overlay.src = url;
-      await overlay.decode();
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, Math.max(0, options.opacity));
-      const scale = options.fit.ri / options.geom.irisRadius;
-      ctx.translate(options.fit.cx, options.fit.cy);
-      ctx.rotate((options.fit.rotation * Math.PI) / 180);
-      ctx.scale(scale, scale);
-      ctx.translate(-options.geom.centerX, -options.geom.centerY);
-      ctx.drawImage(
-        overlay,
-        options.geom.viewBox.minX,
-        options.geom.viewBox.minY,
-        options.geom.viewBox.width,
-        options.geom.viewBox.height,
-      );
-      ctx.restore();
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+  if (options.overlayVisible) {
+    await paintOverlay(ctx, options.svg, options.geom, options.fit, options.opacity, options.pupilBlack);
   }
+  return canvasBlob(canvas);
+}
 
-  const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!png) throw new Error("No se pudo generar el PNG.");
-  return png;
+const PAIR_HEIGHT = 1000;
+const PAIR_GAP = 36;
+const PAIR_PAD = 28;
+const PAIR_LABEL = 48;
+
+/** Patient's right eye on the left of the image, patient's left eye on the right. */
+export async function exportIrisPairPng(sides: { right: IrisPngSide; left: IrisPngSide }): Promise<Blob> {
+  const prepared = await Promise.all(
+    (["right", "left"] as const).map(async (eye) => {
+      const side = sides[eye];
+      const photo = side.photoUrl ? await loadHtmlImage(side.photoUrl) : null;
+      const width = photo ? side.photoWidth : (side.geom?.viewBox.width ?? 1200);
+      const height = photo ? side.photoHeight : (side.geom?.viewBox.height ?? 1200);
+      const cellH = PAIR_HEIGHT;
+      const cellW = Math.max(1, Math.round(cellH * (width / Math.max(1, height))));
+      return { eye, side, photo, width, height, cellW, cellH };
+    }),
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = PAIR_PAD * 2 + prepared[0].cellW + PAIR_GAP + prepared[1].cellW;
+  canvas.height = PAIR_PAD + PAIR_LABEL + PAIR_HEIGHT + PAIR_PAD;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo crear el lienzo de exportación.");
+  ctx.fillStyle = "#FAF7F2";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let x = PAIR_PAD;
+  for (const item of prepared) {
+    const y = PAIR_PAD + PAIR_LABEL;
+    ctx.fillStyle = "#241B16";
+    ctx.font = "28px Georgia, 'Times New Roman', serif";
+    ctx.fillText(item.side.label, x, PAIR_PAD + 30);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(item.cellW / item.width, item.cellH / item.height);
+    if (item.photo) {
+      ctx.drawImage(item.photo, 0, 0, item.width, item.height);
+    } else {
+      ctx.fillStyle = "#F6F1EA";
+      ctx.fillRect(0, 0, item.width, item.height);
+    }
+    const geom = item.side.geom;
+    const fit = item.side.fit;
+    if (item.side.overlayVisible && item.side.svg && geom && fit) {
+      await paintOverlay(ctx, item.side.svg, geom, fit, item.side.opacity, item.side.pupilBlack);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "#EADBCE";
+    ctx.strokeRect(x + 0.5, y + 0.5, item.cellW - 1, item.cellH - 1);
+    x += item.cellW + PAIR_GAP;
+  }
+  return canvasBlob(canvas);
 }

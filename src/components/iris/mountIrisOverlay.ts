@@ -225,9 +225,9 @@ export function mountIrisOverlay(
     }
     svg.style.opacity = "1";
     for (const child of Array.from(svg.children)) {
+      if (!(child instanceof SVGElement)) continue;
       if (child.localName === "style" || child.localName === "defs") continue;
-      const el = child as SVGElement;
-      el.style.opacity = child === pupilLayer && pupilBlack && chartOpacity > 0 ? "1" : value;
+      child.style.opacity = child === pupilLayer && pupilBlack && chartOpacity > 0 ? "1" : value;
     }
   }
 

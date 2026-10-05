@@ -48,6 +48,18 @@ APP_BASE_URL=http://localhost:3000
 
 `SMTP_PASS` no es la contraseña normal de Google. En la cuenta: Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones → crear una para Correo. Pega los 16 caracteres en `SMTP_PASS`. `MAIL_FROM` debe ser esa misma cuenta. Sin `SMTP_HOST` y `MAIL_FROM` el restablecimiento no falla: el enlace se imprime en la consola de Next.js.
 
+## Usuarios de prueba por rol
+
+Crea un Practitioner por cada rol definido en `src/lib/roles.ts`. Los correos son `qa+<rol>@integramed.local`. La contraseña se genera al ejecutar y solo se escribe en `.local/test-users.json` (no se commitea y no se imprime).
+
+```bash
+npm run seed:test-users
+npm run seed:test-users -- --rotate   # regenera contraseñas, sin duplicar usuarios
+npm run remove-test-users             # borra solo esos usuarios de prueba
+```
+
+Qué probar con cada rol: [docs/QA.md](docs/QA.md).
+
 ## Navegación
 
 Trabajo del día: Inicio, Agenda, Pacientes. La ficha tiene Resumen, Consultas, Recetas y Estudios. Al pie, según rol: Farmacia, Personal, Bóveda, Configuración.

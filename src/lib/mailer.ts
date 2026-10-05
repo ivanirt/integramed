@@ -13,12 +13,15 @@ export function resetLink(token: string): string {
 }
 
 function logResetLink(to: string, link: string, reason: string) {
+  const token = new URL(link).searchParams.get("token") || "";
   console.log("");
   console.log("========== IntegraMed: enlace para restablecer contraseña ==========");
   console.log(reason);
   console.log(`Para: ${to}`);
+  console.log(`Token: ${token}`);
   console.log(link);
   console.log("Válido 45 minutos y de un solo uso.");
+  console.log("Si la URL se corta en la terminal, abre /acceso/restablecer?token= y pega la línea Token.");
   console.log("====================================================================");
   console.log("");
 }

@@ -12,7 +12,9 @@
     "start:fhir": "node --use-system-ca server/index.js",
     "lint": "eslint",
     "test": "node --experimental-strip-types --test test/*.test.ts",
-    "create-user": "node --experimental-strip-types scripts/create-user.ts"
+    "create-user": "node --experimental-strip-types scripts/create-user.ts",
+    "seed:test-users": "node --experimental-strip-types scripts/seed-test-users.ts",
+    "remove-test-users": "node --experimental-strip-types scripts/remove-test-users.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

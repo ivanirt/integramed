@@ -2,7 +2,7 @@
 
 Clínica FHIR R4. Interfaz Next.js 15 (tono Maferefun) y proxy Express para el almacén FHIR local o Medblocks.
 
-Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas. El cliente Vite anterior está en `legacy-client/`.
+Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas.
 
 ## Local
 
@@ -24,6 +24,16 @@ El primer acceso con el usuario `ivan` crea el Practitioner si el FHIR está vac
 ## Producción (Dokploy)
 
 Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el servicio: `SESSION_SECRET`, `FHIR_PROXY_SECRET`, `CLINIC_MASTER_PASSWORD`. `FHIR_MODE`, `FHIR_BASE_URL` y `FHIR_AUTH_TOKEN` se leen del entorno; la pantalla `/config/fhir` ya no los cambia en caliente. La IA clínica usa `CLINICAL_AI_KEY` y `CLINICAL_AI_BASE` (host en `CLINICAL_AI_HOST_ALLOWLIST`, por defecto `openrouter.ai`).
+
+## Clínica Yeshua
+
+Con el proxy en marcha y el mismo `.env` (`SESSION_SECRET`, `FHIR_PROXY_SECRET`, `FHIR_PROXY_URL` en loopback):
+
+```bash
+npm run seed:yeshua
+```
+
+Crea la organización, la sede de Naucalpan, los consultorios, los servicios y los profesionales (correo y rol). No guarda contraseñas. Firma una sesión corta de administración con `SESSION_SECRET` y la envía al proxy junto con `FHIR_PROXY_SECRET`. Si el recurso ya existe, lo actualiza sin duplicarlo.
 
 ## Navegación
 

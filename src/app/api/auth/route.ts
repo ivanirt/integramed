@@ -6,6 +6,7 @@ import type { RoleId } from "@/lib/roles";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
 import { LOGIN_ERROR } from "@/lib/password-reset";
 import { checkLoginPassword } from "@/lib/passwords";
+import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
 
 export async function GET() {
   return NextResponse.json({ user: await getSession() });
@@ -54,9 +55,11 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  const account = user ? findAccountForStaff(readAccounts(), user.id, user.email) : undefined;
+  const accounts = readAccounts();
+  const account = user ? findAccountForStaff(accounts, user.id, user.email) : undefined;
   const decision = await checkLoginPassword(password, account);
   if (!decision.ok || !user) {
+    if (!user) logMissingPractitionerOnLogin(login, accounts);
     return NextResponse.json({ error: LOGIN_ERROR }, { status: 401 });
   }
 

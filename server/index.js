@@ -13,6 +13,8 @@ import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
 import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
 import { parseFhirTarget } from '../src/lib/fhir-path.js';
+import { defaultAuthStorageRoot } from '../src/lib/auth-root.js';
+import { logAccountsMissingFromStore, readAccountEntries } from '../src/lib/missing-practitioner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -518,6 +520,10 @@ export { app };
 
 if (process.env.FHIR_PROXY_NO_LISTEN !== '1') {
   assertProxySecrets();
+  if (isLocalFhirMode()) {
+    const ids = localFhir.store.listType('Practitioner').map((resource) => resource?.id).filter(Boolean);
+    logAccountsMissingFromStore(readAccountEntries(defaultAuthStorageRoot(PROJECT_ROOT)), ids);
+  }
   const server = app.listen(PORT, HOST, () => {
     console.log(`IntegraMed FHIR Proxy listening on http://${HOST}:${PORT}`);
   });

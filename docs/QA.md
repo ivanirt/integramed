@@ -63,7 +63,7 @@ Lo que sí hay es la modalidad `iridology` («Iridología»), apagada por defect
 
 ## FHIR
 
-Las escrituras clínicas van al proxy (`FHIR_PROXY_URL`, `http://127.0.0.1:3001`): Patient, Appointment, Encounter, Composition, Observation, MedicationRequest, ServiceRequest, DiagnosticReport, Schedule, Basic. Con `FHIR_MODE=local` quedan en `data/fhir/`.
+Las escrituras clínicas van al proxy (`FHIR_PROXY_URL`, `http://127.0.0.1:3001`): Patient, Appointment, Encounter, Composition, Observation, MedicationRequest, ServiceRequest, DiagnosticReport, Schedule, Basic. Con `FHIR_MODE=local` quedan en `INTEGRAMED_FHIR_ROOT` (por defecto `data/fhir/`; en la imagen, `/app/data/fhir`).
 
 Quien tiene pacientes puede abrir la ficha. Recetas y estudios están en esa ficha (`/pacientes/:id/recetas`, `/pacientes/:id/estudios`). Guardar un estudio crea DiagnosticReport. Pedir un estudio crea ServiceRequest. La farmacia guarda inventario en Basic. Nada de eso vuelve a comprobar el rol dentro de la server action: la puerta es la página y, en el proxy, la sesión firmada.
 

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { FHIR_RESOURCE_TYPES, parseBundleEntry, parseFhirTarget } from '../src/lib/fhir-path.js';
+import { defaultFhirStorageRoot } from '../src/lib/fhir-root.js';
 
 const RESOURCE_TYPES = FHIR_RESOURCE_TYPES;
 
@@ -33,7 +34,7 @@ function json(status, body, extraHeaders = {}) {
 }
 
 export function createLocalFhirStore(projectRoot) {
-  const dataDir = path.join(projectRoot, 'data', 'fhir');
+  const dataDir = defaultFhirStorageRoot(projectRoot);
 
   function typeDir(type) {
     return path.join(dataDir, type);

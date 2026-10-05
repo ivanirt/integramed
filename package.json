@@ -12,7 +12,7 @@
     "dev:fhir": "node server/index.js",
     "dev:web": "node ./node_modules/next/dist/bin/next dev --turbopack -p 3000",
     "build": "node ./node_modules/next/dist/bin/next build",
-    "start": "concurrently -n fhir,web \"npm run start:fhir\" \"node ./node_modules/next/dist/bin/next start -p 3000\"",
+    "start": "concurrently --kill-others --success first -n fhir,web \"npm run start:fhir\" \"node ./node_modules/next/dist/bin/next start -p 3000\"",
     "start:fhir": "node server/index.js",
     "lint": "eslint",
     "create-user": "node --experimental-strip-types scripts/create-user.ts",

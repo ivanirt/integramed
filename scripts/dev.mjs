@@ -47,6 +47,9 @@ const child = spawn(
   process.execPath,
   [
     concurrently,
+    '--kill-others',
+    '--success',
+    'first',
     '-n',
     'fhir,web',
     '-c',

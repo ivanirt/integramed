@@ -18,6 +18,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV INTEGRAMED_AUTH_ROOT=/app/data/auth
+ENV INTEGRAMED_FHIR_ROOT=/app/data/fhir
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server ./server
@@ -30,5 +31,5 @@ COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src/lib ./src/lib
 EXPOSE 3000
-VOLUME ["/app/data/auth"]
+VOLUME ["/app/data/auth", "/app/data/fhir"]
 CMD ["npm", "start"]

@@ -71,6 +71,9 @@ export function EyePane({
   onExport,
   busyExport,
   onController,
+  expanded = false,
+  concealed = false,
+  onMaximize,
 }: {
   eye: IrisEye;
   label: string;
@@ -88,6 +91,11 @@ export function EyePane({
   onExport: () => void;
   busyExport: boolean;
   onController: (controller: IrisOverlayController | null) => void;
+  /** This slot is inside the enlarged view, alone or beside the other eye. */
+  expanded?: boolean;
+  /** The other slot is the one filling the screen. */
+  concealed?: boolean;
+  onMaximize?: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -105,6 +113,8 @@ export function EyePane({
   const onSlotRef = useRef(onSlot);
   const onControllerRef = useRef(onController);
   const [dragOver, setDragOver] = useState(false);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frameBox, setFrameBox] = useState({ width: 0, height: 0 });
 
   fitRef.current = slot.fit;
   photoRef.current = slot.photo;
@@ -210,6 +220,20 @@ export function EyePane({
       cancel = true;
     };
   }, [slot.autoSuggest, slot.photo, loaded, suggestRun]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const node = frameRef.current;
+    if (!node) return;
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      setFrameBox({ width: rect.width, height: rect.height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [expanded]);
 
   useEffect(() => {
     function onMove(event: PointerEvent) {
@@ -324,10 +348,28 @@ export function EyePane({
       : "Sin mapa";
   const otherLabel = eye === "right" ? "ojo izquierdo" : "ojo derecho";
 
+  const photoLimit =
+    expanded && frameBox.height > 80
+      ? Math.max(80, Math.floor(Math.min(frameBox.height, Math.max(frameBox.width, 1)) - 4))
+      : undefined;
+
   return (
-    <section data-eye={eye} aria-label={label} className="min-w-0">
-      <h2 className="font-serif text-2xl">{label}</h2>
-      <p className="mt-1 text-sm text-[#6D5E52]">{mapLabel}</p>
+    <section
+      data-eye={eye}
+      aria-label={label}
+      className={`min-w-0 ${concealed ? "hidden" : ""} ${expanded ? "flex h-full min-h-0 flex-col" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-serif text-2xl">{label}</h2>
+          <p className="mt-1 text-sm text-[#6D5E52]">{mapLabel}</p>
+        </div>
+        {onMaximize && !expanded ? (
+          <GhostButton type="button" onClick={onMaximize} aria-label={`Ampliar ${label}`}>
+            Ampliar
+          </GhostButton>
+        ) : null}
+      </div>
 
       {mapError ? (
         <div className="mt-4 border border-[#EADBCE] bg-white px-4 py-6 text-sm">
@@ -337,8 +379,12 @@ export function EyePane({
       ) : null}
 
       <div
+        ref={frameRef}
+        className={expanded ? "mt-3 flex min-h-0 flex-1 items-center justify-center overflow-hidden" : "mt-4"}
+      >
+      <div
         ref={stageRef}
-        className={`relative mt-4 max-w-full border bg-white ${slot.photo ? "inline-block" : "w-full"} ${dragOver ? "border-[#241B16]" : "border-[#EADBCE]"}`}
+        className={`relative max-w-full border bg-white ${slot.photo || photoLimit ? "inline-block" : "w-full"} ${dragOver ? "border-[#241B16]" : "border-[#EADBCE]"}`}
         onDragOver={(event) => {
           event.preventDefault();
           setDragOver(true);
@@ -370,11 +416,22 @@ export function EyePane({
             ref={imgRef}
             src={slot.photo.url}
             alt={`Fotografía del ${label.toLowerCase()}, solo en este navegador`}
-            className="block max-h-[58vh] max-w-full"
+            className="block max-w-full"
+            style={
+              expanded && frameBox.width > 80 && frameBox.height > 80
+                ? {
+                    maxWidth: Math.max(80, Math.floor(frameBox.width) - 4),
+                    maxHeight: Math.max(80, Math.floor(frameBox.height) - 4),
+                  }
+                : { maxHeight: "58vh" }
+            }
             draggable={false}
           />
         ) : (
-          <div className="aspect-square w-full bg-[#F6F1EA]">
+          <div
+            className="aspect-square bg-[#F6F1EA]"
+            style={photoLimit ? { width: photoLimit, height: photoLimit } : { width: "100%" }}
+          >
             <p className="pointer-events-none p-3 text-xs text-[#6D5E52]">
               Mapa sin foto. Arrastra una imagen aquí para alinearlo.
             </p>
@@ -429,23 +486,80 @@ export function EyePane({
           </>
         ) : null}
       </div>
+      </div>
 
       {slot.photoError ? <p className="mt-2 text-sm text-[#6D5E52]">{slot.photoError}</p> : null}
-      {slot.fitNote ? <p className="mt-3 text-sm text-[#6D5E52]">{slot.fitNote}</p> : null}
-      {loaded?.geom.usedFallback ? (
-        <p className="mt-2 text-sm text-[#6D5E52]">
-          Este SVG no declara bien pupila o radio exterior. El ajuste usa el viewBox como aproximación.
-        </p>
-      ) : null}
-      {loaded?.map.warnings.length ? (
-        <ul className="mt-2 list-disc pl-5 text-xs text-[#6D5E52]">
-          {loaded.map.warnings.slice(0, 3).map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
+      {expanded ? null : (
+        <>
+          {slot.fitNote ? <p className="mt-3 text-sm text-[#6D5E52]">{slot.fitNote}</p> : null}
+          {loaded?.geom.usedFallback ? (
+            <p className="mt-2 text-sm text-[#6D5E52]">
+              Este SVG no declara bien pupila o radio exterior. El ajuste usa el viewBox como aproximación.
+            </p>
+          ) : null}
+          {loaded?.map.warnings.length ? (
+            <ul className="mt-2 list-disc pl-5 text-xs text-[#6D5E52]">
+              {loaded.map.warnings.slice(0, 3).map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      )}
+
+      {expanded ? (
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <label className="flex items-center gap-2">
+            Opacidad
+            <input
+              className="w-28"
+              type="range"
+              min={0}
+              max={100}
+              aria-label={`Opacidad del mapa, ${label}`}
+              value={Math.round(slot.opacity * 100)}
+              onChange={(event) => onSlot({ opacity: Number(event.target.value) / 100 })}
+            />
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={slot.pupilBlack}
+              onChange={(event) => onSlot({ pupilBlack: event.target.checked })}
+            />
+            Pupila negra
+          </label>
+          <GhostButton type="button" onClick={() => onSlot({ overlayVisible: !slot.overlayVisible })} disabled={!loaded}>
+            {slot.overlayVisible ? "Ocultar mapa" : "Mostrar mapa"}
+          </GhostButton>
+          {slot.photo && slot.fit ? (
+            <label className="flex items-center gap-2">
+              Rotación {Math.round(slot.fit.rotation)}°
+              <input
+                className="w-28"
+                type="range"
+                min={-180}
+                max={180}
+                aria-label={`Rotación, ${label}`}
+                value={Math.round(slot.fit.rotation)}
+                onChange={(event) => {
+                  suggestToken.current += 1;
+                  onSlot({
+                    autoSuggest: false,
+                    fit: clampFit(
+                      { ...slot.fit!, rotation: Number(event.target.value) },
+                      slot.photo!.width,
+                      slot.photo!.height,
+                    ),
+                  });
+                }}
+              />
+            </label>
+          ) : null}
+        </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className={`mt-4 flex flex-wrap gap-2 ${expanded ? "hidden" : ""}`}>
         <Button type="button" onClick={() => fileRef.current?.click()}>
           {slot.photo ? "Cambiar foto" : "Elegir foto"}
         </Button>
@@ -508,7 +622,7 @@ export function EyePane({
         }}
       />
 
-      <label className="mt-3 flex items-center gap-2 text-sm">
+      <label className={`mt-3 flex items-center gap-2 text-sm ${expanded ? "hidden" : ""}`}>
         <input
           type="checkbox"
           checked={slot.pupilBlack}
@@ -517,7 +631,7 @@ export function EyePane({
         Pupila negra
       </label>
 
-      {slot.photo && slot.fit ? (
+      {!expanded && slot.photo && slot.fit ? (
         <div className="mt-4 grid gap-3 border border-[#EADBCE] bg-white p-4 text-sm">
           <label>
             Opacidad del mapa

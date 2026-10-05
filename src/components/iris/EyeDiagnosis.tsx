@@ -77,11 +77,14 @@ export function EyeDiagnosis({
   const [saveState, setSaveState] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [busy, setBusy] = useState<IrisEye | "pair" | null>(null);
+  const [maximized, setMaximized] = useState<null | "both" | IrisEye>(null);
 
   const slotsRef = useRef(slots);
   const mapsRef = useRef(maps);
   const ctrlRef = useRef<Record<IrisEye, IrisOverlayController | null>>({ right: null, left: null });
   const selectionRef = useRef<OrganPick | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const fullscreenRequested = useRef(false);
   slotsRef.current = slots;
   mapsRef.current = maps;
 
@@ -101,6 +104,36 @@ export function EyeDiagnosis({
   const onController = useCallback((eye: IrisEye, controller: IrisOverlayController | null) => {
     ctrlRef.current[eye] = controller;
   }, []);
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      if (!fullscreenElement() && fullscreenRequested.current) {
+        fullscreenRequested.current = false;
+        setMaximized(null);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape" || fullscreenElement()) return;
+      setMaximized((current) => (current ? null : current));
+    }
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!maximized) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [maximized]);
 
   useEffect(() => {
     const current = slotsRef;
@@ -230,6 +263,23 @@ export function EyeDiagnosis({
     setPicked({ key, source });
   }
 
+  function openMaximized(mode: "both" | IrisEye) {
+    setMaximized(mode);
+    const node = shellRef.current;
+    if (!node) return;
+    fullscreenRequested.current = true;
+    void requestElementFullscreen(node).catch(() => {
+      if (!fullscreenElement()) fullscreenRequested.current = false;
+    });
+  }
+
+  function closeMaximized() {
+    fullscreenRequested.current = false;
+    const active = fullscreenElement();
+    if (active) void exitElementFullscreen();
+    setMaximized(null);
+  }
+
   function swapPhotos() {
     setSlots((prev) => ({
       right: { ...prev.left, autoSuggest: false },
@@ -346,16 +396,55 @@ export function EyeDiagnosis({
         Los dos ojos se ven como al mirar la cara del paciente: su ojo derecho queda a la izquierda de la pantalla y su
         ojo izquierdo a la derecha. En pantallas estrechas el ojo derecho queda arriba. Cada foto pertenece a la ranura
         donde la pongas. Si cae en la otra, muévela o intercambia las fotos. Con una sola foto, el otro ojo sigue
-        mostrando su mapa.
+        mostrando su mapa. Ampliar pone un ojo, o los dos, a pantalla completa; Esc o Cerrar vuelve a la página.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button type="button" disabled={loadingMaps || (!maps.right && !maps.left) || busy === "pair"} onClick={() => void onExportPair()}>
           {busy === "pair" ? "Exportando…" : "Descargar ambos ojos"}
         </Button>
+        <GhostButton type="button" onClick={() => openMaximized("both")}>
+          Ampliar ambos ojos
+        </GhostButton>
         {exportError ? <p className="text-sm text-red-800">{exportError}</p> : null}
       </div>
 
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
+      <div
+        ref={shellRef}
+        data-maximized={maximized ?? "off"}
+        className={
+          maximized
+            ? "fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[#FAF7F2] p-3 [&:fullscreen]:bg-[#FAF7F2]"
+            : undefined
+        }
+      >
+        {maximized ? (
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="font-serif text-2xl">
+              {maximized === "both" ? "Ambos ojos" : EYE_LABEL[maximized]}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {maximized !== "both" ? (
+                <GhostButton type="button" onClick={() => openMaximized("both")}>
+                  Ampliar ambos ojos
+                </GhostButton>
+              ) : null}
+              <Button type="button" onClick={closeMaximized}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      <div
+        className={
+          maximized
+            ? `grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto md:h-full md:grid-rows-[minmax(0,1fr)] md:overflow-hidden ${
+                maximized === "both"
+                  ? "md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18rem]"
+                  : "md:grid-cols-[minmax(0,1fr)_18rem]"
+              }`
+            : "mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]"
+        }
+      >
         {(["right", "left"] as const).map((eye) => (
           <EyePane
             key={eye}
@@ -381,10 +470,19 @@ export function EyeDiagnosis({
             onExport={() => void onExportEye(eye)}
             busyExport={busy === eye}
             onController={(controller) => onController(eye, controller)}
+            expanded={maximized === "both" || maximized === eye}
+            concealed={maximized !== null && maximized !== "both" && maximized !== eye}
+            onMaximize={() => openMaximized(eye)}
           />
         ))}
 
-        <aside className="min-w-0 border border-[#EADBCE] bg-white lg:sticky lg:top-4">
+        <aside
+          className={
+            maximized
+              ? "flex h-full min-h-0 flex-col overflow-hidden border border-[#EADBCE] bg-white"
+              : "min-w-0 border border-[#EADBCE] bg-white lg:sticky lg:top-4"
+          }
+        >
           <div className="border-b border-[#EADBCE] px-4 py-3">
             <h2 className="font-serif text-2xl">Regiones</h2>
             <p className="mt-1 text-xs text-[#6D5E52]">
@@ -468,7 +566,9 @@ export function EyeDiagnosis({
               aria-label="Buscar región"
             />
           </div>
-          <ul className="max-h-[32rem] overflow-auto border-t border-[#EADBCE] text-sm">
+          <ul
+            className={`${maximized ? "min-h-0 flex-1" : "max-h-[32rem]"} overflow-auto border-t border-[#EADBCE] text-sm`}
+          >
             {filtered.length === 0 ? (
               <li className="px-4 py-6 text-[#6D5E52]">Ninguna región coincide.</li>
             ) : (
@@ -507,6 +607,7 @@ export function EyeDiagnosis({
             )}
           </ul>
         </aside>
+      </div>
       </div>
 
       {patients.length || patientId ? (
@@ -547,6 +648,31 @@ export function EyeDiagnosis({
       )}
     </div>
   );
+}
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+function fullscreenElement() {
+  const doc = document as Document & { webkitFullscreenElement?: Element | null };
+  return document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+}
+
+function requestElementFullscreen(node: HTMLElement) {
+  const target = node as FullscreenElement;
+  if (typeof node.requestFullscreen === "function") return node.requestFullscreen();
+  if (typeof target.webkitRequestFullscreen === "function") {
+    return Promise.resolve(target.webkitRequestFullscreen());
+  }
+  return Promise.reject(new Error("fullscreen"));
+}
+
+function exitElementFullscreen() {
+  const doc = document as Document & { webkitExitFullscreen?: () => Promise<void> | void };
+  if (typeof document.exitFullscreen === "function" && document.fullscreenElement) return document.exitFullscreen();
+  if (typeof doc.webkitExitFullscreen === "function") return Promise.resolve(doc.webkitExitFullscreen());
+  return Promise.resolve();
 }
 
 function inferredSentence(entry: IrisCatalogEntry) {

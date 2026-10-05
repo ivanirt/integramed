@@ -104,10 +104,11 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   store.writeResource(roleResource("role-admin", "prac-admin", "admin"));
   store.writeResource(practitioner("prac-doctor", doctorEmail, "doctor", "QA"));
   store.writeResource(roleResource("role-doctor", "prac-doctor", "doctor"));
+  const adminAccount = blankAccount("prac-admin", adminEmail, true);
   const doctorAccount = blankAccount("prac-doctor", doctorEmail, true);
   doctorAccount.passwordHash = await bcrypt.hash(doctorPassword, 4);
   doctorAccount.passwordChangedAt = 10;
-  writeAccounts([doctorAccount], authRoot);
+  writeAccounts([adminAccount, doctorAccount], authRoot);
 
   const proxyPort = await freePort();
   const webPort = await freePort();

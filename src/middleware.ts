@@ -2,6 +2,11 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { isAcceptableSecret, verifySessionToken } from "@/lib/session-edge";
 
+// This edge check verifies the signature, expiry, and a known role.
+// It does not read accounts.json, so it cannot reject a cookie issued before
+// the current password. Sensitive route handlers (for example /api/cie) must
+// call getSession(), which includes that pwdAt check.
+
 const PUBLIC = ["/acceso", "/api/auth"];
 
 function isPublic(pathname: string) {

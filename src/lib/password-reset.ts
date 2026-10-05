@@ -117,6 +117,8 @@ export function authorizeLogin(input: {
   return { ok: true, pwdAt: Number(input.account?.passwordChangedAt || 0) };
 }
 
+export const LOGIN_ERROR = "Contraseña incorrecta.";
+
 export const SMTP_UNAVAILABLE_LOG =
   "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.";
 
@@ -148,9 +150,10 @@ export async function processForgotPassword(options: {
   deliver: (to: string, link: string) => Promise<void>;
   linkFor: (token: string) => string;
   log: (line: string) => void;
+  unavailableLog?: string;
 }): Promise<ForgotPasswordResult> {
   if (options.mode === "unavailable") {
-    options.log(SMTP_UNAVAILABLE_LOG);
+    options.log(options.unavailableLog || SMTP_UNAVAILABLE_LOG);
     return { status: 200, body: { message: RESET_REQUEST_MESSAGE } };
   }
 

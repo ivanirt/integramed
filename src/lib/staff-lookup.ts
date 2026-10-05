@@ -1,6 +1,7 @@
 import { isAcceptableSecret } from "./session-edge";
 import { fhirProxyOrigin } from "./proxy";
 import type { RoleId } from "./roles";
+import { isAuthLookupQuery } from "./auth-query.js";
 
 export type AuthStaff = {
   id: string;
@@ -17,6 +18,7 @@ export type AuthStaff = {
  * cookie and it does not use the session-gated FHIR routes.
  */
 export async function lookupStaffForAuth(query: string): Promise<AuthStaff | null> {
+  if (!isAuthLookupQuery(query)) return null;
   const secret = (process.env.FHIR_PROXY_SECRET || "").trim();
   if (!isAcceptableSecret(secret)) {
     throw new Error("FHIR_PROXY_SECRET is not configured");

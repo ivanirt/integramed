@@ -5,6 +5,7 @@ import tls from 'node:tls';
 import { fileURLToPath } from 'url';
 import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessionAuth.js';
 import { findAuthStaff } from './staffLookup.js';
+import { isAuthLookupQuery } from '../src/lib/auth-query.js';
 import { resolveAiBaseUrl } from './aiAllowlist.js';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
@@ -109,8 +110,9 @@ async function remoteSearch(relativePath) {
 // Clinical routes stay behind requireClinicAccess and still need both.
 app.post('/api/internal/staff-lookup', async (req, res) => {
   if (!proxySecretOk(req)) return res.status(401).json({ error: 'No autorizado' });
-  const q = String(req.body?.q || '').trim();
-  if (!q || q.length > 320) return res.status(400).json({ error: 'Consulta inválida' });
+  const rawQuery = String(req.body?.q ?? '');
+  if (!isAuthLookupQuery(rawQuery)) return res.status(400).json({ error: 'Consulta inválida' });
+  const q = rawQuery.trim();
   try {
     let practitioners = [];
     let roles = [];

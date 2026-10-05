@@ -12,4 +12,18 @@ export async function runNodeStartup(): Promise<void> {
     process.exit(1);
   }
   if (!process.env.SMTP_HOST || !process.env.MAIL_FROM) console.error(MAIL_UNCONFIGURED_LOG);
+  try {
+    const { productionAppBaseUrlOk, APP_BASE_URL_LOG } = await import("@/lib/mailer");
+    if (!productionAppBaseUrlOk()) console.error(APP_BASE_URL_LOG);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+  try {
+    const { assertAuthRootWritable } = await import("@/lib/credentials");
+    assertAuthRootWritable();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
 }

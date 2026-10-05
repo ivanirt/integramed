@@ -44,9 +44,9 @@ async function request(server, token) {
 
 test("the proxy rejects a session issued before the personal password changed", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
-  fs.mkdirSync(path.join(root, "data", "auth"), { recursive: true });
+  fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(
-    path.join(root, "data", "auth", "accounts.json"),
+    path.join(root, "accounts.json"),
     JSON.stringify({
       accounts: [{ practitionerId: "prac-reset", passwordChangedAt: 500 }],
     }),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { blankAccount, mutateAccounts } from "@/lib/credentials";
-import { resetDeliveryMode, resetLink, sendPasswordResetEmail } from "@/lib/mailer";
+import { mutateAccounts, pinnedAccountEmail, readAccounts, storeResetOnPinnedAccount } from "@/lib/credentials";
+import { resetDeliveryMode, resetLink, resetUnavailableLog, sendPasswordResetEmail } from "@/lib/mailer";
 import {
   issueReset,
   processForgotPassword,
@@ -52,22 +52,18 @@ export async function POST(request: Request) {
 
   const result = await processForgotPassword({
     mode: resetDeliveryMode(),
+    unavailableLog: resetUnavailableLog(),
     lookup: async () => {
       const user = await lookupStaffForAuth(email);
       if (!user) return null;
-      return { id: user.id, email: user.email || "" };
+      const destination = pinnedAccountEmail(readAccounts(), user.id);
+      if (!destination) return null;
+      return { id: user.id, email: destination };
     },
     issue: () => issueReset(now),
     save: (user, record) => {
       mutateAccounts((accounts) => {
-        let account = accounts.find((item) => item.practitionerId === user.id);
-        if (!account) {
-          account = blankAccount(user.id, user.email, false);
-          accounts.push(account);
-        }
-        account.email = user.email;
-        account.resetTokenHash = record.tokenHash;
-        account.resetExpiresAt = record.expiresAt;
+        storeResetOnPinnedAccount(accounts, user.id, record);
       });
     },
     deliver: async (to, link) => {

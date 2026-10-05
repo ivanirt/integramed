@@ -4,11 +4,8 @@ import { lookupStaffForAuth } from "@/lib/staff-lookup";
 import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
-import { authorizeLogin } from "@/lib/password-reset";
-import { verifyPassword } from "@/lib/passwords";
-
-const NO_PASSWORD =
-  "Esta cuenta no tiene contraseña personal. Usa «¿Olvidaste tu contraseña?» para definirla.";
+import { LOGIN_ERROR } from "@/lib/password-reset";
+import { checkLoginPassword } from "@/lib/passwords";
 
 export async function GET() {
   return NextResponse.json({ user: await getSession() });
@@ -57,18 +54,10 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  if (!user) {
-    return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
-  }
-
-  const account = findAccountForStaff(readAccounts(), user.id, user.email);
-  const hashMatches = account?.passwordHash ? await verifyPassword(password, account.passwordHash) : false;
-  const decision = authorizeLogin({ account, hashMatches });
-  if (!decision.ok) {
-    return NextResponse.json(
-      { error: decision.reason === "unset" ? NO_PASSWORD : "Contraseña incorrecta." },
-      { status: 401 },
-    );
+  const account = user ? findAccountForStaff(readAccounts(), user.id, user.email) : undefined;
+  const decision = await checkLoginPassword(password, account);
+  if (!decision.ok || !user) {
+    return NextResponse.json({ error: LOGIN_ERROR }, { status: 401 });
   }
 
   const requested = body.role as RoleId;

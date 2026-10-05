@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createLocalFhirStore } from "../server/localFhir.js";
 import { findAuthStaff } from "../server/staffLookup.js";
+import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
 import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
@@ -13,9 +14,7 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 const dataRoot = process.env.INTEGRAMED_DATA_ROOT
   ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
   : repoRoot;
-const authRoot = process.env.INTEGRAMED_AUTH_ROOT
-  ? path.resolve(process.env.INTEGRAMED_AUTH_ROOT)
-  : repoRoot;
+const authRoot = defaultAuthStorageRoot(repoRoot);
 
 function redact(text: string, secret: string) {
   if (!secret) return text;
@@ -65,12 +64,14 @@ async function main() {
 
   const passwordHash = await hashPassword(secret);
   const accounts = readAccounts(authRoot);
+  const queryIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query);
   const index = accounts.findIndex(
-    (account) => account.practitionerId === staff.id || account.email === staff.email || account.email === query,
+    (account) => account.practitionerId === staff.id || account.email === query || account.email === staff.email,
   );
-  const next = index === -1 ? blankAccount(staff.id, staff.email, true) : accounts[index];
+  const next = index === -1 ? blankAccount(staff.id, queryIsEmail ? query : staff.email, true) : accounts[index];
   next.practitionerId = staff.id;
-  next.email = staff.email || query;
+  if (queryIsEmail) next.email = query;
+  else if (!next.email) next.email = staff.email;
   next.passwordHash = passwordHash;
   next.passwordRequired = true;
   next.passwordChangedAt = Date.now();

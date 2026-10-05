@@ -20,13 +20,13 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 | Configuración `/config` | no | no | no | no | sí | no | no |
 | Perfil `/perfil` | sí | sí | sí | sí | sí | sí | sí |
 
-«No» en una ruta directa redirige a `/?aviso=…` con el texto de que la pantalla no está disponible. El middleware comprueba la firma de la cookie y el rol conocido; cada página vuelve a mirar la pantalla con `requireScreen`.
+«No» en una ruta directa redirige a `/?aviso=…` con el texto de que la pantalla no está disponible. El middleware de borde comprueba la firma de la cookie, la caducidad y el rol conocido. No comprueba `pwdAt`: eso lo hace `getSession()` en las rutas sensibles (por ejemplo `GET /api/cie`) y en cada página con `requireScreen`.
 
 ## Login y logout
 
 - Con la contraseña del archivo, el correo entra y el rol de la sesión es el de esa fila. La cookie va firmada; el proxy FHIR la exige igual que el middleware.
-- Un correo que no existe responde «Contraseña incorrecta.»
-- No hay contraseña compartida. Una cuenta sin hash personal, tenga o no `passwordRequired`, responde que hay que definirla con «¿Olvidaste tu contraseña?». `CLINIC_MASTER_PASSWORD` no abre sesión.
+- Un correo que no existe, una cuenta sin contraseña personal y una contraseña equivocada responden lo mismo: «Contraseña incorrecta.» y estado 401.
+- No hay contraseña compartida. Una cuenta sin hash personal no inicia sesión. `CLINIC_MASTER_PASSWORD` no abre sesión. La contraseña se define con «¿Olvidaste tu contraseña?» o con `npm run set-password`.
 - «Salir» en el pie llama `POST /api/auth` con `action: logout`, borra la cookie y vuelve a `/acceso`.
 - El selector de rol solo aparece si el Practitioner tiene más de un rol. Cada usuario de prueba tiene uno, así que no debe aparecer.
 
@@ -34,6 +34,9 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 
 - En `/acceso`, «¿Olvidaste tu contraseña?» abre `/acceso/recuperar`.
 - Cualquier correo bien formado recibe el mismo texto: «Si la cuenta existe, enviamos un enlace para restablecer la contraseña.»
+- El enlace solo se envía al correo fijado en `accounts.json` (`create-user` o `set-password`). Si no hay correo fijado, no se genera token. Cambiar `telecom.email` del Practitioner no cambia el destino ni reescribe `accounts.json`.
+- En producción, sin `APP_BASE_URL` https no se genera token. El arranque lo avisa.
+- Solo una sesión `admin` puede crear, modificar o borrar un Practitioner (proxy y acciones del servidor). Un doctor que hace PUT/PATCH/POST/DELETE recibe 403.
 - Sin SMTP, la respuesta es la misma y no se genera enlace. En producción no se imprime. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El arranque avisa que el correo no está configurado. `npm run set-password -- <correo>` con `SET_PASSWORD` en el entorno asigna o reemplaza la contraseña sin escribirla en un archivo ni en el registro. El enlace, cuando existe, dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
 - `/acceso/restablecer?token=…` pide contraseña y confirmación (8 caracteres, una letra y un número).
 - Después se entra con la clave nueva. La cookie anterior deja de servir.

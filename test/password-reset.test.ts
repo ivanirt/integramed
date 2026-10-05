@@ -3,7 +3,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
+import { randomBytes } from "node:crypto";
+import {
+  assertAuthRootWritable,
+  blankAccount,
+  credentialFile,
+  mutateAccounts,
+  pinnedAccountEmail,
+  readAccounts,
+  storeResetOnPinnedAccount,
+  writeAccounts,
+} from "../src/lib/credentials.ts";
+import { checkLoginPassword, hashPassword } from "../src/lib/passwords.ts";
 import {
   RESET_TTL_MS,
   findResetAccount,
@@ -139,5 +150,82 @@ test("the credential file keeps the hash and drops the token after use", () => {
   assert.equal(after[0]?.passwordHash, "$2a$12$already-hashed");
   assert.equal(after[0]?.resetTokenHash, null);
   assert.equal(findResetAccount(after, issued.token, 10_500).status, "invalid");
-  assert.equal(fs.readFileSync(path.join(dir, "data", "auth", "accounts.json"), "utf8").includes(issued.token), false);
+  assert.equal(fs.readFileSync(path.join(dir, "accounts.json"), "utf8").includes(issued.token), false);
+});
+
+test("reset mail uses the pinned account email even when the FHIR email differs", () => {
+  const pinned = "real@clinic.test";
+  const fhirEmail = "attacker@evil.test";
+  const accounts = [blankAccount("prac-1", pinned, true)];
+  assert.equal(pinnedAccountEmail(accounts, "prac-1"), pinned);
+  assert.notEqual(pinnedAccountEmail(accounts, "prac-1"), fhirEmail);
+  const stored = storeResetOnPinnedAccount(accounts, "prac-1", { tokenHash: "abc", expiresAt: 99 });
+  assert.equal(stored, true);
+  assert.equal(accounts[0]?.email, pinned);
+  assert.equal(accounts[0]?.resetTokenHash, "abc");
+
+  const unpinned = [blankAccount("prac-2", "", true)];
+  assert.equal(pinnedAccountEmail(unpinned, "prac-2"), null);
+  assert.equal(storeResetOnPinnedAccount(unpinned, "prac-2", { tokenHash: "nope", expiresAt: 1 }), false);
+  assert.equal(unpinned[0]?.resetTokenHash, null);
+
+  const route = fs.readFileSync("src/app/api/auth/recuperar/route.ts", "utf8");
+  assert.match(route, /pinnedAccountEmail/);
+  assert.equal(route.includes("account.email"), false);
+  assert.equal(route.includes("blankAccount"), false);
+});
+
+test("unset, rejected, and unknown logins share one failure result", async () => {
+  const password = `${randomBytes(12).toString("base64url")}a1`;
+  const other = `${randomBytes(12).toString("base64url")}b2`;
+  const passwordHash = await hashPassword(password);
+  const account = { passwordHash, passwordRequired: true, passwordChangedAt: 5 };
+  const wrong = await checkLoginPassword(other, account);
+  const unset = await checkLoginPassword(other, { passwordHash: null, passwordRequired: true });
+  const missing = await checkLoginPassword(other, null);
+  assert.deepEqual(wrong, { ok: false });
+  assert.deepEqual(unset, wrong);
+  assert.deepEqual(missing, wrong);
+  assert.deepEqual(await checkLoginPassword(password, account), { ok: true, pwdAt: 5 });
+  const source = fs.readFileSync("src/app/api/auth/route.ts", "utf8");
+  assert.equal(source.includes("Esta cuenta no tiene contraseña"), false);
+  assert.equal(source.includes("LOGIN_ERROR"), true);
+});
+
+test("mutateAccounts keeps both edits and does not leave the lock behind", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
+  writeAccounts([blankAccount("prac-1", "real@clinic.test", true)], dir);
+  mutateAccounts((accounts) => {
+    const account = accounts[0];
+    if (account) account.resetTokenHash = "one";
+  }, dir);
+  mutateAccounts((accounts) => {
+    const account = accounts[0];
+    if (account) account.resetExpiresAt = 5;
+  }, dir);
+  const loaded = readAccounts(dir);
+  assert.equal(loaded[0]?.email, "real@clinic.test");
+  assert.equal(loaded[0]?.resetTokenHash, "one");
+  assert.equal(loaded[0]?.resetExpiresAt, 5);
+  assert.equal(fs.existsSync(path.join(dir, "accounts.lock")), false);
+  assert.equal(credentialFile(dir), path.join(dir, "accounts.json"));
+});
+
+test("the auth root defaults to data/auth and must be writable", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
+  const previous = process.env.INTEGRAMED_AUTH_ROOT;
+  process.env.INTEGRAMED_AUTH_ROOT = dir;
+  try {
+    assert.equal(credentialFile(), path.join(dir, "accounts.json"));
+    assert.doesNotThrow(() => assertAuthRootWritable(dir));
+  } finally {
+    if (previous === undefined) delete process.env.INTEGRAMED_AUTH_ROOT;
+    else process.env.INTEGRAMED_AUTH_ROOT = previous;
+  }
+  if (previous === undefined) {
+    assert.equal(credentialFile(), path.join(process.cwd(), "data", "auth", "accounts.json"));
+  }
+  const blocked = path.join(dir, "not-a-directory");
+  fs.writeFileSync(blocked, "x");
+  assert.throws(() => assertAuthRootWritable(blocked), /no se puede escribir/);
 });

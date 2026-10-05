@@ -110,6 +110,98 @@ test("vault relink rejects traversal and non-admin writes", async () => {
   }
 });
 
+test("non-admin sessions cannot write Practitioner resources", async () => {
+  const server = await listen(app);
+  try {
+    const denied = await request(server, "PUT", "/api/fhir/Practitioner/prac-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: {
+        resourceType: "Practitioner",
+        id: "prac-sec",
+        telecom: [{ system: "email", value: "attacker@evil.test" }],
+      },
+    });
+    assert.equal(denied.status, 403);
+
+    const bundle = await request(server, "POST", "/fhir", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: {
+        resourceType: "Bundle",
+        type: "transaction",
+        entry: [
+          {
+            request: { method: "PUT", url: "Practitioner/prac-sec" },
+            resource: { resourceType: "Practitioner", id: "prac-sec" },
+          },
+        ],
+      },
+    });
+    assert.equal(bundle.status, 403);
+
+    const missing = await request(server, "GET", "/api/fhir/Practitioner/prac-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(missing.status, 404);
+
+    const created = await request(server, "POST", "/api/fhir/Practitioner", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Practitioner", id: "prac-sec", active: true },
+    });
+    assert.equal(created.status, 201);
+
+    const removed = await request(server, "DELETE", "/api/fhir/Practitioner/prac-sec", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(removed.status, 204);
+
+    const patient = await request(server, "POST", "/api/fhir/Patient", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Patient", id: "pat-sec", active: true },
+    });
+    assert.equal(patient.status, 201);
+    const dropPatient = await request(server, "DELETE", "/api/fhir/Patient/pat-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(dropPatient.status, 204);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("staff-lookup rejects pipes and control characters", async () => {
+  const server = await listen(app);
+  try {
+    const headers = {
+      token: undefined,
+      secret: FHIR_PROXY_SECRET,
+    };
+    const pipe = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan|admin@clinic.test" },
+    });
+    assert.equal(pipe.status, 400);
+    const control = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan\n@clinic.test" },
+    });
+    assert.equal(control.status, 400);
+    const login = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan" },
+    });
+    assert.equal(login.status, 404);
+  } finally {
+    await stop(server);
+  }
+});
+
 test("consult ignores caller key and base URL", async () => {
   let hits = 0;
   const attacker = await listen((req, res) => {

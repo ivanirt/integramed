@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createLocalFhirStore } from "../server/localFhir.js";
+import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
 import { blankAccount, readAccounts, writeAccounts, type CredentialAccount } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
@@ -99,6 +100,10 @@ function matchesTestIdentity(resource: Practitioner, email: string) {
   return emailOf(resource) === email || loginOf(resource) === email;
 }
 
+function accountsRoot(repoRoot: string): string {
+  return defaultAuthStorageRoot(repoRoot);
+}
+
 function upsertCredential(
   root: string,
   practitionerId: string,
@@ -106,7 +111,7 @@ function upsertCredential(
   passwordHash: string | null,
   replacePassword: boolean,
 ) {
-  const accounts = readAccounts(root);
+  const accounts = readAccounts(accountsRoot(root));
   const index = accounts.findIndex((account) => account.practitionerId === practitionerId || account.email === email);
   if (index === -1) {
     const account = blankAccount(practitionerId, email, true);
@@ -115,7 +120,7 @@ function upsertCredential(
       account.passwordChangedAt = Date.now();
     }
     accounts.push(account);
-    writeAccounts(accounts, root);
+    writeAccounts(accounts, accountsRoot(root));
     return;
   }
   const current = accounts[index] as CredentialAccount;
@@ -129,7 +134,7 @@ function upsertCredential(
     current.resetExpiresAt = null;
   }
   accounts[index] = current;
-  writeAccounts(accounts, root);
+  writeAccounts(accounts, accountsRoot(root));
 }
 
 export async function seedTestUsers(root: string, options: { rotate: boolean }) {
@@ -179,7 +184,7 @@ export async function seedTestUsers(root: string, options: { rotate: boolean }) 
     }
 
     const previous = stored.find((user) => user.email === email);
-    const existingAccount = readAccounts(root).find(
+    const existingAccount = readAccounts(accountsRoot(root)).find(
       (account) => account.practitionerId === practitionerId || account.email === email,
     );
     const repairHash = !options.rotate && !created && Boolean(previous?.password) && !existingAccount?.passwordHash;
@@ -233,10 +238,10 @@ export function removeTestUsers(root: string) {
     if (roleResource.id && ids.has(id)) deleteResource("PractitionerRole", roleResource.id);
   }
 
-  const accounts = readAccounts(root).filter(
+  const accounts = readAccounts(accountsRoot(root)).filter(
     (account) => !ids.has(account.practitionerId) && !isTestUserEmail(account.email),
   );
-  writeAccounts(accounts, root);
+  writeAccounts(accounts, accountsRoot(root));
 
   if (fs.existsSync(credentialsPath(root))) fs.rmSync(credentialsPath(root));
 

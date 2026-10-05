@@ -18,7 +18,7 @@ Si omites `SESSION_SECRET` o `FHIR_PROXY_SECRET`, `npm run dev` inventa un secre
 - UI: [http://localhost:3000](http://localhost:3000)
 - Proxy FHIR: solo en `127.0.0.1:3001` (no lo publiques). La UI habla con él en el mismo equipo.
 
-El acceso es con la contraseña personal de cada Practitioner. No hay contraseña compartida de clínica: si `CLINIC_MASTER_PASSWORD` sigue en el entorno, el login la ignora. Quien aún no tiene contraseña personal entra por «¿Olvidaste tu contraseña?» y necesita un correo en su Practitioner.
+El acceso es con la contraseña personal de cada Practitioner. No hay contraseña compartida de clínica: si `CLINIC_MASTER_PASSWORD` sigue en el entorno, el login la ignora. Quien aún no tiene contraseña personal usa «¿Olvidaste tu contraseña?». El enlace solo sale al correo fijado en `accounts.json` por `create-user` o `set-password`. Si ese correo no está fijado, la respuesta es la misma y no se envía nada. Cambiar el email del Practitioner en FHIR no cambia el destino.
 
 El login ya no crea al Practitioner `ivan` solo. El primer administrador se da de alta con `npm run create-user` (abajo) o tiene que existir ya en FHIR.
 
@@ -81,9 +81,13 @@ Qué probar con cada rol: [docs/QA.md](docs/QA.md).
 
 Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el servicio: `SESSION_SECRET` y `FHIR_PROXY_SECRET`. `FHIR_MODE`, `FHIR_BASE_URL` y `FHIR_AUTH_TOKEN` se leen del entorno; la pantalla `/config/fhir` ya no los cambia en caliente. La IA clínica usa `CLINICAL_AI_KEY` y `CLINICAL_AI_BASE` (host en `CLINICAL_AI_HOST_ALLOWLIST`, por defecto `openrouter.ai`).
 
-Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_BASE_URL` (el origen público, sin barra final). No definas `PASSWORD_RESET_LOG_LINK` en producción: se ignora.
+Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_BASE_URL` (el origen público https, sin barra final). En producción, si `APP_BASE_URL` falta o no es https, el arranque avisa, la respuesta sigue siendo la misma y no se genera enlace. No definas `PASSWORD_RESET_LOG_LINK` en producción: se ignora.
 
-Quien ya tenía sesión sigue con esa cookie hasta que expire o hasta que cambies `SESSION_SECRET`. El siguiente acceso pide contraseña personal. Quien nunca la definió usa «¿Olvidaste tu contraseña?» y necesita un correo en su Practitioner.
+Las contraseñas y los tokens viven en `accounts.json`, dentro de `INTEGRAMED_AUTH_ROOT` (por defecto `data/auth`, en la imagen `/app/data/auth`). En Dokploy monta un volumen persistente en `/app/data/auth`. Sin ese volumen, un redeploy borra las contraseñas. Si ese directorio no se puede escribir, el proceso de producción no arranca. El almacén FHIR (`data/fhir`) es otro dato y no sustituye este volumen.
+
+Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña. El middleware de borde comprueba la firma, la caducidad y el rol. No lee `accounts.json`, así que no ve si la contraseña cambió. Las rutas sensibles, por ejemplo `/api/cie`, llaman a `getSession()`, que sí rechaza una cookie anterior al cambio de contraseña.
+
+Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita el correo ya fijado en `accounts.json`. El login responde «Contraseña incorrecta.» igual si el usuario no existe, si no tiene contraseña o si la contraseña no coincide.
 
 ## Navegación
 

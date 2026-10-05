@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createLocalFhirStore } from "../server/localFhir.js";
+import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
 import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
@@ -10,6 +11,7 @@ import { ROLE_LABELS, SYSTEMS, type RoleId } from "../src/lib/roles.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env") });
+const authRoot = defaultAuthStorageRoot(root);
 
 const ROLES = Object.keys(ROLE_LABELS) as RoleId[];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -139,7 +141,7 @@ async function main() {
     });
   }
 
-  const accounts = readAccounts(root);
+  const accounts = readAccounts(authRoot);
   const index = accounts.findIndex(
     (account) => account.practitionerId === practitionerId || account.email === options.email,
   );
@@ -151,7 +153,7 @@ async function main() {
       account.passwordChangedAt = Date.now();
     }
     accounts.push(account);
-    writeAccounts(accounts, root);
+    writeAccounts(accounts, authRoot);
     passwordNote = passwordHash
       ? "Contraseña definida desde CREATE_USER_PASSWORD (no quedó escrita en el repositorio)."
       : "Contraseña: sin definir. Usa npm run set-password o el correo de restablecimiento.";
@@ -173,7 +175,7 @@ async function main() {
       passwordNote = "Sigue sin contraseña usable. Usa npm run set-password o «¿Olvidaste tu contraseña?».";
     }
     accounts[index] = account;
-    writeAccounts(accounts, root);
+    writeAccounts(accounts, authRoot);
   }
 
   const verb = createdPractitioner ? "Usuario creado" : "El usuario ya existía";

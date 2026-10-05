@@ -421,3 +421,15 @@ export async function saveInventoryAction(formData: FormData) {
   revalidatePath("/farmacia");
 }
 
+export async function setFhirModeAction(formData: FormData) {
+  const fhirMode = String(formData.get("fhirMode"));
+  const fhirBaseUrl = String(formData.get("fhirBaseUrl") || "");
+  const fhirAuthToken = String(formData.get("fhirAuthToken") || "");
+  const proxy = process.env.FHIR_PROXY_URL || "http://localhost:3001";
+  await fetch(`${proxy}/api/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fhirMode, fhirBaseUrl, fhirAuthToken }),
+  });
+  revalidatePath("/config/fhir");
+}

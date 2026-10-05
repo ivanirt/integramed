@@ -175,8 +175,7 @@ export function registerVaultRoutes(app, { PROJECT_ROOT }) {
       const result = applyAutoLinks(vaultPath, enabledNotes, suggestions);
       res.json({ ok: true, ...result, remaining: suggestAutoLinks(loadVaultNotes(vaultPath)) });
     } catch (err) {
-      const status = err.message === 'Ruta de nota no válida' ? 400 : 500;
-      res.status(status).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 

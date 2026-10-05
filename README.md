@@ -2,7 +2,7 @@
 
 Clínica FHIR R4. Interfaz Next.js 15 (tono Maferefun) y proxy Express para el almacén FHIR local o Medblocks.
 
-Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas. El cliente Vite anterior está en `legacy-client/`.
+Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas.
 
 ## Local
 
@@ -14,6 +14,16 @@ Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes
 - FHIR proxy: [http://localhost:3001](http://localhost:3001) (`GET /fhir/metadata`)
 
 Acceso de demostración: usuario `ivan`, contraseña `IntegraMed27`. El primer login crea el Practitioner si el FHIR está vacío.
+
+## Clínica Yeshua
+
+Con el proxy en marcha (`npm run dev:fhir`):
+
+```bash
+npm run seed:yeshua
+```
+
+Crea la organización, la sede de Naucalpan, los consultorios, los servicios y los profesionales (correo y rol). No guarda contraseñas. Lee `FHIR_PROXY_URL` (por defecto `http://localhost:3001`). Si el recurso ya existe, lo actualiza sin duplicarlo.
 
 ## Navegación
 

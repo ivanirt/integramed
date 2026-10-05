@@ -1,35 +1,29 @@
-import { setFhirModeAction } from "@/lib/actions";
-import { Button, Field, Input, Select } from "@/components/ui";
+import { proxyFetch } from "@/lib/proxy";
 
 async function health() {
-  const proxy = process.env.FHIR_PROXY_URL || "http://localhost:3001";
-  const res = await fetch(`${proxy}/api/health`, { cache: "no-store" });
+  const res = await proxyFetch("/api/health");
+  if (!res.ok) return { status: "unreachable", mode: "local", message: "Proxy no disponible" };
   return res.json();
 }
 
 export default async function FhirPage() {
-  const info = await health().catch(() => ({ status: "unreachable", mode: "local" }));
+  const info = await health().catch(() => ({
+    status: "unreachable",
+    mode: "local",
+    message: "Proxy no disponible",
+  }));
   return (
     <div>
       <h2 className="font-serif text-2xl">Conexión FHIR</h2>
       <p className="mt-2 text-sm text-[#6D5E52]">
-        Estado: {info.status} · modo {info.mode} · pacientes {info.patientCount ?? "—"}
+        Estado: {info.status} · modo {info.mode || "—"} · pacientes {info.patientCount ?? "—"}
       </p>
-      <form action={setFhirModeAction} className="mt-6 max-w-lg space-y-4">
-        <Field label="Modo">
-          <Select name="fhirMode" defaultValue={info.mode || "local"}>
-            <option value="local">IntegraMed local FHIR R4</option>
-            <option value="proxy">Proxy Medblocks</option>
-          </Select>
-        </Field>
-        <Field label="Base URL remota">
-          <Input name="fhirBaseUrl" defaultValue={info.serverUrl || ""} />
-        </Field>
-        <Field label="Token">
-          <Input name="fhirAuthToken" type="password" />
-        </Field>
-        <Button type="submit">Aplicar</Button>
-      </form>
+      {info.serverUrl ? <p className="mt-2 text-sm text-[#6D5E52]">Servidor: {info.serverUrl}</p> : null}
+      {info.message ? <p className="mt-2 text-sm text-[#6D5E52]">{info.message}</p> : null}
+      <p className="mt-6 max-w-lg text-sm text-[#6D5E52]">
+        El modo, la URL y el token se leen solo del entorno del servidor (FHIR_MODE, FHIR_BASE_URL,
+        FHIR_AUTH_TOKEN). Esta pantalla ya no los cambia en caliente.
+      </p>
     </div>
   );
 }

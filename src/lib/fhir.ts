@@ -1,6 +1,8 @@
 import { SYSTEMS } from "./roles";
+import { displayName } from "./display-name";
+import { fhirProxyHeaders, fhirProxyOrigin } from "./proxy";
 
-const PROXY = () => process.env.FHIR_PROXY_URL || "http://localhost:3001";
+export { displayName };
 
 export type FhirResource = {
   resourceType: string;
@@ -23,13 +25,13 @@ export class FhirError extends Error {
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<unknown> {
-  const url = `${PROXY()}/api/fhir/${path.replace(/^\//, "")}`;
-  const headers: Record<string, string> = {
+  const url = `${fhirProxyOrigin()}/api/fhir/${path.replace(/^\//, "")}`;
+  const headers = await fhirProxyHeaders({
     Accept: "application/fhir+json, application/json",
     ...(init.headers as Record<string, string> | undefined),
-  };
-  if (init.body && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/fhir+json";
+  });
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/fhir+json");
   }
   const res = await fetch(url, { ...init, headers, cache: "no-store" });
   const text = await res.text();
@@ -87,14 +89,6 @@ export function bundleResources(data: FhirBundle | FhirResource | null, type: st
       .filter((r): r is FhirResource => Boolean(r && r.resourceType === type));
   }
   return [];
-}
-
-export function displayName(resource?: FhirResource | null) {
-  const name = Array.isArray(resource?.name) ? resource?.name[0] : resource?.name;
-  if (!name || typeof name !== "object") return resource?.id || "Sin nombre";
-  const n = name as { text?: string; given?: string[]; family?: string };
-  if (n.text) return n.text;
-  return `${(n.given || []).join(" ")} ${n.family || ""}`.trim() || resource?.id || "Sin nombre";
 }
 
 export function identifierValue(resource: FhirResource | undefined, system: string) {

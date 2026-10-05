@@ -1,6 +1,6 @@
 # Mapas de iris
 
-El módulo de revisión iridológica carga estos archivos en el navegador. Cambiar un mapa no exige tocar código: se sustituye el SVG y, si hace falta, una línea del manifiesto. La vista «Solo iris» es una máscara derivada en el navegador a partir de los círculos de ajuste; no modifica la foto ni estos SVG.
+La pantalla de revisión iridológica (`/iris`) carga estos archivos en el navegador. La enciende la modalidad Iridología, no un módulo aparte. Cambiar un mapa no exige tocar código: se sustituye el SVG y, si hace falta, una línea del manifiesto. La vista «Solo iris» es una máscara derivada en el navegador a partir de los círculos de ajuste; no modifica la foto ni estos SVG.
 
 ## Cómo actualizar un mapa
 

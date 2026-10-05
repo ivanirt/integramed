@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-export function PatientNav({ id }: { id: string }) {
+export function PatientNav({ id, showIris = false }: { id: string; showIris?: boolean }) {
   const items = [
     { href: `/pacientes/${id}`, label: "Resumen" },
     { href: `/pacientes/${id}/consultas`, label: "Consultas" },
     { href: `/pacientes/${id}/recetas`, label: "Recetas" },
     { href: `/pacientes/${id}/estudios`, label: "Estudios" },
-    { href: `/iris?paciente=${id}`, label: "Mapa de iris" },
+    ...(showIris ? [{ href: `/iris?paciente=${id}`, label: "Mapa de iris" }] : []),
   ];
   return (
     <nav className="mt-4 flex flex-wrap gap-4 text-sm text-[#6D5E52]">

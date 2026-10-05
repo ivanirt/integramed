@@ -35,6 +35,8 @@ export type ConsultWorkspaceProps = {
   catalog: IntegrativeModality[];
   activeModalities: string[];
   role: string;
+  /** Iridology is on for this clinic and this role may open /iris. */
+  irisScreen?: boolean;
 };
 
 type SpeechRec = {
@@ -495,7 +497,7 @@ export function ConsultWorkspace(props: ConsultWorkspaceProps) {
                   Editar catálogo
                 </Link>
               ) : null}
-              {modalities.includes("iridology") ? (
+              {props.irisScreen ? (
                 <Link href={`/iris?paciente=${props.patient.id}`} className="mt-3 block text-sm underline">
                   Abrir mapa de iris
                 </Link>

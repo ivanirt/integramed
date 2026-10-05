@@ -11,7 +11,6 @@ const LABELS: Record<string, string> = {
   farmacia: "Farmacia",
   personal: "Personal",
   boveda: "Bóveda",
-  iris: "Mapa de iris",
 };
 
 export function ModulesForm({ initial, fhirId }: { initial: Record<string, boolean>; fhirId?: string }) {

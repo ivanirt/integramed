@@ -8,6 +8,7 @@ export const SYSTEMS = {
   leave: "https://integramed.app/fhir/id/leave",
   inventory: "https://integramed.app/fhir/id/inventory-item",
   integrativeCatalog: "https://integramed.app/fhir/id/clinic-integrative-modalities",
+  findingModule: "https://integramed.app/fhir/CodeSystem/finding-module",
   hoursExtension: "https://integramed.app/fhir/StructureDefinition/weekly-hours",
   payload: "https://integramed.app/fhir/StructureDefinition/app-payload",
 };
@@ -38,7 +39,6 @@ export const DEFAULT_MODULES: Record<string, boolean> = {
   farmacia: true,
   personal: true,
   boveda: true,
-  iris: true,
 };
 
 export const ROLE_SCREENS: Record<RoleId, string[]> = {
@@ -47,7 +47,7 @@ export const ROLE_SCREENS: Record<RoleId, string[]> = {
   nurse: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "boveda", "perfil"],
   receptionist: ["home", "agenda", "patients", "perfil"],
   admin: ["home", "agenda", "patients", "consulta", "iris", "horario", "ausencias", "farmacia", "personal", "boveda", "config", "perfil"],
-  lab: ["home", "patients", "iris", "boveda", "perfil"],
+  lab: ["home", "patients", "boveda", "perfil"],
   pharmacist: ["home", "farmacia", "patients", "perfil"],
 };
 
@@ -56,6 +56,7 @@ export function canAccess(role: RoleId, screen: string, modules = DEFAULT_MODULE
   if (screen === "config") return role === "admin";
   if (!ROLE_SCREENS[role]?.includes(screen)) return false;
   if (screen === "consulta" || screen === "horario" || screen === "ausencias") return true;
+  if (screen === "iris") return modules.iridology === true;
   const key = screen === "patients" ? "patients" : screen;
   return modules[key] !== false;
 }

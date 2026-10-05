@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { fhirCreate, fhirDelete, fhirRead, fhirSearch, fhirUpdate, displayName, type FhirResource } from "./fhir";
-import { saveHours, saveHoliday, saveLeave, saveModules, savePractitionerHours, type ClinicHours } from "./clinic-config";
-import { saveIntegrativeCatalog, type IntegrativeModality } from "./integrative";
+import { loadModules, saveHours, saveHoliday, saveLeave, saveModules, savePractitionerHours, type ClinicHours } from "./clinic-config";
+import { withoutLegacyIrisFlag } from "./iridology-access";
+import { loadIntegrativeCatalog, saveIntegrativeCatalog, type IntegrativeModality } from "./integrative";
 import { upsertStaff } from "./staff";
 import type { RoleId } from "./roles";
 import { SYSTEMS } from "./roles";
@@ -243,7 +244,14 @@ export async function finalizeConsultAction(formData: FormData) {
 
 export async function saveIntegrativeCatalogAction(items: IntegrativeModality[], id?: string) {
   await saveIntegrativeCatalog(items, id);
+  if (items.some((item) => item.id === "iridology")) {
+    const loaded = await loadModules();
+    if (Object.prototype.hasOwnProperty.call(loaded.modules, "iris")) {
+      await saveModules(withoutLegacyIrisFlag(loaded.modules), loaded.id);
+    }
+  }
   revalidatePath("/config/integrativa");
+  revalidatePath("/config/modulos");
 }
 
 export async function createMedicationRequestAction(formData: FormData) {
@@ -327,6 +335,13 @@ export async function saveIrisNoteAction(input: {
   await fhirCreate({
     resourceType: "DiagnosticReport",
     status: "final",
+    category: [
+      {
+        coding: [{ system: SYSTEMS.findingModule, code: "iridology", display: "Iridología" }],
+        text: "iridology",
+      },
+    ],
+    meta: { tag: [{ system: SYSTEMS.findingModule, code: "iridology" }] },
     code: { text: "Nota de revisión iridológica" },
     subject: { reference: `Patient/${patientId}` },
     issued: new Date().toISOString(),
@@ -402,8 +417,20 @@ export async function deleteLeaveAction(id: string, practitionerId: string) {
 }
 
 export async function saveModulesAction(modules: Record<string, boolean>, id?: string) {
-  await saveModules(modules, id);
+  const legacyOn = modules.iris === true;
+  await saveModules(withoutLegacyIrisFlag(modules), id);
+  if (legacyOn) {
+    const catalog = await loadIntegrativeCatalog();
+    const already = catalog.items.find((item) => item.id === "iridology")?.enabled === true;
+    if (!already) {
+      const items = catalog.items.some((item) => item.id === "iridology")
+        ? catalog.items.map((item) => (item.id === "iridology" ? { ...item, enabled: true } : item))
+        : [...catalog.items, { id: "iridology", labelEs: "Iridología", enabled: true }];
+      await saveIntegrativeCatalog(items, catalog.id);
+    }
+  }
   revalidatePath("/config/modulos");
+  revalidatePath("/config/integrativa");
 }
 
 export async function saveOrgAction(formData: FormData) {

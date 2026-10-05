@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: |
+          export SESSION_SECRET="$(openssl rand -base64 48)"
+          export FHIR_PROXY_SECRET="$(openssl rand -base64 48)"
+          npm test
+
+      - name: Build
+        run: |
+          export SESSION_SECRET="$(openssl rand -base64 48)"
+          export FHIR_PROXY_SECRET="$(openssl rand -base64 48)"
+          npm run build
+
+  image:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add a throwaway public asset
+        run: |
+          mkdir -p public
+          printf 'integramed-static-ok\n' > public/ci-static.txt
+
+      - name: Build image
+        run: docker build -t integramed:ci .
+
+      - name: Image keeps the production constraints
+        run: |
+          node_version="$(docker run --rm --entrypoint node integramed:ci -p "process.versions.node")"
+          echo "Node ${node_version}"
+          docker run --rm --entrypoint node integramed:ci -e '
+            const [major, minor] = process.versions.node.split(".").map(Number);
+            if (major < 22 || (major === 22 && minor < 6)) {
+              console.error("Node must be >= 22.6");
+              process.exit(1);
+            }
+          '
+          docker run --rm --entrypoint sh integramed:ci -c 'test -d /app/public && test -f /app/public/ci-static.txt && test -d /app/modules && test ! -e /app/.env'
+          exposed="$(docker inspect --format '{{json .Config.ExposedPorts}}' integramed:ci)"
+          echo "Exposed ports: ${exposed}"
+          test "${exposed}" = '{"3000/tcp":{}}'
+          env_json="$(docker inspect --format '{{json .Config.Env}}' integramed:ci)"
+          case "${env_json}" in
+            *SESSION_SECRET*|*FHIR_PROXY_SECRET*)
+              echo "runtime secrets were baked into the image"
+              exit 1
+              ;;
+          esac
+
+      - name: Serve the public asset
+        run: |
+          session_secret="$(openssl rand -base64 48)"
+          proxy_secret="$(openssl rand -base64 48)"
+          token="$(docker run --rm --entrypoint node \
+            -e "SESSION_SECRET=${session_secret}" \
+            integramed:ci \
+            --input-type=module \
+            -e 'import { signSession } from "./server/sessionAuth.js"; process.stdout.write(signSession({ id: "ci", name: "CI", login: "ci", role: "doctor" }, process.env.SESSION_SECRET));')"
+          docker run -d --name integramed-ci \
+            -e "SESSION_SECRET=${session_secret}" \
+            -e "FHIR_PROXY_SECRET=${proxy_secret}" \
+            -e FHIR_MODE=local \
+            -p 3000:3000 \
+            integramed:ci
+          trap 'docker logs integramed-ci; docker rm -f integramed-ci >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS -H "Cookie: integramed_session=${token}" http://127.0.0.1:3000/ci-static.txt | grep -qx 'integramed-static-ok'; then
+              docker exec integramed-ci node --input-type=module -e '
+                const res = await fetch("http://127.0.0.1:3001/api/health");
+                if (res.status !== 401) {
+                  console.error("expected 401 from the loopback proxy, got", res.status);
+                  process.exit(1);
+                }
+              '
+              logs="$(docker logs integramed-ci 2>&1)"
+              echo "${logs}" | grep -F "TLS: using Node default CAs plus the OS certificate store"
+              procs="$(docker exec integramed-ci ps)"
+              echo "${procs}" | grep -F "node server/index.js"
+              if echo "${procs}" | grep -q "use-system-ca"; then
+                echo "proxy still started with --use-system-ca"
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Public asset was not served from the image"
+          exit 1

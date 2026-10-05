@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import { isSessionPasswordCurrent } from '../src/lib/session-stamp.js';
 import { accountsFile } from '../src/lib/auth-root.js';
+import { isPractitionerMutation } from '../src/lib/fhir-path.js';
 
 export const SESSION_COOKIE = 'integramed_session';
 export const MIN_SECRET_LENGTH = 32;
@@ -107,37 +108,7 @@ export function readPasswordStamps(root) {
   }
 }
 
-function fhirRelativePath(req) {
-  const raw = String(req.path || '');
-  if (raw === '/api/fhir' || raw.startsWith('/api/fhir/')) {
-    return raw.slice('/api/fhir'.length).replace(/^\/+/, '');
-  }
-  if (raw === '/fhir' || raw.startsWith('/fhir/')) {
-    return raw.slice('/fhir'.length).replace(/^\/+/, '');
-  }
-  return null;
-}
-
-function bundleWritesPractitioner(body) {
-  if (!body || body.resourceType !== 'Bundle' || !Array.isArray(body.entry)) return false;
-  return body.entry.some((item) => {
-    const method = String(item?.request?.method || 'POST').toUpperCase();
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return false;
-    const url = String(item?.request?.url || '');
-    const fromUrl = url.split('?')[0].replace(/^\/+/, '').split('/')[0];
-    return fromUrl === 'Practitioner' || item?.resource?.resourceType === 'Practitioner';
-  });
-}
-
-export function isPractitionerMutation(req) {
-  const method = String(req.method || 'GET').toUpperCase();
-  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return false;
-  const relative = fhirRelativePath(req);
-  if (relative === null) return false;
-  const type = relative.split('/').filter(Boolean)[0] || '';
-  if (type === 'Practitioner') return true;
-  return bundleWritesPractitioner(req.body);
-}
+export { isPractitionerMutation };
 
 export function requireClinicAccess(req, res, next) {
   if (!proxySecretOk(req)) {

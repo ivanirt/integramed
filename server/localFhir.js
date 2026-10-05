@@ -1,13 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { FHIR_RESOURCE_TYPES, parseBundleEntry, parseFhirTarget } from '../src/lib/fhir-path.js';
 
-const RESOURCE_TYPES = [
-  'Patient', 'Practitioner', 'Encounter', 'Observation', 'Condition',
-  'MedicationRequest', 'Medication', 'AllergyIntolerance', 'DiagnosticReport',
-  'DocumentReference', 'HealthcareService', 'Organization', 'Location',
-  'Appointment', 'RelatedPerson', 'Task', 'List', 'Basic', 'Schedule', 'Slot', 'PractitionerRole'
-];
+const RESOURCE_TYPES = FHIR_RESOURCE_TYPES;
 
 function nowInstant() {
   return new Date().toISOString();
@@ -266,10 +262,22 @@ export function createLocalFhirHandler(projectRoot, { publicBaseUrl } = {}) {
   }
 
   function handleTransaction(bundle) {
-    const entry = (bundle.entry || []).map((item) => {
-      const method = String(item.request?.method || 'POST').toUpperCase();
-      const url = String(item.request?.url || item.resource?.resourceType || '');
-      const result = handleFhirRequest(method, url, {}, item.resource);
+    const type = String(bundle?.type || '').toLowerCase();
+    if (bundle?.resourceType !== 'Bundle' || (type !== 'transaction' && type !== 'batch') || !Array.isArray(bundle.entry)) {
+      return outcome('error', 'invalid', 'Bundle type must be transaction or batch', 400);
+    }
+    const prepared = [];
+    for (const item of bundle.entry) {
+      const entry = parseBundleEntry(item);
+      if (!entry.ok) return outcome('error', 'invalid', 'URL de entrada no válida', 400);
+      prepared.push(entry);
+    }
+    const entry = prepared.map((parsedEntry, index) => {
+      const item = bundle.entry[index];
+      const target = [parsedEntry.parsed.rawType, parsedEntry.parsed.id, ...parsedEntry.parsed.extra]
+        .filter((part) => part)
+        .join('/');
+      const result = handleFhirRequest(parsedEntry.method, target, {}, item.resource);
       return {
         response: {
           status: String(result.status),
@@ -282,29 +290,35 @@ export function createLocalFhirHandler(projectRoot, { publicBaseUrl } = {}) {
   }
 
   function handleFhirRequest(method, rawPath, query = {}, body) {
-    const cleaned = String(rawPath || '').replace(/^\/+/, '').replace(/^fhir\/?/, '');
-    if (!cleaned || cleaned === 'metadata') {
-      return json(200, capabilityStatement(baseUrl));
-    }
-    if (method === 'POST' && !cleaned.includes('/') && body?.resourceType === 'Bundle') {
+    const verb = String(method || 'GET').toUpperCase();
+    const parsed = parseFhirTarget(rawPath);
+    if (!parsed.ok) return outcome('error', 'invalid', 'URL de FHIR no válida', 400);
+    if (verb === 'POST' && parsed.kind === 'base' && body?.resourceType === 'Bundle') {
       return handleTransaction(body);
     }
-
-    const [type, id, ...rest] = cleaned.split('/').filter(Boolean);
-    if (rest.length) return outcome('error', 'not-supported', 'Operation not supported', 404);
-    if (!RESOURCE_TYPES.includes(type) && method !== 'GET') {
-      // still allow unknown types to be stored
+    if ((parsed.kind === 'base' || parsed.kind === 'metadata') && verb === 'GET') {
+      return json(200, capabilityStatement(baseUrl));
     }
+    if (parsed.kind !== 'type') {
+      return outcome('error', 'not-supported', `${verb} not supported`, 405);
+    }
+    if (parsed.nonCanonical) {
+      return outcome('error', 'not-found', `${parsed.rawType} not found`, 404);
+    }
+    if (parsed.extra.length) return outcome('error', 'not-supported', 'Operation not supported', 404);
+
+    const type = parsed.canonical || parsed.rawType;
+    const id = parsed.id;
     if (!type) return outcome('error', 'not-found', 'Resource type required', 404);
 
-    if (method === 'GET' && !id) return search(type, query);
-    if (method === 'GET' && id) {
+    if (verb === 'GET' && !id) return search(type, query);
+    if (verb === 'GET' && id) {
       const resource = store.readResource(type, id);
       if (!resource) return outcome('error', 'not-found', `${type}/${id} not found`, 404);
       return json(200, resource);
     }
-    if (method === 'POST' && !id) return create(type, body);
-    if ((method === 'PUT' || method === 'PATCH') && id) {
+    if (verb === 'POST' && !id) return create(type, body);
+    if ((verb === 'PUT' || verb === 'PATCH') && id) {
       if (!body || typeof body !== 'object') return outcome('error', 'invalid', 'JSON body required');
       const existing = store.readResource(type, id);
       const resource = store.writeResource({
@@ -315,12 +329,12 @@ export function createLocalFhirHandler(projectRoot, { publicBaseUrl } = {}) {
       });
       return json(existing ? 200 : 201, resource);
     }
-    if (method === 'DELETE' && id) {
+    if (verb === 'DELETE' && id) {
       const ok = store.deleteResource(type, id);
       if (!ok) return outcome('error', 'not-found', `${type}/${id} not found`, 404);
       return { status: 204, headers: {}, body: null };
     }
-    return outcome('error', 'not-supported', `${method} ${cleaned} not supported`, 405);
+    return outcome('error', 'not-supported', `${verb} ${type} not supported`, 405);
   }
 
   return {

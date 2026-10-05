@@ -12,6 +12,7 @@ import { registerVaultRoutes } from './vaultRoutes.js';
 import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
 import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
+import { parseFhirTarget } from '../src/lib/fhir-path.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -376,17 +377,45 @@ function parseFhirQuery(url) {
   return query;
 }
 
+function rejectNonCanonicalFhir(req, res) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok) {
+    res.status(400).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'invalid', diagnostics: 'URL de FHIR no válida' }]
+    });
+    return true;
+  }
+  if (parsed.nonCanonical) {
+    res.status(404).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'not-found', diagnostics: `${parsed.rawType} not found` }]
+    });
+    return true;
+  }
+  return false;
+}
+
+function canonicalFhirPath(req) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok || parsed.kind === 'base') return '';
+  if (parsed.kind === 'metadata') return 'metadata';
+  return [parsed.type, parsed.id, ...parsed.extra].filter(Boolean).join('/');
+}
+
 app.all('/fhir*', (req, res) => {
-  const fhirPath = req.path.replace(/^\/fhir\/?/, '');
-  const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  // req.method only. X-HTTP-Method-Override is not read.
+  const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
   return sendFhirResult(res, result);
 });
 
 // FHIR Proxy Endpoint (local store or remote)
 app.all('/api/fhir/*', async (req, res) => {
-  const fhirPath = req.params[0] || '';
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  const fhirPath = canonicalFhirPath(req);
   if (isLocalFhirMode()) {
-    const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+    const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
     return sendFhirResult(res, result);
   }
 

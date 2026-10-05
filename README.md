@@ -13,7 +13,40 @@ Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes
 - UI: [http://localhost:3000](http://localhost:3000)
 - FHIR proxy: [http://localhost:3001](http://localhost:3001) (`GET /fhir/metadata`)
 
-Acceso de demostración: usuario `ivan`, contraseña `IntegraMed27`. El primer login crea el Practitioner si el FHIR está vacío.
+Acceso de demostración: usuario `ivan`, contraseña `IntegraMed27`. El primer login crea el Practitioner si el FHIR está vacío. Quien no tiene contraseña propia sigue usando esa clave maestra.
+
+## Usuario ivanirt@gmail.com
+
+Crea el Practitioner del propietario sin contraseña (el comando es idempotente y no guarda claves en el repo):
+
+```bash
+npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin
+```
+
+Esa cuenta no acepta `IntegraMed27`. Con `npm run dev` en marcha:
+
+1. Abre [http://localhost:3000/acceso](http://localhost:3000/acceso).
+2. Pulsa «¿Olvidaste tu contraseña?».
+3. Escribe `ivanirt@gmail.com`.
+4. Si SMTP no está en `.env`, el enlace sale en la consola del proceso `web` (no en la del proxy FHIR). Dura 45 minutos y es de un solo uso.
+5. Ábrelo, elige la contraseña y entra con ese correo.
+
+Opcional, solo en la terminal: `CREATE_USER_PASSWORD='una-clave-larga-1' npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin`. No guardes esa variable en un archivo que se suba al repositorio.
+
+## Correo con Gmail
+
+Copia `.env.example` a `.env` y rellena:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ivanirt@gmail.com
+SMTP_PASS=la-contraseña-de-aplicación
+MAIL_FROM=ivanirt@gmail.com
+APP_BASE_URL=http://localhost:3000
+```
+
+`SMTP_PASS` no es la contraseña normal de Google. En la cuenta: Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones → crear una para Correo. Pega los 16 caracteres en `SMTP_PASS`. `MAIL_FROM` debe ser esa misma cuenta. Sin `SMTP_HOST` y `MAIL_FROM` el restablecimiento no falla: el enlace se imprime en la consola de Next.js.
 
 ## Navegación
 

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { clearSession, createSession, getSession } from "@/lib/session";
 import { ensureBootstrapStaff, listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
+import { findAccountForStaff, readAccounts } from "@/lib/credentials";
+import { loginStrategy } from "@/lib/password-reset";
+import { verifyPassword } from "@/lib/passwords";
 
 export async function GET() {
   return NextResponse.json({ user: await getSession() });
@@ -36,12 +39,8 @@ export async function POST(request: Request) {
 
   const login = String(body.login || body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  const master = process.env.CLINIC_MASTER_PASSWORD || "IntegraMed27";
   if (!login || !password) {
     return NextResponse.json({ error: "Usuario y contraseña son necesarios." }, { status: 400 });
-  }
-  if (password !== master) {
-    return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
   }
 
   let staff: Awaited<ReturnType<typeof listStaff>> = [];
@@ -63,12 +62,34 @@ export async function POST(request: Request) {
       );
     }
   }
+  const master = process.env.CLINIC_MASTER_PASSWORD || "IntegraMed27";
   if (!user) {
+    if (password !== master) {
+      return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
+    }
     return NextResponse.json({ error: "No hay un Practitioner con ese acceso." }, { status: 404 });
   }
+
+  const account = findAccountForStaff(readAccounts(), user.id, user.email);
+  const strategy = loginStrategy(account);
+  if (strategy === "unset") {
+    return NextResponse.json(
+      { error: "Esta cuenta no tiene contraseña. Usa «¿Olvidaste tu contraseña?» para definirla." },
+      { status: 401 },
+    );
+  }
+  if (strategy === "hash") {
+    const matches = await verifyPassword(password, account?.passwordHash || "");
+    if (!matches) {
+      return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
+    }
+  } else if (password !== master) {
+    return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
+  }
+
   const requested = body.role as RoleId;
   const role = requested && user.roles.includes(requested) ? requested : user.primaryRole;
   const session = { id: user.id, name: user.name, login: user.login, role };
-  await createSession(session);
+  await createSession(session, { pwdAt: account?.passwordChangedAt || 0 });
   return NextResponse.json({ user: session });
 }

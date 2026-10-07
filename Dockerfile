@@ -16,9 +16,19 @@ RUN npm run build
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3001
+# Next.js listens on 3000 (`next start -p 3000`). The loopback FHIR proxy
+# listens on FHIR_PROXY_PORT. PORT is left unset: Dokploy may inject it, and
+# neither process reads it, so it cannot move the proxy onto 3000 or take
+# Next off the published port.
+ENV FHIR_PROXY_PORT=3001
 ENV INTEGRAMED_AUTH_ROOT=/app/data/auth
 ENV INTEGRAMED_FHIR_ROOT=/app/data/fhir
+# npm start logs under HOME. Keep that off the image tree.
+ENV HOME=/tmp
+
+RUN addgroup -S -g 1001 integramed \
+  && adduser -S -D -H -u 1001 -G integramed integramed
+
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server ./server
@@ -30,6 +40,16 @@ COPY --from=builder /app/modules ./modules
 # Password CLIs and the FHIR proxy load these at runtime (strip-types + relative imports).
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src/lib ./src/lib
+# Writable paths only: credential and FHIR data, Next's runtime cache, and the
+# vault trees the proxy edits. The rest of /app stays root-owned and read-only.
+RUN mkdir -p /app/data/auth /app/data/fhir /app/.next/cache \
+  && chown -R integramed:integramed /app/data /app/.next /app/vault-es /app/vault-en
 EXPOSE 3000
 VOLUME ["/app/data/auth", "/app/data/fhir"]
+# Readiness: GET http://127.0.0.1:3000/healthz
+# Port 3000 is Next.js, the published listener. No cookie and no secret.
+# The FHIR proxy on 127.0.0.1:3001 is not this check.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["node", "scripts/healthcheck.mjs"]
+USER integramed
 CMD ["npm", "start"]

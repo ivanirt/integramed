@@ -12,9 +12,22 @@
 // exits on its own, including exit code 0, kills the sibling and exits non-zero.
 
 import { spawn } from "node:child_process";
+import { collectDataRootProblems } from "../src/lib/startup-data.js";
 
 const children = [];
 let stopping = false;
+
+function childName(args) {
+  if (args.some((arg) => arg === "server/index.js" || arg.endsWith("/server/index.js"))) return "proxy";
+  if (args.includes("start") && args.some((arg) => arg.includes("next"))) return "next";
+  return "child";
+}
+
+function describeExit(code, signal) {
+  if (signal) return `signal ${signal}`;
+  if (typeof code === "number") return `code ${code}`;
+  return "unknown status";
+}
 
 function defaultCommands() {
   return [
@@ -85,28 +98,42 @@ function finish(status) {
   timer.unref();
 }
 
-function shutdown() {
+function shutdown(signal) {
   if (stopping) return;
   stopping = true;
+  console.error(`[supervise] shutting down on ${signal}. Container exit 0.`);
   finish(0);
 }
 
-function childStopped(code) {
+function childStopped(name, code, signal) {
   if (stopping) return;
   stopping = true;
   const status = typeof code === "number" && code !== 0 ? code : 1;
+  console.error(`[supervise] ${name} exited (${describeExit(code, signal)}). Container exit ${status}.`);
   finish(status);
 }
 
 function start(command, args) {
   const child = spawn(command, args, { stdio: "inherit", env: process.env });
+  const name = childName(args);
   children.push(child);
-  child.on("error", () => childStopped(1));
-  child.on("exit", (code) => childStopped(code));
+  child.on("error", () => childStopped(name, 1, null));
+  child.on("exit", (code, signal) => childStopped(name, code, signal));
 }
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Custom `--` commands are for tests and local experiments. Production (no
+// argv) checks both data roots before either child starts, so one failure
+// cannot hide the other.
+if (process.argv.slice(2).length === 0) {
+  const problems = collectDataRootProblems();
+  if (problems.length > 0) {
+    for (const problem of problems) console.error(problem);
+    process.exit(1);
+  }
+}
 
 for (const [command, args] of parseCommands(process.argv)) {
   start(command, args);

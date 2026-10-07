@@ -131,7 +131,7 @@ test("each sensitive action denies a lower role and lets an allowed role succeed
   process.env.FHIR_PROXY_URL = origin;
   const child = spawn(process.execPath, ["server/index.js"], {
     cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."),
-    env: { ...process.env, PORT: String(port), NODE_ENV: "development" },
+    env: { ...process.env, FHIR_PROXY_PORT: String(port), NODE_ENV: "development" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";

@@ -86,6 +86,16 @@ test("the proxy blocks every clinical call while mustChangePassword is set", asy
     assert.equal(consult.status, 403);
     assert.deepEqual(Object.keys(JSON.parse(consult.text)), ["error"]);
 
+    const { port } = server.address();
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`, {
+      headers: { cookie: `integramed_session=${token(500, true)}` },
+    });
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { ok: true });
+    const bare = await fetch(`http://127.0.0.1:${port}/healthz`);
+    assert.equal(bare.status, 200);
+    assert.deepEqual(await bare.json(), { ok: true });
+
     writeAccounts(root, [{ practitionerId: "prac-temp", passwordChangedAt: 900, mustChangePassword: false }]);
     const stale = await request(server, token(500, true));
     assert.equal(stale.status, 401);

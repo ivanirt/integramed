@@ -35,17 +35,17 @@ El correo también puede ir como primer argumento, sin `--email`.
 Para dejar una contraseña temporal que hay que cambiar al entrar, el mismo comando pide la clave en un prompt oculto (y hay que repetirla). No queda en los argumentos, en el entorno, en el historial ni en el registro:
 
 ```bash
-npm run create-user -- --email ivanirt@gmail.com --role admin --must-change
+npm run create-user -- --email <correo> --role admin --must-change
 ```
 
-Para asignar o reemplazar la contraseña de alguien que ya existe:
+Para asignar o reemplazar la contraseña de alguien que ya existe, `set-password` acepta el mismo `--must-change`:
 
 ```bash
-npm run set-password -- ivanirt@gmail.com
-npm run set-password -- ivanirt@gmail.com --must-change
+npm run set-password -- <correo>
+npm run set-password -- <correo> --must-change
 ```
 
-En un terminal, la contraseña se escribe oculta y se confirma. Sin terminal (un script), se lee una sola línea de stdin. `SET_PASSWORD` y `CREATE_USER_PASSWORD` están en desuso: si siguen definidas, el comando avisa y las ignora. No pongas la contraseña como argumento.
+En un terminal, la contraseña se escribe oculta y se confirma. Sin terminal (un script, o `docker exec` sin `-t`), se lee una sola línea de stdin y no se confirma. No hay forma de pasarla por argv ni por el entorno: `--password`, `--pass` y `-p` se rechazan sin imprimir el valor. `SET_PASSWORD` y `CREATE_USER_PASSWORD` están en desuso: si siguen definidas, el comando avisa y las ignora.
 
 Con SMTP configurado, o en local con `PASSWORD_RESET_LOG_LINK=1`:
 
@@ -102,7 +102,7 @@ Las contraseñas y los tokens viven en `accounts.json`, dentro de `INTEGRAMED_AU
 
 Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña. El middleware de borde comprueba la firma, la caducidad, el rol y, si la cookie lo trae, que la contraseña sea temporal (`mustChange`). No lee `accounts.json`, así que no ve un cambio de contraseña posterior ni un flag que se haya activado después de emitir la cookie. `getSession()`, las páginas, las server actions, las rutas `/api` y el proxy FHIR sí leen `accounts.json`: si `mustChangePassword` es true, o si el archivo no se puede leer, no dejan pasar datos clínicos. Una cookie vieja no basta para saltarse el flag.
 
-Con ese flag la sesión solo abre `/cuenta/contrasena`, la acción de cambiar la contraseña, salir (`POST /api/auth/logout`) y los estáticos. El resto redirige a esa pantalla o responde 403 sin cuerpo clínico. Al guardar, la contraseña nueva tiene que cumplir la misma regla que el restablecimiento (8 caracteres, una letra y un número), no puede ser igual a la actual, se borra el flag, cambia `passwordChangedAt` y se firma otra cookie: las sesiones anteriores dejan de servir. La misma pantalla sirve para cambiar la contraseña en cualquier momento, desde el menú o desde Perfil, aunque el flag no esté puesto.
+Con ese flag la sesión solo abre `/cuenta/contrasena`, la acción de cambiar la contraseña, salir (`POST /api/auth/logout`) y los estáticos. `GET /healthz` de Next y del proxy sigue sin sesión y sin secreto: el flag no lo bloquea y no devuelve datos clínicos. El resto redirige a esa pantalla o responde 403 sin cuerpo clínico. El proxy aplica el mismo corte en `requireClinicAccess` leyendo `accounts.json`. Al guardar, la contraseña nueva tiene que cumplir la misma regla que el restablecimiento (8 caracteres, una letra y un número), no puede ser igual a la actual, se borra el flag, cambia `passwordChangedAt` y se firma otra cookie: las sesiones anteriores dejan de servir. La misma pantalla sirve para cambiar la contraseña en cualquier momento, desde el menú o desde Perfil, aunque el flag no esté puesto.
 
 Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita el correo ya fijado en `accounts.json`. El login responde «Contraseña incorrecta.» igual si el usuario no existe, si no tiene contraseña o si la contraseña no coincide.
 
@@ -111,10 +111,18 @@ Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita 
 La imagen define `INTEGRAMED_AUTH_ROOT=/app/data/auth` y `INTEGRAMED_FHIR_ROOT=/app/data/fhir`, y corre como uid 1001. `docker exec` hereda esas variables, así que el Practitioner y `accounts.json` quedan en los volúmenes montados en `/app/data/fhir` y `/app/data/auth`. El exec va como ese mismo usuario. `-it` hace falta para que el prompt oculte lo que se escribe. La contraseña no va en el comando, ni en `-e`, ni en un archivo.
 
 ```bash
-docker exec -it --user 1001 <contenedor> npm run create-user -- --email ivanirt@gmail.com --role admin --must-change
+docker exec -it --user 1001 <contenedor> npm run create-user -- --email <correo> --role admin --must-change
 ```
 
 Escribe la contraseña cuando pida `Contraseña:` y otra vez en `Repite la contraseña:`. Al primer acceso la clínica solo abre la pantalla para cambiarla.
+
+Para marcar como temporal la contraseña de una cuenta que ya existe:
+
+```bash
+docker exec -it --user 1001 <contenedor> npm run set-password -- <correo> --must-change
+```
+
+`-t` hace que el prompt oculte la entrada y pida confirmación. Sin terminal, el mismo comando lee una sola línea de stdin y no la confirma. Por ejemplo, un script puede redirigir esa línea al `docker exec -i` (sin `-t`). La contraseña no va en argv, en `-e`, ni en un archivo. `--password`, `--pass` y `-p` se rechazan. Si `SET_PASSWORD` o `CREATE_USER_PASSWORD` están definidas, el comando avisa y las ignora.
 
 ## Clínica Yeshua
 

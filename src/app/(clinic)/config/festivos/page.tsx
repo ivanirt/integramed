@@ -1,8 +1,10 @@
 import { listHolidays } from "@/lib/clinic-config";
 import { saveHolidayAction, deleteHolidayAction } from "@/lib/actions";
 import { Button, Field, Input } from "@/components/ui";
+import { requireAdmin } from "@/lib/require";
 
 export default async function FestivosPage() {
+  await requireAdmin();
   const holidays = await listHolidays();
   return (
     <div>

@@ -60,6 +60,20 @@ test("bundle entries without a resource use the same normalizer", () => {
   );
 });
 
+test("protocol-relative FHIR urls fail closed", () => {
+  assert.equal(parseFhirTarget("//evil.example/Practitioner/1").ok, false);
+  assert.equal(parseFhirTarget("//evil.example/fhir/Practitioner/1").ok, false);
+  assert.equal(parseFhirTarget("\\\\evil.example\\Practitioner\\1").ok, false);
+  assert.equal(parseFhirTarget("%2F%2Fevil.example/Practitioner/1").ok, false);
+  assert.equal(parseFhirTarget("https://example.com//evil.example/Practitioner/1").ok, false);
+  assert.equal(
+    bundleEntryBlockedForNonAdmin({ request: { method: "PUT", url: "//evil.example/Practitioner/1" } }),
+    true,
+  );
+  assert.equal(parseFhirTarget("https://example.com/Practitioner/abc").rawType, "Practitioner");
+  assert.equal(parseFhirTarget("/fhir/Practitioner/1").rawType, "Practitioner");
+});
+
 test("X-HTTP-Method-Override does not change the FHIR method", () => {
   const read = {
     method: "GET",

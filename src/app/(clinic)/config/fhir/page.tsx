@@ -1,4 +1,5 @@
 import { proxyFetch } from "@/lib/proxy";
+import { requireAdmin } from "@/lib/require";
 
 async function health() {
   const res = await proxyFetch("/api/health");
@@ -7,6 +8,7 @@ async function health() {
 }
 
 export default async function FhirPage() {
+  await requireAdmin();
   const info = await health().catch(() => ({
     status: "unreachable",
     mode: "local",

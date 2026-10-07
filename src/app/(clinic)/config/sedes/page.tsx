@@ -1,8 +1,10 @@
 import { fhirSearch } from "@/lib/fhir";
 import { saveOrgAction, saveLocationAction } from "@/lib/actions";
 import { Button, Field, Input, Select } from "@/components/ui";
+import { requireAdmin } from "@/lib/require";
 
 export default async function SedesPage() {
+  await requireAdmin();
   const [orgs, locations] = await Promise.all([fhirSearch("Organization"), fhirSearch("Location")]);
   return (
     <div className="space-y-10">

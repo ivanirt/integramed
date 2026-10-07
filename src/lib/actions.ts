@@ -8,10 +8,16 @@ import { upsertStaff } from "./staff";
 import type { RoleId } from "./roles";
 import { SYSTEMS } from "./roles";
 import { VITAL_FIELDS } from "./vitals";
-import { requireAdmin, requireSelfOrAdmin } from "./require";
 import { addMinutesToFhirDateTime, toFhirDateTime } from "./agenda";
+import { enforceAction } from "./enforce-action";
+
+function revalidate(path: string) {
+  if (process.env.INTEGRAMED_ACTION_TEST === "1") return;
+  revalidatePath(path);
+}
 
 export async function createPatientAction(formData: FormData) {
+  await enforceAction("createPatientAction");
   const given = String(formData.get("given") || "").trim();
   const family = String(formData.get("family") || "").trim();
   const gender = String(formData.get("gender") || "unknown");
@@ -23,11 +29,12 @@ export async function createPatientAction(formData: FormData) {
     gender,
     birthDate: birthDate || undefined,
   });
-  revalidatePath("/pacientes");
+  revalidate("/pacientes");
   return created.id as string;
 }
 
 export async function createAppointmentAction(formData: FormData) {
+  await enforceAction("createAppointmentAction");
   const patientId = String(formData.get("patientId"));
   const practitionerId = String(formData.get("practitionerId"));
   const start = String(formData.get("start"));
@@ -50,11 +57,12 @@ export async function createAppointmentAction(formData: FormData) {
       { actor: { reference: `Practitioner/${practitionerId}`, display: displayName(practitioner) }, status: "accepted" },
     ],
   });
-  revalidatePath("/agenda");
-  revalidatePath("/");
+  revalidate("/agenda");
+  revalidate("/");
 }
 
 export async function moveAppointmentAction(formData: FormData) {
+  await enforceAction("moveAppointmentAction");
   const id = String(formData.get("id"));
   const start = String(formData.get("start"));
   const minutes = Number(formData.get("minutes") || 30);
@@ -63,8 +71,8 @@ export async function moveAppointmentAction(formData: FormData) {
   const startInstant = toFhirDateTime(start);
   const end = addMinutesToFhirDateTime(startInstant, duration);
   await fhirUpdate({ ...appt, start: startInstant, end, minutesDuration: duration });
-  revalidatePath("/agenda");
-  revalidatePath("/");
+  revalidate("/agenda");
+  revalidate("/");
 }
 
 function patientIdFromAppointment(appt: FhirResource) {
@@ -74,6 +82,7 @@ function patientIdFromAppointment(appt: FhirResource) {
 }
 
 export async function startConsultFromAppointment(appointmentId: string) {
+  await enforceAction("startConsultFromAppointment");
   const appt = await fhirRead("Appointment", appointmentId);
   const patientId = patientIdFromAppointment(appt);
   const allEncounters = await fhirSearch("Encounter");
@@ -94,11 +103,12 @@ export async function startConsultFromAppointment(appointmentId: string) {
     });
     await fhirUpdate({ ...appt, status: "arrived" });
   }
-  revalidatePath("/agenda");
+  revalidate("/agenda");
   return { encounterId: encounter.id as string, patientId };
 }
 
 export async function saveSoapAction(formData: FormData) {
+  await enforceAction("saveSoapAction");
   const encounterId = String(formData.get("encounterId"));
   const patientId = String(formData.get("patientId"));
   const subjective = String(formData.get("subjective") || "");
@@ -147,8 +157,8 @@ export async function saveSoapAction(formData: FormData) {
   };
   if (compositions[0]?.id) await fhirUpdate(resource);
   else await fhirCreate(resource);
-  revalidatePath(`/consulta/${encounterId}`);
-  revalidatePath(`/pacientes/${patientId}/consultas`);
+  revalidate(`/consulta/${encounterId}`);
+  revalidate(`/pacientes/${patientId}/consultas`);
 }
 
 function escapeHtml(value: string) {
@@ -156,6 +166,7 @@ function escapeHtml(value: string) {
 }
 
 export async function saveVitalsAction(formData: FormData) {
+  await enforceAction("saveVitalsAction");
   const patientId = String(formData.get("patientId"));
   const encounterId = String(formData.get("encounterId"));
   const handoff = String(formData.get("handoff") || "") === "1";
@@ -188,20 +199,22 @@ export async function saveVitalsAction(formData: FormData) {
       await fhirUpdate({ ...encounter, status: "triaged" });
     }
   }
-  revalidatePath(`/consulta/${encounterId}`);
-  revalidatePath(`/consulta/${encounterId}/signos`);
-  revalidatePath(`/pacientes/${patientId}`);
+  revalidate(`/consulta/${encounterId}`);
+  revalidate(`/consulta/${encounterId}/signos`);
+  revalidate(`/pacientes/${patientId}`);
 }
 
 export async function beginDoctorConsultAction(encounterId: string) {
+  await enforceAction("beginDoctorConsultAction");
   const encounter = await fhirRead("Encounter", encounterId);
   if (encounter.status === "triaged" || encounter.status === "arrived") {
     await fhirUpdate({ ...encounter, status: "in-progress" });
-    revalidatePath(`/consulta/${encounterId}`);
+    revalidate(`/consulta/${encounterId}`);
   }
 }
 
 export async function finalizeConsultAction(formData: FormData) {
+  await enforceAction("finalizeConsultAction");
   await saveSoapAction(formData);
   const encounterId = String(formData.get("encounterId"));
   const patientId = String(formData.get("patientId"));
@@ -237,16 +250,18 @@ export async function finalizeConsultAction(formData: FormData) {
   if (compositions[0]?.id) {
     await fhirUpdate({ ...compositions[0], status: "final" });
   }
-  revalidatePath(`/consulta/${encounterId}`);
-  revalidatePath("/agenda");
+  revalidate(`/consulta/${encounterId}`);
+  revalidate("/agenda");
 }
 
 export async function saveIntegrativeCatalogAction(items: IntegrativeModality[], id?: string) {
+  await enforceAction("saveIntegrativeCatalogAction");
   await saveIntegrativeCatalog(items, id);
-  revalidatePath("/config/integrativa");
+  revalidate("/config/integrativa");
 }
 
 export async function createMedicationRequestAction(formData: FormData) {
+  await enforceAction("createMedicationRequestAction");
   const patientId = String(formData.get("patientId"));
   const medication = String(formData.get("medication") || "").trim();
   const dosage = String(formData.get("dosage") || "").trim();
@@ -259,10 +274,11 @@ export async function createMedicationRequestAction(formData: FormData) {
     authoredOn: new Date().toISOString(),
     dosageInstruction: dosage ? [{ text: dosage }] : [],
   });
-  revalidatePath(`/pacientes/${patientId}/recetas`);
+  revalidate(`/pacientes/${patientId}/recetas`);
 }
 
 export async function createServiceRequestAction(formData: FormData) {
+  await enforceAction("createServiceRequestAction");
   const patientId = String(formData.get("patientId"));
   const code = String(formData.get("study") || "").trim();
   await fhirCreate({
@@ -273,10 +289,11 @@ export async function createServiceRequestAction(formData: FormData) {
     subject: { reference: `Patient/${patientId}` },
     authoredOn: new Date().toISOString(),
   });
-  revalidatePath(`/pacientes/${patientId}/estudios`);
+  revalidate(`/pacientes/${patientId}/estudios`);
 }
 
 export async function saveDiagnosticReportAction(formData: FormData) {
+  await enforceAction("saveDiagnosticReportAction");
   const patientId = String(formData.get("patientId"));
   const conclusion = String(formData.get("conclusion") || "").trim();
   const title = String(formData.get("title") || "Estudio");
@@ -288,17 +305,17 @@ export async function saveDiagnosticReportAction(formData: FormData) {
     issued: new Date().toISOString(),
     conclusion,
   });
-  revalidatePath(`/pacientes/${patientId}/estudios`);
+  revalidate(`/pacientes/${patientId}/estudios`);
 }
 
 export async function saveHoursAction(hours: ClinicHours, id?: string) {
-  await requireAdmin();
+  await enforceAction("saveHoursAction");
   await saveHours(hours, id);
-  revalidatePath("/config/horario");
+  revalidate("/config/horario");
 }
 
 export async function savePractitionerHoursAction(hours: ClinicHours, practitionerId: string, id?: string) {
-  await requireSelfOrAdmin(practitionerId);
+  await enforceAction("savePractitionerHoursAction", { practitionerId });
   const practitioner = await fhirRead("Practitioner", practitionerId);
   await savePractitionerHours({
     practitionerId,
@@ -306,31 +323,31 @@ export async function savePractitionerHoursAction(hours: ClinicHours, practition
     hours,
     id,
   });
-  revalidatePath("/horario");
-  revalidatePath(`/personal/${practitionerId}`);
+  revalidate("/horario");
+  revalidate(`/personal/${practitionerId}`);
 }
 
 export async function saveHolidayAction(formData: FormData) {
-  await requireAdmin();
+  await enforceAction("saveHolidayAction");
   await saveHoliday(String(formData.get("date")), String(formData.get("name")));
-  revalidatePath("/config/festivos");
+  revalidate("/config/festivos");
 }
 
 export async function deleteHolidayAction(id: string) {
-  await requireAdmin();
+  await enforceAction("deleteHolidayAction");
   await fhirDelete("Schedule", id);
-  revalidatePath("/config/festivos");
+  revalidate("/config/festivos");
 }
 
 export async function deleteResourceAction(type: string, id: string, path: string) {
-  await requireAdmin();
+  await enforceAction("deleteResourceAction");
   await fhirDelete(type, id);
-  revalidatePath(path);
+  revalidate(path);
 }
 
 export async function saveLeaveAction(formData: FormData) {
   const practitionerId = String(formData.get("practitionerId"));
-  await requireSelfOrAdmin(practitionerId);
+  await enforceAction("saveLeaveAction", { practitionerId });
   const practitioner = await fhirRead("Practitioner", practitionerId);
   await saveLeave({
     practitionerId,
@@ -339,36 +356,39 @@ export async function saveLeaveAction(formData: FormData) {
     end: String(formData.get("end")),
     reason: String(formData.get("reason")),
   });
-  revalidatePath("/ausencias");
-  revalidatePath("/config/ausencias");
-  revalidatePath(`/personal/${practitionerId}`);
+  revalidate("/ausencias");
+  revalidate("/config/ausencias");
+  revalidate(`/personal/${practitionerId}`);
 }
 
 export async function deleteLeaveAction(id: string, practitionerId: string) {
-  await requireSelfOrAdmin(practitionerId);
+  await enforceAction("deleteLeaveAction", { practitionerId });
   const schedule = await fhirRead("Schedule", id);
   const ref = ((schedule.actor as { reference?: string }[]) || [])[0]?.reference;
   if (ref && ref !== `Practitioner/${practitionerId}`) {
     throw new Error("Esa ausencia no corresponde a este profesional.");
   }
   await fhirDelete("Schedule", id);
-  revalidatePath("/ausencias");
-  revalidatePath("/config/ausencias");
-  revalidatePath(`/personal/${practitionerId}`);
+  revalidate("/ausencias");
+  revalidate("/config/ausencias");
+  revalidate(`/personal/${practitionerId}`);
 }
 
 export async function saveModulesAction(modules: Record<string, boolean>, id?: string) {
+  await enforceAction("saveModulesAction");
   await saveModules(modules, id);
-  revalidatePath("/config/modulos");
+  revalidate("/config/modulos");
 }
 
 export async function saveOrgAction(formData: FormData) {
+  await enforceAction("saveOrgAction");
   const name = String(formData.get("name") || "").trim();
   await fhirCreate({ resourceType: "Organization", name, active: true });
-  revalidatePath("/config/sedes");
+  revalidate("/config/sedes");
 }
 
 export async function saveLocationAction(formData: FormData) {
+  await enforceAction("saveLocationAction");
   const name = String(formData.get("name") || "").trim();
   const orgId = String(formData.get("orgId") || "");
   await fhirCreate({
@@ -377,21 +397,22 @@ export async function saveLocationAction(formData: FormData) {
     status: "active",
     managingOrganization: orgId ? { reference: `Organization/${orgId}` } : undefined,
   });
-  revalidatePath("/config/sedes");
+  revalidate("/config/sedes");
 }
 
 export async function saveServiceAction(formData: FormData) {
+  await enforceAction("saveServiceAction");
   const name = String(formData.get("name") || "").trim();
   await fhirCreate({
     resourceType: "HealthcareService",
     name,
     active: true,
   });
-  revalidatePath("/config/servicios");
+  revalidate("/config/servicios");
 }
 
 export async function saveStaffAction(formData: FormData) {
-  await requireAdmin();
+  await enforceAction("saveStaffAction");
   const id = String(formData.get("id") || "") || undefined;
   await upsertStaff({
     id,
@@ -405,11 +426,12 @@ export async function saveStaffAction(formData: FormData) {
       .map((r) => r.trim())
       .filter(Boolean) as RoleId[],
   });
-  revalidatePath("/personal");
-  if (id) revalidatePath(`/personal/${id}`);
+  revalidate("/personal");
+  if (id) revalidate(`/personal/${id}`);
 }
 
 export async function saveInventoryAction(formData: FormData) {
+  await enforceAction("saveInventoryAction");
   const name = String(formData.get("name") || "").trim();
   const qty = Number(formData.get("qty") || 0);
   await fhirCreate({
@@ -418,6 +440,6 @@ export async function saveInventoryAction(formData: FormData) {
     identifier: [{ system: SYSTEMS.inventory, value: `${Date.now()}` }],
     extension: [{ url: SYSTEMS.payload, valueString: JSON.stringify({ name, qty }) }],
   });
-  revalidatePath("/farmacia");
+  revalidate("/farmacia");
 }
 

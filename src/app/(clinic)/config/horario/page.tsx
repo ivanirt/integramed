@@ -1,7 +1,9 @@
 import { loadHours } from "@/lib/clinic-config";
 import { HoursForm } from "@/components/HoursForm";
+import { requireAdmin } from "@/lib/require";
 
 export default async function HorarioPage() {
+  await requireAdmin();
   const { hours, id } = await loadHours();
   return (
     <div>

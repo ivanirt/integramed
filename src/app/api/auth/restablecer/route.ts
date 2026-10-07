@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mutateAccounts, readAccounts } from "@/lib/credentials";
 import { hashPassword } from "@/lib/passwords";
 import { findResetAccount, rateLimitAllow, validateNewPassword } from "@/lib/password-reset";
+import { enforceRoute } from "@/lib/enforce-action";
 
 const ipBuckets = new Map<string, number[]>();
 const RESET_POST_LIMIT = 20;
@@ -14,6 +15,9 @@ function clientIp(request: Request): string {
 }
 
 export async function POST(request: Request) {
+  const denied = enforceRoute("authCompleteReset", null);
+  if (denied) return denied;
+
   if (!rateLimitAllow(ipBuckets, clientIp(request), Date.now(), RESET_POST_LIMIT, RESET_POST_WINDOW_MS)) {
     return NextResponse.json(
       { error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." },

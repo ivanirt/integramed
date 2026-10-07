@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { isAcceptableSecret, SESSION_COOKIE } from "./session-edge";
+import { overriddenSession } from "./session";
+import { buildSessionToken } from "./session-token";
 
 export function fhirProxyOrigin(): string {
   const raw = process.env.FHIR_PROXY_URL || "http://127.0.0.1:3001";
@@ -25,6 +27,24 @@ export async function fhirProxyHeaders(extra?: HeadersInit): Promise<Headers> {
     );
   }
   headers.set("x-integramed-proxy-secret", secret);
+  const actor = overriddenSession();
+  if (actor) {
+    const sessionSecret = (process.env.SESSION_SECRET || "").trim();
+    const token = buildSessionToken(
+      {
+        id: actor.id,
+        name: actor.name,
+        login: actor.login,
+        role: actor.role,
+        pwdAt: Date.now(),
+        exp: Date.now() + 60_000,
+      },
+      sessionSecret,
+    );
+    headers.set("cookie", `${SESSION_COOKIE}=${token}`);
+    return headers;
+  }
+  if (actor === null) return headers;
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) headers.set("cookie", `${SESSION_COOKIE}=${token}`);

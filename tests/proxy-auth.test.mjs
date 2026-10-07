@@ -78,6 +78,30 @@ test("PHI and config routes reject missing and forged sessions", async () => {
     });
     assert.equal(config.status, 401);
 
+    const configDoctor = await request(server, "POST", "/api/config", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: { fhirBaseUrl: "http://169.254.169.254/", fhirAuthToken: "stolen", fhirMode: "proxy" },
+    });
+    assert.equal(configDoctor.status, 403);
+    assert.equal(configDoctor.text.includes("FHIR_AUTH_TOKEN"), false);
+    assert.equal(configDoctor.text.includes("FHIR_BASE_URL"), false);
+
+    const healthDoctor = await request(server, "GET", "/api/health", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(healthDoctor.status, 403);
+    assert.equal(healthDoctor.text.includes("serverUrl"), false);
+    assert.equal(healthDoctor.text.includes("patientCount"), false);
+
+    const healthAdmin = await request(server, "GET", "/api/health", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(healthAdmin.status, 200);
+    assert.match(healthAdmin.text, /"status"/);
+
     const configAdmin = await request(server, "POST", "/api/config", {
       token: admin(),
       secret: FHIR_PROXY_SECRET,
@@ -203,6 +227,8 @@ test("practitioner write bypasses are rejected for non-admin sessions", async ()
       bundle(`https://example.com/Practitioner/${id}`),
       bundle(`./Practitioner/${id}`),
       bundle(`Practitioner/${id}`),
+      bundle(`//evil.example/Practitioner/${id}`),
+      bundle(`%2F%2Fevil.example/Practitioner/${id}`),
     ];
     for (const body of cases) {
       const denied = await request(server, "POST", "/fhir", {
@@ -333,6 +359,18 @@ test("consult ignores caller key and base URL", async () => {
     assert.equal(res.status, 500);
     assert.equal(hits, 0);
     assert.match(res.text, /no está permitido/);
+
+    const pharmacist = signSession(
+      { id: "prac-1", name: "Ivan", login: "ivan", role: "pharmacist" },
+      SESSION_SECRET,
+    );
+    const lower = await request(server, "POST", "/api/ai/consult", {
+      token: pharmacist,
+      secret: FHIR_PROXY_SECRET,
+      body: { diagnosis: "cefalea", language: "es" },
+    });
+    assert.equal(lower.status, 403);
+    assert.equal(hits, 0);
   } finally {
     process.env.CLINICAL_AI_KEY = previousKey;
     process.env.CLINICAL_AI_BASE = previousBase;

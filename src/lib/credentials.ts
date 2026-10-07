@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { accountsFile, authStorageRoot } from "./auth-root.js";
+import { authRootProblem } from "./startup-data.js";
 
 export type CredentialAccount = {
   practitionerId: string;
@@ -197,22 +198,6 @@ export function storeResetOnPinnedAccount(
 }
 
 export function assertAuthRootWritable(root = defaultAuthRoot()): void {
-  const dir = path.resolve(root);
-  let exists = false;
-  try {
-    exists = fs.statSync(dir).isDirectory();
-  } catch {
-    exists = false;
-  }
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    const probe = path.join(dir, `.write-probe-${process.pid}`);
-    fs.writeFileSync(probe, "ok", { encoding: "utf8", mode: 0o600 });
-    fs.rmSync(probe, { force: true });
-  } catch {
-    const hint = exists
-      ? `El proceso corre como uid 1001. En un volumen migrado: chown -R 1001:1001 ${dir}`
-      : "Monta un volumen persistente en INTEGRAMED_AUTH_ROOT.";
-    throw new Error(`El directorio de credenciales no se puede escribir (${dir}). ${hint}`);
-  }
+  const problem = authRootProblem(root);
+  if (problem) throw new Error(problem);
 }

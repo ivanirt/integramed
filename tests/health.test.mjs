@@ -136,7 +136,7 @@ test("spawned proxy serves /healthz on FHIR_PROXY_PORT when PORT is 3000", async
   }
 });
 
-test("Next /healthz is public and returns 200 without a session", async () => {
+test("Next /healthz is public and checks the proxy without auth", async () => {
   const { isPublicPath } = await import("../src/lib/public-path.ts");
   const { GET } = await import("../src/app/healthz/route.ts");
   const middlewareSource = fs.readFileSync(path.join(repo, "src/middleware.ts"), "utf8");
@@ -147,7 +147,23 @@ test("Next /healthz is public and returns 200 without a session", async () => {
   assert.equal(isPublicPath("/api/health"), false);
   assert.equal(isPublicPath("/api/auth"), true);
 
-  const body = await GET();
-  assert.equal(body.status, 200);
-  assert.deepEqual(await body.json(), { ok: true });
+  const stub = await listen((req, res) => {
+    res.writeHead(req.url === "/healthz" ? 200 : 404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, leaked: "do-not-forward" }));
+  });
+  const previous = process.env.FHIR_PROXY_URL;
+  process.env.FHIR_PROXY_URL = `http://127.0.0.1:${stub.address().port}`;
+  try {
+    const body = await GET();
+    assert.equal(body.status, 200);
+    assert.deepEqual(await body.json(), { ok: true });
+  } finally {
+    await stop(stub);
+    if (previous === undefined) delete process.env.FHIR_PROXY_URL;
+    else process.env.FHIR_PROXY_URL = previous;
+  }
+
+  const down = await GET();
+  assert.equal(down.status, 503);
+  assert.deepEqual(await down.json(), { ok: false });
 });

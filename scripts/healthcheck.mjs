@@ -3,8 +3,8 @@
 // URL:  http://127.0.0.1:3000/healthz
 // Port: 3000 (Next.js, `next start -p 3000`, the port EXPOSE publishes)
 //
-// The FHIR proxy stays on 127.0.0.1:$FHIR_PROXY_PORT (default 3001) and is not
-// this check. PORT, if Dokploy sets it, is not the health URL.
+// Next's /healthz also asks the loopback proxy GET /healthz (FHIR_PROXY_URL,
+// 1s, no secret, no upstream FHIR). PORT, if Dokploy sets it, is not this URL.
 
 const url = "http://127.0.0.1:3000/healthz";
 

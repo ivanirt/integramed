@@ -67,7 +67,7 @@ Las escrituras clínicas van al proxy (`FHIR_PROXY_URL`, `http://127.0.0.1:3001`
 
 Quien tiene pacientes puede abrir la ficha. Recetas y estudios están en esa ficha (`/pacientes/:id/recetas`, `/pacientes/:id/estudios`). Guardar un estudio crea DiagnosticReport. Pedir un estudio crea ServiceRequest. La farmacia guarda inventario en Basic. Nada de eso vuelve a comprobar el rol dentro de la server action: la puerta es la página y, en el proxy, la sesión firmada.
 
-El proxy escucha solo en loopback y pide el secreto interno más una sesión firmada de un rol de clínica. Next ya no deja pasar `/api/fhir` ni `/api/health` sin esa cookie. `GET /healthz` (Next en el puerto 3000, y el mismo path en el proxy) responde 200 sin cookie ni secreto: es la sonda del HEALTHCHECK, no el estado FHIR. Las escrituras de la bóveda piden rol `admin`.
+El proxy escucha solo en loopback y pide el secreto interno más una sesión firmada de un rol de clínica. Next ya no deja pasar `/api/fhir` ni `/api/health` sin esa cookie. `GET /healthz` del proxy responde 200 sin cookie ni secreto. El `GET /healthz` de Next (puerto 3000, la sonda del HEALTHCHECK) hace lo mismo y, además, comprueba que el proxy conteste el suyo en menos de un segundo; si no, responde 503. No es el estado FHIR. Las escrituras de la bóveda piden rol `admin`.
 
 ## Pacientes
 

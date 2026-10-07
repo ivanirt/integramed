@@ -66,6 +66,7 @@ export async function POST(request: Request) {
       passwordHash,
       passwordRequired: true,
       passwordChangedAt: changedAt,
+      mustChangePassword: false,
       resetTokenHash: null,
       resetExpiresAt: null,
     };

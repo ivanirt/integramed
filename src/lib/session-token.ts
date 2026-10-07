@@ -7,9 +7,11 @@ export type SessionClaims = {
   role: string;
   pwdAt: number;
   exp: number;
+  /** Hint for edge middleware. accounts.json remains the source of truth. */
+  mustChange?: boolean;
 };
 
-/** Signed cookie payload. Extra `pwdAt` is ignored by the edge verifier and kept by the proxy. */
+/** Signed cookie payload. `pwdAt` and `mustChange` are kept by the proxy and the edge check. */
 export function buildSessionToken(claims: SessionClaims, secret: string): string {
   const payload = Buffer.from(
     JSON.stringify({
@@ -18,6 +20,7 @@ export function buildSessionToken(claims: SessionClaims, secret: string): string
       login: claims.login,
       role: claims.role,
       pwdAt: claims.pwdAt,
+      mustChange: claims.mustChange === true,
       exp: claims.exp,
     }),
   ).toString("base64url");

@@ -9,6 +9,7 @@ import { ROLE_SCREENS } from "@/lib/roles";
 export default async function LoggedLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user) redirect("/acceso");
+  if (user.mustChangePassword) redirect("/cuenta/contrasena");
   const { modules } = await loadModules().catch(() => ({ modules: {} as Record<string, boolean> }));
   const screens = (ROLE_SCREENS[user.role] || []).filter((screen) => canAccess(user.role, screen, modules));
   const collapsed = (await cookies()).get("integramed_sidebar_collapsed")?.value === "true";

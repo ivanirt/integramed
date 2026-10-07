@@ -5,11 +5,16 @@ import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
 import { LOGIN_ERROR } from "@/lib/password-reset";
+import { PASSWORD_CHANGE_REQUIRED_ERROR } from "@/lib/password-change-gate";
 import { checkLoginPassword } from "@/lib/passwords";
 import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
 
 export async function GET() {
-  return NextResponse.json({ user: await getSession() });
+  const user = await getSession();
+  if (user?.mustChangePassword) {
+    return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
+  }
+  return NextResponse.json({ user });
 }
 
 export async function POST(request: Request) {
@@ -29,6 +34,9 @@ export async function POST(request: Request) {
   if (action === "switch-role") {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Sin sesión" }, { status: 401 });
+    if (session.mustChangePassword) {
+      return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
+    }
     const role = body.role as RoleId;
     const staff = await listStaff();
     const me = staff.find((s) => s.id === session.id);
@@ -66,6 +74,7 @@ export async function POST(request: Request) {
   const requested = body.role as RoleId;
   const role = requested && user.roles.includes(requested) ? requested : user.primaryRole;
   const session = { id: user.id, name: user.name, login: user.login, role };
-  await createSession(session, { pwdAt: decision.pwdAt });
-  return NextResponse.json({ user: session });
+  const mustChangePassword = account?.mustChangePassword === true;
+  await createSession(session, { pwdAt: decision.pwdAt, mustChange: mustChangePassword });
+  return NextResponse.json({ user: { ...session, mustChangePassword } });
 }

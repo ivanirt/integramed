@@ -86,11 +86,7 @@ export function ClinicShell({
   }
 
   async function logout() {
-    await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "logout" }),
-    });
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/acceso");
     router.refresh();
   }
@@ -225,6 +221,14 @@ export function ClinicShell({
               ))}
             </select>
           ) : null}
+          <Link
+            href="/cuenta/contrasena"
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+            className={`mt-3 block text-xs text-[#6D5E52] underline ${collapsed ? "text-center" : ""}`}
+          >
+            {collapsed ? "Clave" : "Cambiar contraseña"}
+          </Link>
           {!collapsed ? (
             <button type="button" onClick={logout} className="mt-3 text-xs text-[#6D5E52] underline">
               Salir

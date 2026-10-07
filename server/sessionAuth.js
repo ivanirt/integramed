@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import { isSessionPasswordCurrent } from '../src/lib/session-stamp.js';
+import { passwordChangeRequired } from '../src/lib/must-change.js';
 import { accountsFile } from '../src/lib/auth-root.js';
 import { isPractitionerMutation } from '../src/lib/fhir-path.js';
 
@@ -56,7 +57,8 @@ export function verifySessionToken(token, secret) {
       login: String(data.login || ''),
       role: data.role,
       exp: data.exp,
-      pwdAt: typeof data.pwdAt === 'number' && Number.isFinite(data.pwdAt) ? data.pwdAt : 0
+      pwdAt: typeof data.pwdAt === 'number' && Number.isFinite(data.pwdAt) ? data.pwdAt : 0,
+      mustChange: data.mustChange === true
     };
   } catch {
     return null;
@@ -100,11 +102,13 @@ export function isVaultWrite(req) {
 
 export function readPasswordStamps(root) {
   try {
-    const raw = fs.readFileSync(accountsFile(root), 'utf8');
+    const file = accountsFile(root);
+    if (!fs.existsSync(file)) return { ok: true, accounts: [] };
+    const raw = fs.readFileSync(file, 'utf8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.accounts) ? parsed.accounts : [];
+    return { ok: true, accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [] };
   } catch {
-    return [];
+    return { ok: false, accounts: [] };
   }
 }
 
@@ -115,8 +119,12 @@ export function requireClinicAccess(req, res, next) {
     return res.status(401).json({ error: 'No autorizado' });
   }
   const user = sessionFromRequest(req);
-  if (!user || !isSessionPasswordCurrent(user, readPasswordStamps())) {
+  const stamps = readPasswordStamps();
+  if (!stamps.ok || !user || !isSessionPasswordCurrent(user, stamps.accounts)) {
     return res.status(401).json({ error: 'No autorizado' });
+  }
+  if (passwordChangeRequired(user, stamps.accounts, true)) {
+    return res.status(403).json({ error: 'Debes cambiar tu contraseña.' });
   }
   if (isVaultWrite(req) && user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administración puede modificar la bóveda.' });

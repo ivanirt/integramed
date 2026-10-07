@@ -10,6 +10,11 @@ export type CredentialAccount = {
   passwordRequired: boolean;
   /** Epoch ms of the last password change. Older sessions are rejected. */
   passwordChangedAt: number;
+  /**
+   * Temporary password. Missing or any value other than true means false.
+   * The account can only change this password until it is cleared.
+   */
+  mustChangePassword: boolean;
   resetTokenHash: string | null;
   resetExpiresAt: number | null;
 };
@@ -32,16 +37,19 @@ function normalize(raw: Partial<CredentialAccount> | null | undefined): Credenti
     passwordHash: raw.passwordHash ? String(raw.passwordHash) : null,
     passwordRequired: Boolean(raw.passwordRequired),
     passwordChangedAt: Number(raw.passwordChangedAt || 0),
+    mustChangePassword: raw.mustChangePassword === true,
     resetTokenHash: raw.resetTokenHash ? String(raw.resetTokenHash) : null,
     resetExpiresAt: raw.resetExpiresAt == null ? null : Number(raw.resetExpiresAt),
   };
 }
 
-type AccountStore = { accounts: CredentialAccount[]; revision: number };
+type AccountStore = { ok: true; accounts: CredentialAccount[]; revision: number } | { ok: false };
 
 function readStore(root: string): AccountStore {
+  const file = credentialFile(root);
   try {
-    const parsed = JSON.parse(fs.readFileSync(credentialFile(root), "utf8")) as {
+    if (!fs.existsSync(file)) return { ok: true, accounts: [], revision: 0 };
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as {
       accounts?: Partial<CredentialAccount>[];
       revision?: number;
     };
@@ -49,14 +57,24 @@ function readStore(root: string): AccountStore {
       ? parsed.accounts.map((account) => normalize(account)).filter((account): account is CredentialAccount => Boolean(account))
       : [];
     const revision = Number(parsed.revision || 0);
-    return { accounts, revision: Number.isFinite(revision) && revision >= 0 ? revision : 0 };
+    return { ok: true, accounts, revision: Number.isFinite(revision) && revision >= 0 ? revision : 0 };
   } catch {
-    return { accounts: [], revision: 0 };
+    return { ok: false };
   }
 }
 
 export function readAccounts(root = defaultAuthRoot()): CredentialAccount[] {
-  return readStore(root).accounts;
+  const loaded = readStore(root);
+  return loaded.ok ? loaded.accounts : [];
+}
+
+/** `ok: false` means the file exists but could not be read. Callers that authorize access must fail closed. */
+export function readAccountsResult(
+  root = defaultAuthRoot(),
+): { ok: true; accounts: CredentialAccount[] } | { ok: false } {
+  const loaded = readStore(root);
+  if (!loaded.ok) return { ok: false };
+  return { ok: true, accounts: loaded.accounts };
 }
 
 function writeAccountsAtomic(accounts: CredentialAccount[], root: string, revision: number): void {
@@ -125,8 +143,9 @@ function withAuthLock<T>(root: string, fn: () => T): T {
 
 export function writeAccounts(accounts: CredentialAccount[], root = defaultAuthRoot()): void {
   withAuthLock(root, () => {
-    const revision = readStore(root).revision + 1;
-    writeAccountsAtomic(accounts, root, revision);
+    const current = readStore(root);
+    if (!current.ok) throw new Error("No se pudo leer accounts.json");
+    writeAccountsAtomic(accounts, root, current.revision + 1);
   });
 }
 
@@ -137,6 +156,7 @@ export function blankAccount(practitionerId: string, email: string, passwordRequ
     passwordHash: null,
     passwordRequired,
     passwordChangedAt: 0,
+    mustChangePassword: false,
     resetTokenHash: null,
     resetExpiresAt: null,
   };
@@ -149,11 +169,14 @@ export function mutateAccounts(
   return withAuthLock(root, () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const before = readStore(root);
+      if (!before.ok) throw new Error("No se pudo leer accounts.json");
       const accounts = before.accounts.map((account) => ({ ...account }));
       mutate(accounts);
-      if (readStore(root).revision !== before.revision) continue;
+      const again = readStore(root);
+      if (!again.ok || again.revision !== before.revision) continue;
       writeAccountsAtomic(accounts, root, before.revision + 1);
-      if (readStore(root).revision === before.revision + 1) return accounts;
+      const written = readStore(root);
+      if (written.ok && written.revision === before.revision + 1) return accounts;
     }
     throw new Error("No se pudo guardar accounts.json");
   });

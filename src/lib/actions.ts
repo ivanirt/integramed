@@ -8,10 +8,11 @@ import { upsertStaff } from "./staff";
 import type { RoleId } from "./roles";
 import { SYSTEMS } from "./roles";
 import { VITAL_FIELDS } from "./vitals";
-import { requireAdmin, requireSelfOrAdmin } from "./require";
+import { requireAdmin, requireSelfOrAdmin, requireUser } from "./require";
 import { addMinutesToFhirDateTime, toFhirDateTime } from "./agenda";
 
 export async function createPatientAction(formData: FormData) {
+  await requireUser();
   const given = String(formData.get("given") || "").trim();
   const family = String(formData.get("family") || "").trim();
   const gender = String(formData.get("gender") || "unknown");
@@ -28,6 +29,7 @@ export async function createPatientAction(formData: FormData) {
 }
 
 export async function createAppointmentAction(formData: FormData) {
+  await requireUser();
   const patientId = String(formData.get("patientId"));
   const practitionerId = String(formData.get("practitionerId"));
   const start = String(formData.get("start"));
@@ -55,6 +57,7 @@ export async function createAppointmentAction(formData: FormData) {
 }
 
 export async function moveAppointmentAction(formData: FormData) {
+  await requireUser();
   const id = String(formData.get("id"));
   const start = String(formData.get("start"));
   const minutes = Number(formData.get("minutes") || 30);
@@ -74,6 +77,7 @@ function patientIdFromAppointment(appt: FhirResource) {
 }
 
 export async function startConsultFromAppointment(appointmentId: string) {
+  await requireUser();
   const appt = await fhirRead("Appointment", appointmentId);
   const patientId = patientIdFromAppointment(appt);
   const allEncounters = await fhirSearch("Encounter");
@@ -99,6 +103,7 @@ export async function startConsultFromAppointment(appointmentId: string) {
 }
 
 export async function saveSoapAction(formData: FormData) {
+  await requireUser();
   const encounterId = String(formData.get("encounterId"));
   const patientId = String(formData.get("patientId"));
   const subjective = String(formData.get("subjective") || "");
@@ -156,6 +161,7 @@ function escapeHtml(value: string) {
 }
 
 export async function saveVitalsAction(formData: FormData) {
+  await requireUser();
   const patientId = String(formData.get("patientId"));
   const encounterId = String(formData.get("encounterId"));
   const handoff = String(formData.get("handoff") || "") === "1";
@@ -194,6 +200,7 @@ export async function saveVitalsAction(formData: FormData) {
 }
 
 export async function beginDoctorConsultAction(encounterId: string) {
+  await requireUser();
   const encounter = await fhirRead("Encounter", encounterId);
   if (encounter.status === "triaged" || encounter.status === "arrived") {
     await fhirUpdate({ ...encounter, status: "in-progress" });
@@ -202,6 +209,7 @@ export async function beginDoctorConsultAction(encounterId: string) {
 }
 
 export async function finalizeConsultAction(formData: FormData) {
+  await requireUser();
   await saveSoapAction(formData);
   const encounterId = String(formData.get("encounterId"));
   const patientId = String(formData.get("patientId"));
@@ -242,11 +250,13 @@ export async function finalizeConsultAction(formData: FormData) {
 }
 
 export async function saveIntegrativeCatalogAction(items: IntegrativeModality[], id?: string) {
+  await requireUser();
   await saveIntegrativeCatalog(items, id);
   revalidatePath("/config/integrativa");
 }
 
 export async function createMedicationRequestAction(formData: FormData) {
+  await requireUser();
   const patientId = String(formData.get("patientId"));
   const medication = String(formData.get("medication") || "").trim();
   const dosage = String(formData.get("dosage") || "").trim();
@@ -263,6 +273,7 @@ export async function createMedicationRequestAction(formData: FormData) {
 }
 
 export async function createServiceRequestAction(formData: FormData) {
+  await requireUser();
   const patientId = String(formData.get("patientId"));
   const code = String(formData.get("study") || "").trim();
   await fhirCreate({
@@ -277,6 +288,7 @@ export async function createServiceRequestAction(formData: FormData) {
 }
 
 export async function saveDiagnosticReportAction(formData: FormData) {
+  await requireUser();
   const patientId = String(formData.get("patientId"));
   const conclusion = String(formData.get("conclusion") || "").trim();
   const title = String(formData.get("title") || "Estudio");
@@ -329,6 +341,7 @@ export async function deleteResourceAction(type: string, id: string, path: strin
 }
 
 export async function saveLeaveAction(formData: FormData) {
+  await requireUser();
   const practitionerId = String(formData.get("practitionerId"));
   await requireSelfOrAdmin(practitionerId);
   const practitioner = await fhirRead("Practitioner", practitionerId);
@@ -358,17 +371,20 @@ export async function deleteLeaveAction(id: string, practitionerId: string) {
 }
 
 export async function saveModulesAction(modules: Record<string, boolean>, id?: string) {
+  await requireUser();
   await saveModules(modules, id);
   revalidatePath("/config/modulos");
 }
 
 export async function saveOrgAction(formData: FormData) {
+  await requireUser();
   const name = String(formData.get("name") || "").trim();
   await fhirCreate({ resourceType: "Organization", name, active: true });
   revalidatePath("/config/sedes");
 }
 
 export async function saveLocationAction(formData: FormData) {
+  await requireUser();
   const name = String(formData.get("name") || "").trim();
   const orgId = String(formData.get("orgId") || "");
   await fhirCreate({
@@ -381,6 +397,7 @@ export async function saveLocationAction(formData: FormData) {
 }
 
 export async function saveServiceAction(formData: FormData) {
+  await requireUser();
   const name = String(formData.get("name") || "").trim();
   await fhirCreate({
     resourceType: "HealthcareService",
@@ -410,6 +427,7 @@ export async function saveStaffAction(formData: FormData) {
 }
 
 export async function saveInventoryAction(formData: FormData) {
+  await requireUser();
   const name = String(formData.get("name") || "").trim();
   const qty = Number(formData.get("qty") || 0);
   await fhirCreate({

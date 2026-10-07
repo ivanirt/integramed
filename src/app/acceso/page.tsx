@@ -23,6 +23,10 @@ function AccesoForm() {
       setStatus(data.error || "No se pudo entrar.");
       return;
     }
+    if (data.user?.mustChangePassword) {
+      window.location.href = "/cuenta/contrasena";
+      return;
+    }
     window.location.href = params.get("next") || "/";
   }
 

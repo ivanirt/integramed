@@ -8,6 +8,7 @@ import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credential
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
 import { ROLE_LABELS, SYSTEMS, type RoleId } from "../src/lib/roles.ts";
+import { readCliPassword, rejectPasswordArguments, warnDeprecatedPasswordEnv } from "./cli-password.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env") });
@@ -26,8 +27,10 @@ type Practitioner = {
 
 function usage(): never {
   console.error(
-    "Uso: npm run create-user -- <correo> [--given Nombre] [--family Apellido] [--role admin] [--prefix Lic.]",
+    "Uso: npm run create-user -- --email <correo> [--given Nombre] [--family Apellido] [--role admin] [--prefix Lic.] [--must-change]",
   );
+  console.error("El correo también puede ir como primer argumento, sin --email.");
+  console.error("Con --must-change la contraseña se escribe en un prompt oculto (o por stdin si no hay terminal). No la pongas como argumento ni en el entorno.");
   process.exit(1);
 }
 
@@ -37,19 +40,26 @@ function parseArgs(argv: string[]) {
   let family = "";
   let role = "admin";
   let prefix = "";
+  let emailFlag = "";
+  let mustChange = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--given") given = argv[++i] || "";
     else if (arg === "--family") family = argv[++i] || "";
     else if (arg === "--role") role = argv[++i] || "";
     else if (arg === "--prefix") prefix = argv[++i] || "";
+    else if (arg === "--email") emailFlag = argv[++i] || "";
+    else if (arg === "--must-change") mustChange = true;
     else if (arg === "--") continue;
     else if (arg.startsWith("--")) {
-      console.error(`Opción desconocida: ${arg}`);
+      console.error(`Opción desconocida: ${arg.split("=", 1)[0]}`);
       usage();
     } else positional.push(arg);
   }
-  const email = (positional[0] || "").trim().toLowerCase();
+  const positionalEmail = (positional[0] || "").trim().toLowerCase();
+  const flaggedEmail = emailFlag.trim().toLowerCase();
+  if (flaggedEmail && positionalEmail && flaggedEmail !== positionalEmail) usage();
+  const email = flaggedEmail || positionalEmail;
   if (!EMAIL.test(email) || positional.length > 1) usage();
   if (!ROLES.includes(role as RoleId)) {
     console.error(`Rol no válido: ${role}. Usa uno de: ${ROLES.join(", ")}`);
@@ -59,7 +69,14 @@ function parseArgs(argv: string[]) {
     const local = email.split("@")[0] || "Usuario";
     given = local.charAt(0).toUpperCase() + local.slice(1);
   }
-  return { email, given: given.trim(), family: family.trim(), role: role as RoleId, prefix: prefix.trim() };
+  return {
+    email,
+    given: given.trim(),
+    family: family.trim(),
+    role: role as RoleId,
+    prefix: prefix.trim(),
+    mustChange,
+  };
 }
 
 function newId() {
@@ -75,7 +92,10 @@ function loginOf(resource: Practitioner) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  rejectPasswordArguments(argv);
+  warnDeprecatedPasswordEnv();
+  const options = parseArgs(argv);
   const mode = String(process.env.FHIR_MODE || "local").toLowerCase();
   if (mode !== "local") {
     console.warn(
@@ -83,15 +103,17 @@ async function main() {
     );
   }
 
-  const plain = process.env.CREATE_USER_PASSWORD || "";
+  let plain = "";
   let passwordHash: string | null = null;
-  if (plain) {
+  if (options.mustChange) {
+    plain = await readCliPassword();
     const problem = validateNewPassword(plain, plain);
     if (problem) {
       console.error(problem);
       process.exit(1);
     }
     passwordHash = await hashPassword(plain);
+    plain = "";
   }
 
   const { listType, writeResource } = createLocalFhirStore(root);
@@ -151,23 +173,25 @@ async function main() {
     if (passwordHash) {
       account.passwordHash = passwordHash;
       account.passwordChangedAt = Date.now();
+      account.mustChangePassword = true;
     }
     accounts.push(account);
     writeAccounts(accounts, authRoot);
     passwordNote = passwordHash
-      ? "Contraseña definida desde CREATE_USER_PASSWORD (no quedó escrita en el repositorio)."
+      ? "Contraseña temporal definida. Hay que cambiarla al entrar. No quedó escrita en el registro."
       : "Contraseña: sin definir. Usa npm run set-password o el correo de restablecimiento.";
   } else {
     const account = accounts[index];
     account.practitionerId = practitionerId;
     account.email = options.email;
-    if (passwordHash && !account.passwordHash) {
+    if (passwordHash) {
       account.passwordHash = passwordHash;
       account.passwordRequired = true;
       account.passwordChangedAt = Date.now();
+      account.mustChangePassword = true;
       account.resetTokenHash = null;
       account.resetExpiresAt = null;
-      passwordNote = "Contraseña inicial definida desde CREATE_USER_PASSWORD. La anterior no existía.";
+      passwordNote = "Contraseña temporal definida. Hay que cambiarla al entrar. No quedó escrita en el registro.";
     } else if (account.passwordHash) {
       passwordNote = "La contraseña ya existente no se modificó.";
     } else {
@@ -186,12 +210,11 @@ async function main() {
   console.log(passwordNote);
   if (!passwordHash || passwordNote.includes("no se modificó") || passwordNote.includes("Sigue sin")) {
     console.log("");
-    console.log("Para definirla sin escribirla en un archivo ni en el registro:");
-    console.log(`SET_PASSWORD='…' npm run set-password -- ${options.email}`);
-    console.log("O, con SMTP configurado, usa «¿Olvidaste tu contraseña?» en /acceso.");
-    console.log("En desarrollo, PASSWORD_RESET_LOG_LINK=1 imprime el enlace en la consola del proceso web.");
+    console.log("Para definir una contraseña temporal, sin escribirla en un archivo, en los argumentos ni en el registro:");
+    console.log(`npm run create-user -- --email ${options.email} --role ${options.role} --must-change`);
+    console.log("La contraseña se escribe en el prompt oculto. Con SMTP también vale «¿Olvidaste tu contraseña?» en /acceso.");
   } else {
-    console.log("Ya puede entrar en http://localhost:3000/acceso con ese correo.");
+    console.log("Al entrar en /acceso tendrá que elegir una contraseña nueva.");
   }
 }
 

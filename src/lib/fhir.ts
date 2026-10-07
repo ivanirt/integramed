@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { SYSTEMS } from "./roles";
 import { displayName } from "./display-name";
 import { fhirProxyHeaders, fhirProxyOrigin } from "./proxy";
@@ -38,6 +39,8 @@ async function assertPractitionerWrite(path: string, method: string) {
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<unknown> {
+  const session = await getSession();
+  if (session?.mustChangePassword) redirect("/cuenta/contrasena");
   await assertPractitionerWrite(path, init.method || "GET");
   const url = `${fhirProxyOrigin()}/api/fhir/${path.replace(/^\//, "")}`;
   const headers = await fhirProxyHeaders({

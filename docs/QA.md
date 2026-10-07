@@ -27,7 +27,7 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 - Con la contraseña del archivo, el correo entra y el rol de la sesión es el de esa fila. La cookie va firmada; el proxy FHIR la exige igual que el middleware.
 - Un correo que no existe, una cuenta sin contraseña personal y una contraseña equivocada responden lo mismo: «Contraseña incorrecta.» y estado 401.
 - No hay contraseña compartida. Una cuenta sin hash personal no inicia sesión. `CLINIC_MASTER_PASSWORD` no abre sesión. La contraseña se define con «¿Olvidaste tu contraseña?» o con `npm run set-password`.
-- «Salir» en el pie llama `POST /api/auth` con `action: logout`, borra la cookie y vuelve a `/acceso`.
+- «Salir» en el pie llama `POST /api/auth/logout`, borra la cookie y vuelve a `/acceso`. Con la contraseña temporal, esa es la única otra acción permitida además de cambiarla.
 - El selector de rol solo aparece si el Practitioner tiene más de un rol. Cada usuario de prueba tiene uno, así que no debe aparecer.
 
 ## Restablecer contraseña
@@ -37,7 +37,8 @@ El menú y `canAccess` salen de `ROLE_SCREENS`. `perfil` siempre está permitido
 - El enlace solo se envía al correo fijado en `accounts.json` (`create-user` o `set-password`). Si no hay correo fijado, no se genera token. Cambiar `telecom.email` del Practitioner no cambia el destino ni reescribe `accounts.json`.
 - En producción, sin `APP_BASE_URL` https no se genera token. El arranque lo avisa.
 - Solo una sesión `admin` puede crear, modificar o borrar un Practitioner (proxy y acciones del servidor). Un doctor que hace PUT/PATCH/POST/DELETE recibe 403.
-- Sin SMTP, la respuesta es la misma y no se genera enlace. En producción no se imprime. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El arranque avisa que el correo no está configurado. `npm run set-password -- <correo>` con `SET_PASSWORD` en el entorno asigna o reemplaza la contraseña sin escribirla en un archivo ni en el registro. El enlace, cuando existe, dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
+- Sin SMTP, la respuesta es la misma y no se genera enlace. En producción no se imprime. En local solo se imprime si `PASSWORD_RESET_LOG_LINK=1` (ese flag se ignora en producción). El arranque avisa que el correo no está configurado. `npm run set-password -- <correo>` asigna o reemplaza la contraseña: en un terminal el prompt está oculto y pide confirmación; sin terminal lee una línea de stdin. No va en los argumentos, en `SET_PASSWORD` (se ignora) ni en un archivo. El enlace, cuando existe, dura 45 minutos, es de un solo uso, y otro pedido anula el anterior.
+- `npm run create-user -- --email <correo> --role admin --must-change` crea la cuenta con contraseña temporal. `mustChangePassword` en `accounts.json` (si falta, es false) obliga a cambiarla en `/cuenta/contrasena` antes de ver la clínica. La misma pantalla, desde el menú o Perfil, cambia la contraseña de quien ya entró. La nueva no puede ser igual a la actual y sigue la regla de 8 caracteres, letra y número. Al guardarla se limpia el flag, cambia `passwordChangedAt` y la cookie anterior deja de servir.
 - `/acceso/restablecer?token=…` pide contraseña y confirmación (8 caracteres, una letra y un número).
 - Después se entra con la clave nueva. La cookie anterior deja de servir.
 

@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
 import type { RoleId } from "./roles";
-import { readAccounts } from "./credentials";
+import { readAccountsResult } from "./credentials";
+import { passwordChangeRequired } from "./must-change.js";
 import { isAcceptableSecret, KNOWN_ROLES, SESSION_COOKIE } from "./session-edge";
 import { isSessionPasswordCurrent } from "./session-stamp.js";
 import { buildSessionToken } from "./session-token";
@@ -11,6 +12,11 @@ export type SessionUser = {
   name: string;
   login: string;
   role: RoleId;
+};
+
+export type ActiveSession = SessionUser & {
+  /** From accounts.json, not from the cookie. Missing flag means false. */
+  mustChangePassword: boolean;
 };
 
 const COOKIE = SESSION_COOKIE;
@@ -29,7 +35,7 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-type TokenBody = SessionUser & { exp: number; pwdAt?: number };
+type TokenBody = SessionUser & { exp: number; pwdAt?: number; mustChange?: boolean };
 
 function readToken(token: string | undefined): TokenBody | null {
   if (!token) return null;
@@ -56,8 +62,19 @@ async function currentPwdAt(): Promise<number> {
   return readToken(store.get(COOKIE)?.value)?.pwdAt || 0;
 }
 
-export async function createSession(user: SessionUser, options?: { pwdAt?: number }): Promise<void> {
+function mustChangeFromFile(userId: string, explicit?: boolean): boolean {
+  const loaded = readAccountsResult();
+  if (!loaded.ok) return true;
+  const fromFile = passwordChangeRequired({ id: userId }, loaded.accounts, true);
+  return fromFile || explicit === true;
+}
+
+export async function createSession(
+  user: SessionUser,
+  options?: { pwdAt?: number; mustChange?: boolean },
+): Promise<void> {
   const pwdAt = options && typeof options.pwdAt === "number" ? options.pwdAt : await currentPwdAt();
+  const mustChange = mustChangeFromFile(user.id, options?.mustChange);
   const token = buildSessionToken(
     {
       id: user.id,
@@ -65,6 +82,7 @@ export async function createSession(user: SessionUser, options?: { pwdAt?: numbe
       login: user.login,
       role: user.role,
       pwdAt,
+      mustChange,
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
     },
     secret(),
@@ -84,12 +102,21 @@ export async function clearSession(): Promise<void> {
   store.delete(COOKIE);
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+export async function getSession(): Promise<ActiveSession | null> {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
   const data = readToken(token);
   if (!data?.id || !KNOWN_ROLES.has(data.role)) return null;
-  if (!isSessionPasswordCurrent({ id: data.id, pwdAt: data.pwdAt }, readAccounts())) return null;
-  return { id: data.id, name: data.name, login: data.login, role: data.role as RoleId };
+  const loaded = readAccountsResult();
+  if (!loaded.ok) return null;
+  if (!isSessionPasswordCurrent({ id: data.id, pwdAt: data.pwdAt }, loaded.accounts)) return null;
+  const mustChangePassword = passwordChangeRequired({ id: data.id }, loaded.accounts, true);
+  return {
+    id: data.id,
+    name: data.name,
+    login: data.login,
+    role: data.role as RoleId,
+    mustChangePassword,
+  };
 }

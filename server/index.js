@@ -60,8 +60,21 @@ function describeFetchError(err) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 const HOST = '127.0.0.1';
+
+// Loopback FHIR proxy port. This is not the public Next.js port (3000) and it
+// does not follow PORT: Dokploy may set PORT for the published service, and
+// older images used PORT=3001 for this proxy. Either value must not move the
+// listener or collide with Next.
+export function proxyListenPort(env = process.env) {
+  const raw = env.FHIR_PROXY_PORT;
+  if (raw == null || String(raw).trim() === '') return 3001;
+  const port = Number(String(raw).trim());
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return port;
+}
+
+const PORT = proxyListenPort();
 
 app.use(express.json({
   type: ['application/json', 'application/fhir+json', 'application/*+json'],
@@ -77,7 +90,7 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 const DATA_ROOT = process.env.INTEGRAMED_DATA_ROOT
   ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
   : PROJECT_ROOT;
-const LOCAL_FHIR_PUBLIC = `http://127.0.0.1:${process.env.PORT || 3001}/fhir`;
+const LOCAL_FHIR_PUBLIC = `http://127.0.0.1:${PORT || 3001}/fhir`;
 const localFhir = createLocalFhirHandler(DATA_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
 
 function isLocalFhirMode() {
@@ -146,6 +159,13 @@ app.post('/api/internal/staff-lookup', async (req, res) => {
     console.error('[staff-lookup]', err instanceof Error ? err.message : 'failed');
     return res.status(503).json({ error: 'No se pudo consultar el personal' });
   }
+});
+
+// Liveness for the Docker HEALTHCHECK and other unauthenticated probes.
+// No cookie, no proxy secret, and no call to the upstream FHIR server.
+// FHIR status stays on GET /api/health, behind requireClinicAccess.
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true });
 });
 
 app.use(requireClinicAccess);
@@ -519,7 +539,14 @@ function assertProxySecrets() {
 export { app };
 
 if (process.env.FHIR_PROXY_NO_LISTEN !== '1') {
+  if (PORT == null) {
+    console.error('[FHIR Proxy] FHIR_PROXY_PORT must be an integer from 1 to 65535.');
+    process.exit(1);
+  }
   assertProxySecrets();
+  if (process.env.PORT) {
+    console.log(`[FHIR Proxy] PORT=${process.env.PORT} is ignored. Loopback proxy listens on ${PORT}. Next.js serves HTTP on port 3000.`);
+  }
   if (isLocalFhirMode()) {
     const ids = localFhir.store.listType('Practitioner').map((resource) => resource?.id).filter(Boolean);
     logAccountsMissingFromStore(readAccountEntries(defaultAuthStorageRoot(PROJECT_ROOT)), ids);

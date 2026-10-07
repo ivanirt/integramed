@@ -2,21 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { ADMIN_ONLY_MESSAGE, authorizePage } from "@/lib/action-roles.js";
 import { isAcceptableSecret, verifySessionToken } from "@/lib/session-edge";
+import { isPublicPath } from "@/lib/public-path";
 
 // This edge check verifies the signature, expiry, and a known role.
 // It does not read accounts.json, so it cannot reject a cookie issued before
 // the current password. Sensitive route handlers (for example /api/cie) must
 // call getSession(), which includes that pwdAt check.
-
-const PUBLIC = ["/acceso", "/api/auth"];
-
-function isPublic(pathname: string) {
-  return (
-    PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico"
-  );
-}
 
 function wantsJson(pathname: string) {
   return pathname.startsWith("/api/") || pathname === "/fhir" || pathname.startsWith("/fhir/");
@@ -24,7 +15,7 @@ function wantsJson(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (isPublic(pathname)) return NextResponse.next();
+  if (isPublicPath(pathname)) return NextResponse.next();
 
   const secret = process.env.SESSION_SECRET || "";
   const token = request.cookies.get("integramed_session")?.value;

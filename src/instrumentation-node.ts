@@ -26,7 +26,8 @@ export async function runNodeStartup(): Promise<void> {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   }
-  if (String(process.env.FHIR_MODE || "").toLowerCase() === "local") {
+  const { fhirModeIsLocal } = await import("@/lib/fhir-mode");
+  if (fhirModeIsLocal()) {
     try {
       const { assertFhirRootWritable } = await import("@/lib/fhir-root");
       assertFhirRootWritable();

@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { collectDataRootProblems } from "../src/lib/startup-data.js";
+import { readAccounts } from "../src/lib/credentials.ts";
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/supervise.mjs");
 const root = process.getuid?.() !== 0;
@@ -50,6 +51,86 @@ test("preflight reports auth and FHIR together when both roots are not writable"
     fs.rmSync(auth, { recursive: true, force: true });
     fs.rmSync(fhir, { recursive: true, force: true });
   }
+});
+
+test("preflight treats FHIR_MODE case-insensitively", () => {
+  if (!root) return;
+  const auth = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-ok-"));
+  const fhir = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-ro-"));
+  const vault = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-vault-ok-"));
+  fs.chmodSync(fhir, 0o555);
+  try {
+    const problems = withEnv(
+      {
+        INTEGRAMED_AUTH_ROOT: auth,
+        INTEGRAMED_FHIR_ROOT: fhir,
+        INTEGRAMED_VAULT_ROOT: vault,
+        FHIR_MODE: "Local",
+      },
+      () => collectDataRootProblems(),
+    );
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /directorio FHIR/);
+  } finally {
+    fs.chmodSync(fhir, 0o755);
+    fs.rmSync(auth, { recursive: true, force: true });
+    fs.rmSync(fhir, { recursive: true, force: true });
+    fs.rmSync(vault, { recursive: true, force: true });
+  }
+});
+
+test("preflight reports an unreadable accounts.json", () => {
+  if (!root) return;
+  const auth = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-ok-"));
+  const vault = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-vault-ok-"));
+  const file = path.join(auth, "accounts.json");
+  fs.writeFileSync(file, '{"accounts":[{"passwordHash":"hash-should-not-log"}]}');
+  fs.chmodSync(file, 0o000);
+  try {
+    const problems = withEnv(
+      { INTEGRAMED_AUTH_ROOT: auth, INTEGRAMED_VAULT_ROOT: vault, FHIR_MODE: "proxy" },
+      () => collectDataRootProblems(),
+    );
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /accounts\.json no se puede leer/);
+    assert.match(problems[0], /chown -R 1001:1001/);
+    assert.doesNotMatch(problems[0], /hash-should-not-log/);
+  } finally {
+    fs.chmodSync(file, 0o644);
+    fs.rmSync(auth, { recursive: true, force: true });
+    fs.rmSync(vault, { recursive: true, force: true });
+  }
+});
+
+test("reading an unreadable accounts.json logs the code and not the file", () => {
+  if (!root) return;
+  const auth = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-ok-"));
+  const file = path.join(auth, "accounts.json");
+  fs.writeFileSync(file, '{"accounts":[{"passwordHash":"hash-should-not-log"}]}');
+  fs.chmodSync(file, 0o000);
+  const errors = [];
+  const original = console.error;
+  console.error = (...args) => errors.push(args.map(String).join(" "));
+  try {
+    assert.deepEqual(readAccounts(auth), []);
+    const log = errors.join("\n");
+    assert.match(log, /EACCES/);
+    assert.match(log, /chown -R 1001:1001/);
+    assert.doesNotMatch(log, /hash-should-not-log/);
+  } finally {
+    console.error = original;
+    fs.chmodSync(file, 0o644);
+    fs.rmSync(auth, { recursive: true, force: true });
+  }
+});
+
+test("production start does not depend on concurrently", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(script), "../package.json"), "utf8"));
+  assert.equal(pkg.dependencies.concurrently, undefined);
+  assert.equal(typeof pkg.devDependencies.concurrently, "string");
+  assert.equal(pkg.scripts.start, "node scripts/supervise.mjs");
+  const supervisor = fs.readFileSync(script, "utf8");
+  assert.doesNotMatch(supervisor, /require\(["']concurrently["']\)/);
 });
 
 test("preflight skips the FHIR root unless FHIR_MODE is local", () => {

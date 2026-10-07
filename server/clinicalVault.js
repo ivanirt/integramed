@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { inferSourceKind } from './vaultSourceTags.js';
+import { migrateVaultStorage, normalizeVaultLanguage as normalizeVaultLang, vaultReadRoots, vaultWriteRoot } from '../src/lib/vault-root.js';
 
 const STOPWORDS = new Set([
   'de', 'la', 'el', 'en', 'y', 'a', 'del', 'las', 'los', 'un', 'una', 'con', 'por', 'para',
@@ -323,19 +324,22 @@ export function invalidateVaultCache(vaultPath) {
 }
 
 export function normalizeVaultLanguage(lang) {
-  return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'es';
+  return normalizeVaultLang(lang);
 }
 
+/** Write target. Reads also see the bundled tree; see loadLanguageVaultNotes. */
 export function resolveVaultPath(lang, projectRoot) {
-  const normalized = normalizeVaultLanguage(lang);
-  const envKey = normalized === 'en' ? 'CLINICAL_VAULT_EN_PATH' : 'CLINICAL_VAULT_ES_PATH';
-  if (process.env[envKey]) return path.resolve(process.env[envKey]);
+  return vaultWriteRoot(lang, projectRoot);
+}
 
-  const named = path.resolve(projectRoot, `vault-${normalized}`);
-  if (fs.existsSync(named)) return named;
-
-  if (process.env.CLINICAL_VAULT_PATH) return path.resolve(process.env.CLINICAL_VAULT_PATH);
-  return path.resolve(projectRoot, 'vault');
+export function loadLanguageVaultNotes(lang, projectRoot) {
+  migrateVaultStorage(projectRoot);
+  const merged = new Map();
+  for (const root of vaultReadRoots(lang, projectRoot)) {
+    if (!fs.existsSync(root)) continue;
+    for (const note of loadVaultNotes(root)) merged.set(note.file, note);
+  }
+  return [...merged.values()];
 }
 
 export function loadVaultNotes(vaultPath) {

@@ -27,16 +27,26 @@ El login ya no crea al Practitioner `ivan` solo. El primer administrador se da d
 Crea el Practitioner del propietario sin contraseña (el comando es idempotente y no guarda claves en el repo):
 
 ```bash
-npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin
+npm run create-user -- --email ivanirt@gmail.com --given Ivan --family Renteria --role admin
 ```
 
-Para asignar la contraseña desde el servidor, sin escribirla en un archivo ni en el registro:
+El correo también puede ir como primer argumento, sin `--email`.
+
+Para dejar una contraseña temporal que hay que cambiar al entrar, el mismo comando pide la clave en un prompt oculto (y hay que repetirla). No queda en los argumentos, en el entorno, en el historial ni en el registro:
 
 ```bash
-SET_PASSWORD='…' npm run set-password -- ivanirt@gmail.com
+npm run create-user -- --email <correo> --role admin --must-change
 ```
 
-La contraseña se lee de `SET_PASSWORD` (o de una línea en stdin). No la pongas como argumento del comando. El mismo comando la reemplaza si ya existía. `CREATE_USER_PASSWORD` en el entorno hace lo mismo solo al crear, y no pisa una contraseña que ya esté guardada.
+Para asignar o reemplazar la contraseña de alguien que ya existe, `set-password` deja la contraseña como temporal (hay que cambiarla al entrar). `--must-change` es lo mismo. `--no-must-change` es lo que quita el flag:
+
+```bash
+npm run set-password -- <correo>
+npm run set-password -- <correo> --must-change
+npm run set-password -- <correo> --no-must-change
+```
+
+En un terminal, la contraseña se escribe oculta y se confirma. Sin terminal (un script, o `docker exec` sin `-t`), se lee una sola línea de stdin y no se confirma. No hay forma de pasarla por argv ni por el entorno: `--password`, `--pass` y `-p` se rechazan sin imprimir el valor. `SET_PASSWORD` y `CREATE_USER_PASSWORD` están en desuso: si siguen definidas, el comando avisa y las ignora.
 
 Con SMTP configurado, o en local con `PASSWORD_RESET_LOG_LINK=1`:
 
@@ -63,7 +73,7 @@ APP_BASE_URL=http://localhost:3000
 
 `SMTP_PASS` no es la contraseña normal de Google. En la cuenta: Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones → crear una para Correo. Pega los 16 caracteres en `SMTP_PASS`. `MAIL_FROM` debe ser esa misma cuenta.
 
-En producción, si faltan `SMTP_HOST` o `MAIL_FROM`, el proceso avisa al arrancar. La solicitud responde igual que si el correo existiera y no escribe el enlace en ningún registro. Un fallo de SMTP tampoco escribe el enlace. En ese caso la contraseña se asigna con `npm run set-password`.
+En producción, si faltan `SMTP_HOST` o `MAIL_FROM`, el proceso avisa al arrancar. La solicitud responde igual que si el correo existiera y no escribe el enlace en ningún registro. Un fallo de SMTP tampoco escribe el enlace. En ese caso la contraseña se asigna con `npm run set-password -- <correo>` (prompt oculto o stdin).
 
 ## Usuarios de prueba por rol
 
@@ -106,9 +116,37 @@ Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`,
 
 Las contraseñas y los tokens viven en `accounts.json`, dentro de `INTEGRAMED_AUTH_ROOT` (por defecto `data/auth`, en la imagen `/app/data/auth`). El almacén FHIR local vive en `INTEGRAMED_FHIR_ROOT` (por defecto `data/fhir`, en la imagen `/app/data/fhir`). En Dokploy monta los dos volúmenes persistentes: `/app/data/auth` y `/app/data/fhir`. Sin el de auth, un redeploy borra las contraseñas. Sin el de FHIR, las contraseñas siguen y el Practitioner no: el login responde 401 y el registro avisa qué cuenta quedó sin Practitioner. Si el directorio de auth no se puede escribir, Next sale con error y el contenedor termina con un código distinto de cero. Si el directorio existe pero el usuario del contenedor (uid 1001) no puede escribir, el mensaje pide `chown -R 1001:1001` sobre ese volumen. Con `FHIR_MODE=local`, el proxy hace la misma prueba sobre `INTEGRAMED_FHIR_ROOT` antes de escuchar: si no puede escribir, sale enseguida en lugar de marcarse sano y caer en la primera escritura clínica. `node scripts/supervise.mjs` es el proceso principal. Antes de arrancar a Next y al proxy comprueba auth y, con `FHIR_MODE=local`, FHIR, y escribe cada problema a la vez. Si Next o el proxy salen solos, aunque el código sea 0, el registro nombra cuál fue, el código o la señal, y el código con el que termina el contenedor (distinto de cero). `docker stop` (SIGTERM o SIGINT a ese proceso) termina con código 0 y deja una línea de apagado limpio.
 
-Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña. El middleware de borde comprueba la firma, la caducidad y el rol. No lee `accounts.json`, así que no ve si la contraseña cambió. Las rutas sensibles, por ejemplo `/api/cie`, llaman a `getSession()`, que sí rechaza una cookie anterior al cambio de contraseña.
+En Dokploy, Traefik es el único salto delante de la app. Define `TRUST_PROXY=1` para que el límite de intentos al cambiar la contraseña use `X-Real-IP` o el último salto de `X-Forwarded-For`. Sin esa variable esos encabezados se ignoran y el límite queda por cuenta, así que un cliente no puede agotar el cupo de los demás ni inventar una IP.
+
+Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña o se vuelva a enlazar la cuenta a otro Practitioner. Una cookie con `login` de usuario (sin `@`) deja de servir en ese caso: la sesión firma el correo de `accounts.json` y, si no hay fila para ese Practitioner, se rechaza. El middleware de borde comprueba la firma, la caducidad, el rol y, si la cookie lo trae, que la contraseña sea temporal (`mustChange`). No lee `accounts.json`, así que no ve un cambio de contraseña posterior ni un flag que se haya activado después de emitir la cookie. `getSession()`, las páginas, las server actions, las rutas `/api` y el proxy FHIR sí leen `accounts.json`: si `mustChangePassword` es true, o si el archivo no se puede leer, no dejan pasar datos clínicos. Una cookie vieja no basta para saltarse el flag.
+
+Con ese flag la sesión solo abre `/cuenta/contrasena`, la acción de cambiar la contraseña, salir (`POST /api/auth/logout`) y los estáticos. `GET /healthz` de Next y del proxy sigue sin sesión y sin secreto: el flag no lo bloquea y no devuelve datos clínicos. El resto redirige a esa pantalla o responde 403 sin cuerpo clínico. El proxy aplica el mismo corte en `requireClinicAccess` leyendo `accounts.json`. Al guardar, la contraseña nueva tiene que cumplir la misma regla que el restablecimiento (12 caracteres, una letra, un número, y no ser una contraseña común), no puede ser igual a la actual, se borra el flag, cambia `passwordChangedAt` y se firma otra cookie: las sesiones anteriores dejan de servir. La misma pantalla sirve para cambiar la contraseña en cualquier momento, desde el menú o desde Perfil, aunque el flag no esté puesto.
 
 Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita el correo ya fijado en `accounts.json`. El login responde «Contraseña incorrecta.» igual si el usuario no existe, si no tiene contraseña o si la contraseña no coincide.
+
+### Administrador con contraseña temporal, dentro del contenedor
+
+La imagen define `INTEGRAMED_AUTH_ROOT=/app/data/auth` y `INTEGRAMED_FHIR_ROOT=/app/data/fhir`, y corre como uid 1001. `docker exec` hereda esas variables, así que el Practitioner y `accounts.json` quedan en los volúmenes montados en `/app/data/fhir` y `/app/data/auth`. El exec va como ese mismo usuario. `-it` hace falta para que el prompt oculte lo que se escribe. La contraseña no va en el comando, ni en `-e`, ni en un archivo.
+
+```bash
+docker exec -it --user 1001 <contenedor> npm run create-user -- --email <correo> --role admin --must-change
+```
+
+Escribe la contraseña cuando pida `Contraseña:` y otra vez en `Repite la contraseña:`. Al primer acceso la clínica solo abre la pantalla para cambiarla.
+
+Para marcar como temporal la contraseña de una cuenta que ya existe:
+
+```bash
+docker exec -it --user 1001 <contenedor> npm run set-password -- <correo> --must-change
+```
+
+Sin `--must-change` el resultado es el mismo: la contraseña queda temporal. Para dejarla definitiva:
+
+```bash
+docker exec -it --user 1001 <contenedor> npm run set-password -- <correo> --no-must-change
+```
+
+`-t` hace que el prompt oculte la entrada y pida confirmación. Sin terminal, el mismo comando lee una sola línea de stdin y no la confirma. Por ejemplo, un script puede redirigir esa línea al `docker exec -i` (sin `-t`). La contraseña no va en argv, en `-e`, ni en un archivo. `--password`, `--pass` y `-p` se rechazan. Si `SET_PASSWORD` o `CREATE_USER_PASSWORD` están definidas, el comando avisa y las ignora.
 
 ## Clínica Yeshua
 

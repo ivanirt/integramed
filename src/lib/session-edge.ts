@@ -18,6 +18,8 @@ export type VerifiedSession = {
   login: string;
   role: string;
   exp: number;
+  /** Present when the cookie was signed after a temporary password. Missing means false. */
+  mustChange: boolean;
 };
 
 export function normalizeSecret(value: string | undefined | null): string {
@@ -70,7 +72,7 @@ export async function verifySessionToken(
   );
   if (!ok) return null;
   try {
-    const data = JSON.parse(new TextDecoder().decode(body)) as VerifiedSession;
+    const data = JSON.parse(new TextDecoder().decode(body)) as VerifiedSession & { mustChange?: unknown };
     if (!data || typeof data.exp !== "number" || data.exp < Date.now()) return null;
     if (!data.id || !KNOWN_ROLES.has(data.role)) return null;
     return {
@@ -79,6 +81,7 @@ export async function verifySessionToken(
       login: String(data.login || ""),
       role: data.role,
       exp: data.exp,
+      mustChange: data.mustChange === true,
     };
   } catch {
     return null;

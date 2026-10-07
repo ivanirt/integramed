@@ -1,5 +1,5 @@
 export const MAIL_UNCONFIGURED_LOG =
-  "[IntegraMed] El correo de restablecimiento no está configurado (faltan SMTP_HOST o MAIL_FROM). La solicitud responde igual y no genera enlace. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno. No pongas la contraseña en los argumentos ni en un archivo.";
+  "[IntegraMed] El correo de restablecimiento no está configurado (faltan SMTP_HOST o MAIL_FROM). La solicitud responde igual y no genera enlace. Para asignar una contraseña en el servidor: npm run set-password -- <correo>. La contraseña se escribe en el prompt oculto o por stdin. No la pongas en los argumentos, en el entorno ni en un archivo.";
 
 export async function runNodeStartup(): Promise<void> {
   if (process.env.NEXT_PHASE === "phase-production-build") return;

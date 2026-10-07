@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { PASSWORD_CHANGE_REQUIRED_ERROR } from "./password-change-gate";
 import { isAcceptableSecret, SESSION_COOKIE } from "./session-edge";
+import { getSession } from "./session";
 
 export function fhirProxyOrigin(): string {
   const raw = process.env.FHIR_PROXY_URL || "http://127.0.0.1:3001";
@@ -32,6 +34,13 @@ export async function fhirProxyHeaders(extra?: HeadersInit): Promise<Headers> {
 }
 
 export async function proxyFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const session = await getSession();
+  if (session?.mustChangePassword) {
+    return new Response(JSON.stringify({ error: PASSWORD_CHANGE_REQUIRED_ERROR }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    });
+  }
   const headers = await fhirProxyHeaders(init.headers);
   return fetch(`${fhirProxyOrigin()}${path}`, { ...init, headers, cache: "no-store" });
 }

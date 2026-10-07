@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { SYSTEMS } from "./roles";
 import { displayName } from "./display-name";
 import { fhirProxyHeaders, fhirProxyOrigin } from "./proxy";
@@ -26,19 +27,24 @@ export class FhirError extends Error {
   }
 }
 
-async function assertPractitionerWrite(path: string, method: string) {
+async function assertPractitionerWrite(
+  path: string,
+  method: string,
+  session: { role: string } | null,
+) {
   const verb = method.toUpperCase();
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(verb)) return;
   const parsed = parseFhirTarget(path.split("?")[0] || path);
   if (!isPractitionerTarget(parsed)) return;
-  const session = await getSession();
   if (session?.role !== "admin") {
     throw new FhirError("Solo administración puede modificar un Practitioner.", 403);
   }
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<unknown> {
-  await assertPractitionerWrite(path, init.method || "GET");
+  const session = await getSession();
+  if (session?.mustChangePassword) redirect("/cuenta/contrasena");
+  await assertPractitionerWrite(path, init.method || "GET", session);
   const url = `${fhirProxyOrigin()}/api/fhir/${path.replace(/^\//, "")}`;
   const headers = await fhirProxyHeaders({
     Accept: "application/fhir+json, application/json",

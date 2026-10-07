@@ -6,6 +6,7 @@ import { loadModules } from "./clinic-config";
 export async function requireUser() {
   const user = await getSession();
   if (!user) redirect("/acceso");
+  if (user.mustChangePassword) redirect("/cuenta/contrasena");
   return user;
 }
 

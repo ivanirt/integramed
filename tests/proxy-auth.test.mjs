@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,15 @@ process.env.FHIR_MODE = "local";
 process.env.FHIR_PROXY_NO_LISTEN = "1";
 process.env.CLINICAL_AI_KEY = "";
 process.env.CLINICAL_AI_BASE = "https://openrouter.ai/api/v1";
+const authRoot = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
+process.env.INTEGRAMED_AUTH_ROOT = authRoot;
+fs.writeFileSync(
+  path.join(authRoot, "accounts.json"),
+  JSON.stringify({
+    revision: 1,
+    accounts: [{ practitionerId: "prac-1", email: "prac-1@clinic.test", passwordChangedAt: 0, mustChangePassword: false }],
+  }),
+);
 
 const { app } = await import("../server/index.js");
 

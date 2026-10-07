@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/require";
 import { ROLE_LABELS } from "@/lib/roles";
 import { listStaff } from "@/lib/staff";
@@ -28,6 +29,11 @@ export default async function PerfilPage() {
           <dd>{me?.roles.map((r) => ROLE_LABELS[r] || r).join(", ")}</dd>
         </div>
       </dl>
+      <p className="mt-8 text-sm">
+        <Link href="/cuenta/contrasena" className="underline">
+          Cambiar contraseña
+        </Link>
+      </p>
     </div>
   );
 }

@@ -4,9 +4,11 @@ import dotenv from "dotenv";
 import { createLocalFhirStore } from "../server/localFhir.js";
 import { findAuthStaff } from "../server/staffLookup.js";
 import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
-import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
+import { findCredentialAccount } from "../src/lib/account-lookup.js";
+import { blankAccount, mutateAccounts } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
+import { readCliPassword, rejectPasswordArguments, warnDeprecatedPasswordEnv } from "./cli-password.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(repoRoot, ".env") });
@@ -15,6 +17,7 @@ const dataRoot = process.env.INTEGRAMED_DATA_ROOT
   ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
   : repoRoot;
 const authRoot = defaultAuthStorageRoot(repoRoot);
+let secretForRedaction = "";
 
 function redact(text: string, secret: string) {
   if (!secret) return text;
@@ -22,24 +25,49 @@ function redact(text: string, secret: string) {
 }
 
 function usage(): never {
-  console.error("Uso: SET_PASSWORD='…' npm run set-password -- <correo-o-usuario>");
-  console.error("La contraseña se lee de SET_PASSWORD o de una sola línea en stdin. No la pongas como argumento.");
+  console.error("Uso: npm run set-password -- <correo-o-usuario> [--must-change|--no-must-change]");
+  console.error("Sin --no-must-change la contraseña queda temporal y hay que cambiarla al entrar.");
+  console.error("La contraseña se escribe en un prompt oculto, o en una sola línea de stdin si no hay terminal.");
+  console.error("No la pongas como argumento ni en el entorno. Si SET_PASSWORD está definida, se ignora.");
   process.exit(1);
 }
 
-async function readSecret(): Promise<string> {
-  const fromEnv = process.env.SET_PASSWORD || "";
-  if (fromEnv) return fromEnv;
-  if (process.stdin.isTTY) usage();
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-  return Buffer.concat(chunks).toString("utf8").replace(/\r?\n$/, "");
+function parseArgs(argv: string[]) {
+  const positional: string[] = [];
+  let mustChange = true;
+  let sawMust = false;
+  let sawClear = false;
+  for (const arg of argv) {
+    if (arg === "--") continue;
+    if (arg === "--must-change") {
+      sawMust = true;
+      mustChange = true;
+      continue;
+    }
+    if (arg === "--no-must-change") {
+      sawClear = true;
+      mustChange = false;
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      console.error(`Opción desconocida: ${arg.split("=", 1)[0]}`);
+      usage();
+    }
+    positional.push(arg);
+  }
+  if (sawMust && sawClear) usage();
+  const query = (positional[0] || "").trim().toLowerCase();
+  if (!query || positional.length !== 1) usage();
+  return { query, mustChange };
 }
 
 async function main() {
-  const query = (process.argv.slice(2).find((arg) => arg !== "--") || "").trim().toLowerCase();
-  if (!query || process.argv.slice(2).filter((arg) => arg !== "--").length !== 1) usage();
-  const secret = await readSecret();
+  const argv = process.argv.slice(2);
+  rejectPasswordArguments(argv);
+  warnDeprecatedPasswordEnv();
+  const { query, mustChange } = parseArgs(argv);
+  secretForRedaction = await readCliPassword();
+  const secret = secretForRedaction;
   if (!secret) usage();
   const problem = validateNewPassword(secret, secret);
   if (problem) {
@@ -63,29 +91,34 @@ async function main() {
   }
 
   const passwordHash = await hashPassword(secret);
-  const accounts = readAccounts(authRoot);
   const queryIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query);
-  const index = accounts.findIndex(
-    (account) => account.practitionerId === staff.id || account.email === query || account.email === staff.email,
-  );
-  const next = index === -1 ? blankAccount(staff.id, queryIsEmail ? query : staff.email, true) : accounts[index];
-  next.practitionerId = staff.id;
-  if (queryIsEmail) next.email = query;
-  else if (!next.email) next.email = staff.email;
-  next.passwordHash = passwordHash;
-  next.passwordRequired = true;
-  next.passwordChangedAt = Date.now();
-  next.resetTokenHash = null;
-  next.resetExpiresAt = null;
-  if (index === -1) accounts.push(next);
-  else accounts[index] = next;
-  writeAccounts(accounts, authRoot);
-  console.log(`Contraseña actualizada para ${staff.email || staff.login}. No quedó escrita en el registro.`);
+  mutateAccounts((accounts) => {
+    const match = findCredentialAccount(accounts, {
+      id: staff.id,
+      email: queryIsEmail ? query : staff.email,
+    });
+    const index = match ? accounts.indexOf(match) : -1;
+    const next = index === -1 ? blankAccount(staff.id, queryIsEmail ? query : staff.email, true) : accounts[index];
+    next.practitionerId = staff.id;
+    if (queryIsEmail) next.email = query;
+    else if (!next.email) next.email = staff.email;
+    next.passwordHash = passwordHash;
+    next.passwordRequired = true;
+    next.passwordChangedAt = Date.now();
+    next.mustChangePassword = mustChange;
+    next.resetTokenHash = null;
+    next.resetExpiresAt = null;
+    if (index === -1) accounts.push(next);
+    else accounts[index] = next;
+  }, authRoot);
+  const follow = mustChange ? " Hay que cambiarla al entrar." : "";
+  console.log(`Contraseña actualizada para ${staff.email || staff.login}.${follow} No quedó escrita en el registro.`);
 }
 
 main().catch((err) => {
-  const secret = process.env.SET_PASSWORD || "";
+  const leaked = [secretForRedaction, process.env.SET_PASSWORD || "", process.env.CREATE_USER_PASSWORD || ""];
   const detail = err instanceof Error ? err.message : String(err);
-  console.error(redact(detail, secret));
+  console.error(leaked.reduce((text, secret) => redact(text, secret), detail));
+  secretForRedaction = "";
   process.exit(1);
 });

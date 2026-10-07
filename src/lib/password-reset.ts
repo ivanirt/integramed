@@ -69,13 +69,32 @@ export function findResetAccount<T extends ResetCarrier>(
   return { index: -1, status: "invalid" };
 }
 
+const COMMON_PASSWORDS = new Set([
+  "password1234",
+  "password12345",
+  "passw0rd1234",
+  "qwertyuiop12",
+  "qwerty123456",
+  "changeme1234",
+  "welcome12345",
+  "letmein12345",
+  "administrator1",
+  "admin12345678",
+  "contrasena123",
+  "contraseña123",
+  "integramed123",
+  "123456789012",
+  "123456789abc",
+]);
+
 export function validateNewPassword(password: string, confirm: string): string | null {
   if (password !== confirm) return "Las contraseñas no coinciden.";
-  if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres.";
+  if (password.length < 12) return "La contraseña debe tener al menos 12 caracteres.";
   if (Buffer.byteLength(password) > 72) return "La contraseña es demasiado larga (máximo 72 bytes).";
   if (!/[A-Za-zÁÉÍÓÚÜáéíóúüÑñ]/.test(password) || !/\d/.test(password)) {
     return "La contraseña debe incluir al menos una letra y un número.";
   }
+  if (COMMON_PASSWORDS.has(password.trim().toLowerCase())) return "Esa contraseña es demasiado común.";
   return null;
 }
 
@@ -120,7 +139,7 @@ export function authorizeLogin(input: {
 export const LOGIN_ERROR = "Contraseña incorrecta.";
 
 export const SMTP_UNAVAILABLE_LOG =
-  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.";
+  "[IntegraMed] SMTP no está configurado. No se generó ningún enlace de restablecimiento. Para asignar una contraseña en el servidor: npm run set-password -- <correo>. La contraseña se escribe en el prompt oculto o por stdin. No la pongas en los argumentos, en el entorno ni en un archivo.";
 
 const RESET_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

@@ -3,13 +3,21 @@ import { clearSession, createSession, getSession } from "@/lib/session";
 import { lookupStaffForAuth } from "@/lib/staff-lookup";
 import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
+import { credentialLinkedToPractitioner } from "@/lib/account-lookup.js";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
+import { logoutRequestAllowed } from "@/lib/request-origin";
 import { LOGIN_ERROR } from "@/lib/password-reset";
+import { PASSWORD_CHANGE_REQUIRED_ERROR } from "@/lib/password-change-gate";
 import { checkLoginPassword } from "@/lib/passwords";
 import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
 
 export async function GET() {
-  return NextResponse.json({ user: await getSession() });
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (user.mustChangePassword) {
+    return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
+  }
+  return NextResponse.json({ user });
 }
 
 export async function POST(request: Request) {
@@ -22,6 +30,9 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
 
   if (action === "logout") {
+    if (!logoutRequestAllowed(request)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
     await clearSession();
     return NextResponse.json({ ok: true });
   }
@@ -29,6 +40,9 @@ export async function POST(request: Request) {
   if (action === "switch-role") {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Sin sesión" }, { status: 401 });
+    if (session.mustChangePassword) {
+      return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
+    }
     const role = body.role as RoleId;
     const staff = await listStaff();
     const me = staff.find((s) => s.id === session.id);
@@ -58,7 +72,7 @@ export async function POST(request: Request) {
   const accounts = readAccounts();
   const account = user ? findAccountForStaff(accounts, user.id, user.email) : undefined;
   const decision = await checkLoginPassword(password, account);
-  if (!decision.ok || !user) {
+  if (!decision.ok || !user || !credentialLinkedToPractitioner(account, user.id)) {
     if (!user) logMissingPractitionerOnLogin(login, accounts);
     return NextResponse.json({ error: LOGIN_ERROR }, { status: 401 });
   }
@@ -66,6 +80,11 @@ export async function POST(request: Request) {
   const requested = body.role as RoleId;
   const role = requested && user.roles.includes(requested) ? requested : user.primaryRole;
   const session = { id: user.id, name: user.name, login: user.login, role };
-  await createSession(session, { pwdAt: decision.pwdAt });
-  return NextResponse.json({ user: session });
+  const mustChangePassword = account?.mustChangePassword === true;
+  await createSession(session, {
+    pwdAt: decision.pwdAt,
+    mustChange: mustChangePassword,
+    email: account?.email,
+  });
+  return NextResponse.json({ user: { ...session, mustChangePassword } });
 }

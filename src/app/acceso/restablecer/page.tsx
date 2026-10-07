@@ -41,7 +41,7 @@ function RestablecerForm() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="font-serif text-4xl">Nueva contraseña</h1>
       <p className="mt-2 text-sm text-[#6D5E52]">
-        Elige una contraseña de al menos 8 caracteres, con una letra y un número.
+        Elige una contraseña de al menos 12 caracteres, con una letra y un número.
       </p>
       {!token ? (
         <p className="mt-8 text-sm text-red-800">

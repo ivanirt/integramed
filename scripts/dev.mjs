@@ -38,7 +38,7 @@ ensure('FHIR_PROXY_SECRET');
 
 if (!process.env.SMTP_HOST || !process.env.MAIL_FROM) {
   console.warn(
-    '[IntegraMed] El correo de restablecimiento no está configurado (faltan SMTP_HOST o MAIL_FROM). La solicitud responde igual y no genera enlace, salvo PASSWORD_RESET_LOG_LINK=1 en desarrollo. Para asignar una contraseña en el servidor: npm run set-password -- <correo> con SET_PASSWORD en el entorno.'
+    '[IntegraMed] El correo de restablecimiento no está configurado (faltan SMTP_HOST o MAIL_FROM). La solicitud responde igual y no genera enlace, salvo PASSWORD_RESET_LOG_LINK=1 en desarrollo. Para asignar una contraseña en el servidor: npm run set-password -- <correo>. La contraseña se escribe en el prompt oculto o por stdin.'
   );
 }
 

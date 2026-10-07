@@ -83,9 +83,24 @@ Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el 
 
 Next escucha en el puerto 3000 (`next start -p 3000`). El proxy FHIR escucha en `127.0.0.1` y en `FHIR_PROXY_PORT` (por defecto 3001; `FHIR_PROXY_URL` tiene que coincidir). La imagen no define `PORT`. Si Dokploy lo inyecta, los dos procesos lo ignoran: no pasa el proxy al puerto público ni saca a Next del 3000.
 
-El HEALTHCHECK del contenedor pide `GET http://127.0.0.1:3000/healthz` (Next, el puerto publicado). No lleva cookie ni secreto. Next, a su vez, pide `GET /healthz` del proxy (`FHIR_PROXY_URL`, 1 segundo, sin secreto) y responde `{ "ok": true }` solo si ese probe contesta. Si el proxy no responde, la respuesta es 503 `{ "ok": false }`. No reenvía el cuerpo del proxy ni consulta el FHIR remoto. El estado FHIR sigue en `GET /api/health` del proxy y pide sesión.
+El HEALTHCHECK del contenedor pide `GET http://127.0.0.1:3000/healthz` (Next, el puerto publicado) y corta esa petición a los 3 segundos. No lleva cookie ni secreto. Next, a su vez, pide `GET /healthz` del proxy (`FHIR_PROXY_URL`, 1 segundo, sin secreto) y responde `{ "ok": true }` solo si ese probe contesta. El resultado se reutiliza 3 segundos. Si el proxy no responde, la respuesta es 503 `{ "ok": false }`. No reenvía el cuerpo del proxy ni consulta el FHIR remoto. El estado FHIR sigue en `GET /api/health` del proxy y pide sesión.
 
-El proceso corre como el usuario `integramed` (uid 1001, gid 1001). Los volúmenes `/app/data/auth` y `/app/data/fhir` tienen que ser escribibles por ese uid. Si el volumen se creó con la imagen anterior (root), un `chown` a `1001:1001` en el host deja las contraseñas y el FHIR escribibles. Sin permiso de escritura en auth, Next sale y el contenedor termina.
+El proceso corre como el usuario `integramed` (uid 1001, gid 1001). La imagen no arranca como root y no trae un entrypoint que cambie dueños. Dentro de la imagen, uid 1001 solo puede escribir en `/app/data`, `/app/.next/cache` y los árboles `vault-es` y `vault-en`. El resto de `/app/.next` queda de root.
+
+Los volúmenes `/app/data/auth` y `/app/data/fhir` tienen que ser escribibles por uid 1001 antes del primer arranque. Si el volumen o el bind mount de Dokploy se creó con la imagen anterior (root), haz el chown una sola vez en el host, con el contenedor parado:
+
+```bash
+# volumen nombrado de Docker
+docker run --rm -v <volumen-auth>:/data alpine chown -R 1001:1001 /data
+docker run --rm -v <volumen-fhir>:/data alpine chown -R 1001:1001 /data
+
+# bind mount: la ruta es la del host, la que Dokploy monta en el servicio
+sudo chown -R 1001:1001 /ruta/del/host/auth /ruta/del/host/fhir
+```
+
+Si además montas `vault-es` o `vault-en` desde el host, el mismo `chown -R 1001:1001` sobre esas rutas. Sin ese montaje, las copias de la imagen ya pertenecen a 1001. Sin permiso de escritura en auth, Next sale y el contenedor termina.
+
+La imagen de producción no incluye las devDependencies (ESLint, TypeScript, Tailwind). `create-user`, `set-password` y `seed:yeshua` siguen en la imagen: Node 22 los ejecuta con `--experimental-strip-types`, sin el paquete `typescript`.
 
 Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_BASE_URL` (el origen público https, sin barra final). En producción, si `APP_BASE_URL` falta o no es https, el arranque avisa, la respuesta sigue siendo la misma y no se genera enlace. No definas `PASSWORD_RESET_LOG_LINK` en producción: se ignora.
 

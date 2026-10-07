@@ -138,7 +138,7 @@ test("spawned proxy serves /healthz on FHIR_PROXY_PORT when PORT is 3000", async
 
 test("Next /healthz is public and checks the proxy without auth", async () => {
   const { isPublicPath } = await import("../src/lib/public-path.ts");
-  const { GET } = await import("../src/app/healthz/route.ts");
+  const { GET, clearProxyHealthCache } = await import("../src/app/healthz/route.ts");
   const middlewareSource = fs.readFileSync(path.join(repo, "src/middleware.ts"), "utf8");
   assert.match(middlewareSource, /isPublicPath\(pathname\)/);
 
@@ -146,6 +146,10 @@ test("Next /healthz is public and checks the proxy without auth", async () => {
   assert.equal(isPublicPath("/"), false);
   assert.equal(isPublicPath("/api/health"), false);
   assert.equal(isPublicPath("/api/auth"), true);
+  assert.equal(isPublicPath("/_next/static/chunks/main.js"), true);
+  assert.equal(isPublicPath("/_nextfoo"), false);
+  assert.equal(isPublicPath("/_next"), false);
+  clearProxyHealthCache();
 
   const stub = await listen((req, res) => {
     res.writeHead(req.url === "/healthz" ? 200 : 404, { "content-type": "application/json" });
@@ -157,6 +161,7 @@ test("Next /healthz is public and checks the proxy without auth", async () => {
     const body = await GET();
     assert.equal(body.status, 200);
     assert.deepEqual(await body.json(), { ok: true });
+    clearProxyHealthCache();
   } finally {
     await stop(stub);
     if (previous === undefined) delete process.env.FHIR_PROXY_URL;
@@ -166,4 +171,35 @@ test("Next /healthz is public and checks the proxy without auth", async () => {
   const down = await GET();
   assert.equal(down.status, 503);
   assert.deepEqual(await down.json(), { ok: false });
+  clearProxyHealthCache();
+});
+
+test("Next /healthz reuses the proxy result for a few seconds", async () => {
+  const { GET, clearProxyHealthCache } = await import("../src/app/healthz/route.ts");
+  clearProxyHealthCache();
+  let hits = 0;
+  const stub = await listen((req, res) => {
+    hits += 1;
+    const ok = req.url === "/healthz";
+    res.writeHead(ok ? 200 : 404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok }));
+  });
+  const previous = process.env.FHIR_PROXY_URL;
+  process.env.FHIR_PROXY_URL = `http://127.0.0.1:${stub.address().port}`;
+  try {
+    const first = await GET();
+    const second = await GET();
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(hits, 1);
+    clearProxyHealthCache();
+    const third = await GET();
+    assert.equal(third.status, 200);
+    assert.equal(hits, 2);
+  } finally {
+    clearProxyHealthCache();
+    await stop(stub);
+    if (previous === undefined) delete process.env.FHIR_PROXY_URL;
+    else process.env.FHIR_PROXY_URL = previous;
+  }
 });

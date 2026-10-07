@@ -109,6 +109,29 @@ test("the proxy blocks every clinical call while mustChangePassword is set", asy
     const unreadable = await request(server, token(900, false));
     assert.equal(unreadable.status, 401);
     assert.equal(unreadable.text.includes("resourceType"), false);
+
+    writeAccounts(root, [
+      { practitionerId: "prac-old", email: "admin@clinic.test", passwordChangedAt: 500, mustChangePassword: true },
+    ]);
+    const emailOnly = signSession(
+      {
+        id: "prac-new",
+        name: "Admin",
+        login: "admin@clinic.test",
+        role: "admin",
+        pwdAt: 900,
+        mustChange: false,
+      },
+      SESSION_SECRET,
+    );
+    const relinked = await request(server, emailOnly);
+    assert.equal(relinked.status, 401);
+    assert.equal(relinked.text.includes("resourceType"), false);
+    const emailOnlyHealth = await fetch(`http://127.0.0.1:${server.address().port}/healthz`, {
+      headers: { cookie: `integramed_session=${emailOnly}` },
+    });
+    assert.equal(emailOnlyHealth.status, 200);
+    assert.deepEqual(await emailOnlyHealth.json(), { ok: true });
   } finally {
     if (previous === undefined) delete process.env.INTEGRAMED_AUTH_ROOT;
     else process.env.INTEGRAMED_AUTH_ROOT = previous;

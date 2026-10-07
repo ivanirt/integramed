@@ -38,11 +38,12 @@ Para dejar una contraseña temporal que hay que cambiar al entrar, el mismo coma
 npm run create-user -- --email <correo> --role admin --must-change
 ```
 
-Para asignar o reemplazar la contraseña de alguien que ya existe, `set-password` acepta el mismo `--must-change`:
+Para asignar o reemplazar la contraseña de alguien que ya existe, `set-password` deja la contraseña como temporal (hay que cambiarla al entrar). `--must-change` es lo mismo. `--no-must-change` es lo que quita el flag:
 
 ```bash
 npm run set-password -- <correo>
 npm run set-password -- <correo> --must-change
+npm run set-password -- <correo> --no-must-change
 ```
 
 En un terminal, la contraseña se escribe oculta y se confirma. Sin terminal (un script, o `docker exec` sin `-t`), se lee una sola línea de stdin y no se confirma. No hay forma de pasarla por argv ni por el entorno: `--password`, `--pass` y `-p` se rechazan sin imprimir el valor. `SET_PASSWORD` y `CREATE_USER_PASSWORD` están en desuso: si siguen definidas, el comando avisa y las ignora.
@@ -102,7 +103,7 @@ Las contraseñas y los tokens viven en `accounts.json`, dentro de `INTEGRAMED_AU
 
 Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña. El middleware de borde comprueba la firma, la caducidad, el rol y, si la cookie lo trae, que la contraseña sea temporal (`mustChange`). No lee `accounts.json`, así que no ve un cambio de contraseña posterior ni un flag que se haya activado después de emitir la cookie. `getSession()`, las páginas, las server actions, las rutas `/api` y el proxy FHIR sí leen `accounts.json`: si `mustChangePassword` es true, o si el archivo no se puede leer, no dejan pasar datos clínicos. Una cookie vieja no basta para saltarse el flag.
 
-Con ese flag la sesión solo abre `/cuenta/contrasena`, la acción de cambiar la contraseña, salir (`POST /api/auth/logout`) y los estáticos. `GET /healthz` de Next y del proxy sigue sin sesión y sin secreto: el flag no lo bloquea y no devuelve datos clínicos. El resto redirige a esa pantalla o responde 403 sin cuerpo clínico. El proxy aplica el mismo corte en `requireClinicAccess` leyendo `accounts.json`. Al guardar, la contraseña nueva tiene que cumplir la misma regla que el restablecimiento (8 caracteres, una letra y un número), no puede ser igual a la actual, se borra el flag, cambia `passwordChangedAt` y se firma otra cookie: las sesiones anteriores dejan de servir. La misma pantalla sirve para cambiar la contraseña en cualquier momento, desde el menú o desde Perfil, aunque el flag no esté puesto.
+Con ese flag la sesión solo abre `/cuenta/contrasena`, la acción de cambiar la contraseña, salir (`POST /api/auth/logout`) y los estáticos. `GET /healthz` de Next y del proxy sigue sin sesión y sin secreto: el flag no lo bloquea y no devuelve datos clínicos. El resto redirige a esa pantalla o responde 403 sin cuerpo clínico. El proxy aplica el mismo corte en `requireClinicAccess` leyendo `accounts.json`. Al guardar, la contraseña nueva tiene que cumplir la misma regla que el restablecimiento (12 caracteres, una letra, un número, y no ser una contraseña común), no puede ser igual a la actual, se borra el flag, cambia `passwordChangedAt` y se firma otra cookie: las sesiones anteriores dejan de servir. La misma pantalla sirve para cambiar la contraseña en cualquier momento, desde el menú o desde Perfil, aunque el flag no esté puesto.
 
 Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita el correo ya fijado en `accounts.json`. El login responde «Contraseña incorrecta.» igual si el usuario no existe, si no tiene contraseña o si la contraseña no coincide.
 
@@ -120,6 +121,12 @@ Para marcar como temporal la contraseña de una cuenta que ya existe:
 
 ```bash
 docker exec -it --user 1001 <contenedor> npm run set-password -- <correo> --must-change
+```
+
+Sin `--must-change` el resultado es el mismo: la contraseña queda temporal. Para dejarla definitiva:
+
+```bash
+docker exec -it --user 1001 <contenedor> npm run set-password -- <correo> --no-must-change
 ```
 
 `-t` hace que el prompt oculte la entrada y pida confirmación. Sin terminal, el mismo comando lee una sola línea de stdin y no la confirma. Por ejemplo, un script puede redirigir esa línea al `docker exec -i` (sin `-t`). La contraseña no va en argv, en `-e`, ni en un archivo. `--password`, `--pass` y `-p` se rechazan. Si `SET_PASSWORD` o `CREATE_USER_PASSWORD` están definidas, el comando avisa y las ignora.

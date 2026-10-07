@@ -21,6 +21,16 @@ export function resetPasswordChangeLimits(): void {
   ipBuckets.clear();
 }
 
+/** Traefik sets X-Real-IP. The first X-Forwarded-For hop is caller-controlled, so use the last one. */
+export function passwordChangeClientAddress(header: (name: string) => string | null): string {
+  const real = header("x-real-ip")?.trim();
+  if (real) return real;
+  const forwarded = header("x-forwarded-for");
+  if (!forwarded) return "local";
+  const hops = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+  return hops[hops.length - 1] || "local";
+}
+
 export function allowPasswordChangeAttempt(userId: string, ip: string, now = Date.now()): boolean {
   const userOk = rateLimitAllow(userBuckets, `user:${userId}`, now, CHANGE_PASSWORD_LIMIT, CHANGE_PASSWORD_WINDOW_MS);
   const ipOk = rateLimitAllow(ipBuckets, `ip:${ip}`, now, CHANGE_PASSWORD_IP_LIMIT, CHANGE_PASSWORD_WINDOW_MS);

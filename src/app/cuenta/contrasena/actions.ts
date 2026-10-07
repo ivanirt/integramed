@@ -1,12 +1,14 @@
 "use server";
 
 import { headers } from "next/headers";
+import { credentialLinkedToPractitioner, findCredentialAccount } from "@/lib/account-lookup.js";
 import { mutateAccounts, readAccounts } from "@/lib/credentials";
 import {
   CHANGE_PASSWORD_RATE_ERROR,
   allowPasswordChangeAttempt,
   commitPasswordChange,
   evaluatePasswordChange,
+  passwordChangeClientAddress,
 } from "@/lib/password-change";
 import { createSession, getSession } from "@/lib/session";
 
@@ -14,9 +16,7 @@ export type ChangePasswordState = { ok: true } | { ok: false; error: string } | 
 
 async function requestIp(): Promise<string> {
   const headerStore = await headers();
-  const forwarded = headerStore.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "local";
-  return headerStore.get("x-real-ip") || "local";
+  return passwordChangeClientAddress((name) => headerStore.get(name));
 }
 
 export async function changePasswordAction(
@@ -33,7 +33,10 @@ export async function changePasswordAction(
   const currentPassword = String(formData.get("currentPassword") || "");
   const nextPassword = String(formData.get("password") || "");
   const confirm = String(formData.get("confirm") || "");
-  const account = readAccounts().find((item) => item.practitionerId === user.id);
+  const account = findCredentialAccount(readAccounts(), { id: user.id, login: user.login });
+  if (account && !credentialLinkedToPractitioner(account, user.id)) {
+    return { ok: false, error: "La sesión no es válida. Vuelve a entrar." };
+  }
   const decision = await evaluatePasswordChange({
     account,
     currentPassword,

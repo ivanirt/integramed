@@ -73,11 +73,14 @@ test("expired tokens are not confused with unknown tokens", () => {
 });
 
 test("password rules require length, a letter, a number, and confirmation", () => {
-  assert.equal(validateNewPassword("clave123", "clave123"), null);
-  assert.equal(validateNewPassword("clave123", "clave124"), "Las contraseñas no coinciden.");
-  assert.match(validateNewPassword("abc1", "abc1") || "", /8 caracteres/);
-  assert.match(validateNewPassword("sololetras", "sololetras") || "", /letra y un número/);
-  assert.match(validateNewPassword("12345678", "12345678") || "", /letra y un número/);
+  assert.equal(validateNewPassword("clinica-segura-19", "clinica-segura-19"), null);
+  assert.equal(validateNewPassword("clinica-segura-19", "clinica-segura-18"), "Las contraseñas no coinciden.");
+  assert.match(validateNewPassword("clave123", "clave123") || "", /12 caracteres/);
+  assert.match(validateNewPassword("abc1", "abc1") || "", /12 caracteres/);
+  assert.match(validateNewPassword("sololetraslargas", "sololetraslargas") || "", /letra y un número/);
+  assert.match(validateNewPassword("123456789012", "123456789012") || "", /letra y un número/);
+  assert.match(validateNewPassword("password1234", "password1234") || "", /demasiado común/);
+  assert.match(validateNewPassword("Contraseña123", "Contraseña123") || "", /demasiado común/);
   const long = `ñ1${"ñ".repeat(40)}`;
   assert.match(validateNewPassword(long, long) || "", /demasiado larga/);
 });

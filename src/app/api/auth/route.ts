@@ -3,7 +3,9 @@ import { clearSession, createSession, getSession } from "@/lib/session";
 import { lookupStaffForAuth } from "@/lib/staff-lookup";
 import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
+import { credentialLinkedToPractitioner } from "@/lib/account-lookup.js";
 import { findAccountForStaff, readAccounts } from "@/lib/credentials";
+import { logoutRequestAllowed } from "@/lib/request-origin";
 import { LOGIN_ERROR } from "@/lib/password-reset";
 import { PASSWORD_CHANGE_REQUIRED_ERROR } from "@/lib/password-change-gate";
 import { checkLoginPassword } from "@/lib/passwords";
@@ -27,6 +29,9 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
 
   if (action === "logout") {
+    if (!logoutRequestAllowed(request)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
     await clearSession();
     return NextResponse.json({ ok: true });
   }
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
   const accounts = readAccounts();
   const account = user ? findAccountForStaff(accounts, user.id, user.email) : undefined;
   const decision = await checkLoginPassword(password, account);
-  if (!decision.ok || !user) {
+  if (!decision.ok || !user || !credentialLinkedToPractitioner(account, user.id)) {
     if (!user) logMissingPractitionerOnLogin(login, accounts);
     return NextResponse.json({ error: LOGIN_ERROR }, { status: 401 });
   }

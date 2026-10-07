@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createLocalFhirStore } from "../server/localFhir.js";
 import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
-import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
+import { blankAccount, mutateAccounts } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
 import { ROLE_LABELS, SYSTEMS, type RoleId } from "../src/lib/roles.ts";
@@ -163,24 +163,24 @@ async function main() {
     });
   }
 
-  const accounts = readAccounts(authRoot);
-  const index = accounts.findIndex(
-    (account) => account.practitionerId === practitionerId || account.email === options.email,
-  );
-  let passwordNote: string;
-  if (index === -1) {
-    const account = blankAccount(practitionerId, options.email, true);
-    if (passwordHash) {
-      account.passwordHash = passwordHash;
-      account.passwordChangedAt = Date.now();
-      account.mustChangePassword = true;
+  let passwordNote = "";
+  mutateAccounts((accounts) => {
+    const index = accounts.findIndex(
+      (account) => account.practitionerId === practitionerId || account.email === options.email,
+    );
+    if (index === -1) {
+      const account = blankAccount(practitionerId, options.email, true);
+      if (passwordHash) {
+        account.passwordHash = passwordHash;
+        account.passwordChangedAt = Date.now();
+        account.mustChangePassword = true;
+      }
+      accounts.push(account);
+      passwordNote = passwordHash
+        ? "Contraseña temporal definida. Hay que cambiarla al entrar. No quedó escrita en el registro."
+        : "Contraseña: sin definir. Usa npm run set-password o el correo de restablecimiento.";
+      return;
     }
-    accounts.push(account);
-    writeAccounts(accounts, authRoot);
-    passwordNote = passwordHash
-      ? "Contraseña temporal definida. Hay que cambiarla al entrar. No quedó escrita en el registro."
-      : "Contraseña: sin definir. Usa npm run set-password o el correo de restablecimiento.";
-  } else {
     const account = accounts[index];
     account.practitionerId = practitionerId;
     account.email = options.email;
@@ -199,8 +199,7 @@ async function main() {
       passwordNote = "Sigue sin contraseña usable. Usa npm run set-password o «¿Olvidaste tu contraseña?».";
     }
     accounts[index] = account;
-    writeAccounts(accounts, authRoot);
-  }
+  }, authRoot);
 
   const verb = createdPractitioner ? "Usuario creado" : "El usuario ya existía";
   console.log(`${verb}: ${options.email}`);

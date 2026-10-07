@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import bcrypt from "bcryptjs";
+import { credentialLinkedToPractitioner, findCredentialAccount } from "../src/lib/account-lookup.js";
 import { blankAccount, readAccounts, writeAccounts } from "../src/lib/credentials.ts";
 import { passwordChangeRequired } from "../src/lib/must-change.js";
 import {
@@ -16,6 +17,7 @@ import {
   allowPasswordChangeAttempt,
   commitPasswordChange,
   evaluatePasswordChange,
+  passwordChangeClientAddress,
   resetPasswordChangeLimits,
 } from "../src/lib/password-change.ts";
 import {
@@ -25,6 +27,7 @@ import {
   passwordChangeAccess,
 } from "../src/lib/password-change-gate.ts";
 import { isSessionPasswordCurrent } from "../src/lib/session-stamp.js";
+import { logoutRequestAllowed } from "../src/lib/request-origin.ts";
 import { verifySessionToken } from "../src/lib/session-edge.ts";
 import { buildSessionToken } from "../src/lib/session-token.ts";
 
@@ -103,12 +106,16 @@ test("a must-change session is limited to the change screen, logout, and static 
     ["/api/auth", "POST"],
     ["/fhir/Patient", "GET"],
     ["/api/fhir/Patient", "GET"],
+    ["/api/cie.js", "GET"],
+    ["/api/cie.js", "POST"],
+    ["/fhir/Patient/1.txt", "GET"],
+    ["/fhir/Patient/1.js", "POST"],
   ] as const;
   for (const [pathname, method] of denied) {
     const access = passwordChangeAccess(pathname, method);
     assert.notEqual(access, "allow", pathname);
     if (pathname.startsWith("/api") || pathname.startsWith("/fhir")) assert.equal(access, "deny", pathname);
-    else assert.equal(access, "redirect", pathname);
+    else assert.equal(access, "redirect", `${pathname} ${access}`);
   }
   for (const [pathname, method] of [
     [CHANGE_PASSWORD_PATH, "GET"],
@@ -118,10 +125,15 @@ test("a must-change session is limited to the change screen, logout, and static 
     ["/favicon.ico", "GET"],
     ["/healthz", "GET"],
     ["/_next/static/chunk.js", "GET"],
-    ["/ci-static.txt", "GET"],
+    ["/acceso/recuperar", "GET"],
+    ["/acceso/restablecer", "GET"],
   ] as const) {
     assert.equal(passwordChangeAccess(pathname, method), "allow", pathname);
   }
+  assert.equal(passwordChangeAccess("/ci-static.txt", "GET"), "redirect");
+  assert.equal(passwordChangeAccess("/pacientes/abc.js", "POST"), "redirect");
+  assert.equal(passwordChangeAccess("/cuenta/contrasena/extra", "GET"), "redirect");
+  assert.equal(passwordChangeAccess("/acceso/otro", "GET"), "redirect");
   assert.equal(PASSWORD_CHANGE_REQUIRED_ERROR.includes("contraseña"), true);
 
   const middleware = fs.readFileSync(path.join(repo, "src/middleware.ts"), "utf8");
@@ -180,8 +192,8 @@ test("changing the password clears the flag, rejects the old session, and enforc
   const weak = await evaluatePasswordChange({
     account,
     currentPassword: current,
-    nextPassword: "abcdefgh",
-    confirm: "abcdefgh",
+    nextPassword: "abcdefghijkl",
+    confirm: "abcdefghijkl",
   });
   assert.equal(weak.ok, false);
   if (!weak.ok) assert.match(weak.error, /número/);
@@ -253,6 +265,46 @@ test("change-password attempts are rate limited", () => {
   resetPasswordChangeLimits();
 });
 
+test("an account linked only by email does not authorize the new practitioner", () => {
+  const accounts = [
+    { practitionerId: "prac-old", email: "admin@clinic.test", mustChangePassword: true, passwordChangedAt: 500 },
+  ];
+  const session = { id: "prac-new", login: "admin@clinic.test", pwdAt: 900, mustChange: false };
+  const account = findCredentialAccount(accounts, session);
+  assert.equal(account?.practitionerId, "prac-old");
+  assert.equal(credentialLinkedToPractitioner(account, "prac-new"), false);
+  assert.equal(credentialLinkedToPractitioner(findCredentialAccount(accounts, { id: "prac-old" }), "prac-old"), true);
+  assert.equal(passwordChangeRequired(session, accounts, true), true);
+  assert.equal(isSessionPasswordCurrent(session, accounts), false);
+});
+
+test("the change-password client address uses X-Real-IP or the last forwarded hop", () => {
+  const header = (map: Record<string, string>) => (name: string) => map[name] ?? null;
+  assert.equal(passwordChangeClientAddress(header({ "x-forwarded-for": "1.1.1.1, 10.0.0.8" })), "10.0.0.8");
+  assert.equal(
+    passwordChangeClientAddress(header({ "x-real-ip": "10.1.1.1", "x-forwarded-for": "1.1.1.1, 10.0.0.8" })),
+    "10.1.1.1",
+  );
+  assert.equal(passwordChangeClientAddress(header({})), "local");
+});
+
+test("logout rejects a foreign Origin and a null Origin", () => {
+  const headers = (map: Record<string, string>) => ({ get: (name: string) => map[name.toLowerCase()] ?? null });
+  assert.equal(logoutRequestAllowed({ headers: headers({}) }), true);
+  assert.equal(logoutRequestAllowed({ headers: headers({ origin: "https://clinic.test", host: "clinic.test" }) }), true);
+  assert.equal(
+    logoutRequestAllowed({ headers: headers({ origin: "https://evil.test", host: "clinic.test" }) }),
+    false,
+  );
+  assert.equal(logoutRequestAllowed({ headers: headers({ origin: "null", host: "clinic.test" }) }), false);
+  assert.equal(
+    logoutRequestAllowed({
+      headers: headers({ origin: "https://clinic.test", "x-forwarded-host": "clinic.test", host: "internal" }),
+    }),
+    true,
+  );
+});
+
 test("create-user and set-password round-trip mustChangePassword without the password in argv", { timeout: 120_000 }, async () => {
   const authRoot = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
   const fhirRoot = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-"));
@@ -277,10 +329,14 @@ test("create-user and set-password round-trip mustChangePassword without the pas
   assert.equal(account?.mustChangePassword, true);
   assert.equal(await bcrypt.compare(temporary, account?.passwordHash || ""), true);
 
-  const cleared = await run("scripts/set-password.ts", [email], env, `${replacement}\n`);
+  const kept = await run("scripts/set-password.ts", [email], env, `${replacement}\n`);
+  assert.equal(kept.code, 0, kept.stderr);
+  assert.equal(kept.spawnArgs.includes(replacement), false);
+  assert.equal(`${kept.stdout}\n${kept.stderr}`.includes(replacement), false);
+  const afterDefault = readAccounts(authRoot)[0];
+  assert.equal(afterDefault?.mustChangePassword, true);
+  const cleared = await run("scripts/set-password.ts", [email, "--no-must-change"], env, `${replacement}\n`);
   assert.equal(cleared.code, 0, cleared.stderr);
-  assert.equal(cleared.spawnArgs.includes(replacement), false);
-  assert.equal(`${cleared.stdout}\n${cleared.stderr}`.includes(replacement), false);
   const afterClear = readAccounts(authRoot)[0];
   assert.equal(afterClear?.mustChangePassword, false);
   assert.equal(await bcrypt.compare(replacement, afterClear?.passwordHash || ""), true);

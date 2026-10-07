@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { findCredentialAccount } from "./account-lookup.js";
 import { accountsFile, authStorageRoot } from "./auth-root.js";
 
 export type CredentialAccount = {
@@ -187,8 +188,7 @@ export function findAccountForStaff(
   practitionerId: string,
   email: string,
 ): CredentialAccount | undefined {
-  const mail = email.trim().toLowerCase();
-  return accounts.find((account) => account.practitionerId === practitionerId || (mail && account.email === mail));
+  return findCredentialAccount(accounts, { id: practitionerId, email });
 }
 
 /** Email stored by create-user or set-password. FHIR telecom is not a reset destination. */

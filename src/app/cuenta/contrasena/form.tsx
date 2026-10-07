@@ -23,8 +23,8 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
       <h1 className="font-serif text-4xl">Cambia tu contraseña</h1>
       <p id="password-hint" className="mt-2 text-sm text-[#6D5E52]">
         {forced
-          ? "Esta contraseña es temporal. Elige una nueva antes de usar la clínica. Tiene que tener al menos 8 caracteres, con una letra y un número, y ser distinta de la actual."
-          : "Elige una contraseña de al menos 8 caracteres, con una letra y un número, distinta de la actual."}
+          ? "Esta contraseña es temporal. Elige una nueva antes de usar la clínica. Tiene que tener al menos 12 caracteres, con una letra y un número, y ser distinta de la actual."
+          : "Elige una contraseña de al menos 12 caracteres, con una letra y un número, distinta de la actual."}
       </p>
       <form action={formAction} className="mt-8 space-y-4" aria-describedby="password-hint">
         <label className="block text-sm" htmlFor="currentPassword">

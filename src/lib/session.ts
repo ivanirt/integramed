@@ -62,10 +62,10 @@ async function currentPwdAt(): Promise<number> {
   return readToken(store.get(COOKIE)?.value)?.pwdAt || 0;
 }
 
-function mustChangeFromFile(userId: string, explicit?: boolean): boolean {
+function mustChangeFromFile(user: SessionUser, explicit?: boolean): boolean {
   const loaded = readAccountsResult();
   if (!loaded.ok) return true;
-  const fromFile = passwordChangeRequired({ id: userId }, loaded.accounts, true);
+  const fromFile = passwordChangeRequired({ id: user.id, login: user.login }, loaded.accounts, true);
   return fromFile || explicit === true;
 }
 
@@ -74,7 +74,7 @@ export async function createSession(
   options?: { pwdAt?: number; mustChange?: boolean },
 ): Promise<void> {
   const pwdAt = options && typeof options.pwdAt === "number" ? options.pwdAt : await currentPwdAt();
-  const mustChange = mustChangeFromFile(user.id, options?.mustChange);
+  const mustChange = mustChangeFromFile(user, options?.mustChange);
   const token = buildSessionToken(
     {
       id: user.id,
@@ -110,8 +110,9 @@ export async function getSession(): Promise<ActiveSession | null> {
   if (!data?.id || !KNOWN_ROLES.has(data.role)) return null;
   const loaded = readAccountsResult();
   if (!loaded.ok) return null;
-  if (!isSessionPasswordCurrent({ id: data.id, pwdAt: data.pwdAt }, loaded.accounts)) return null;
-  const mustChangePassword = passwordChangeRequired({ id: data.id }, loaded.accounts, true);
+  const identity = { id: data.id, login: data.login, pwdAt: data.pwdAt };
+  if (!isSessionPasswordCurrent(identity, loaded.accounts)) return null;
+  const mustChangePassword = passwordChangeRequired(identity, loaded.accounts, true);
   return {
     id: data.id,
     name: data.name,

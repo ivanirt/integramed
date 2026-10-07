@@ -3,8 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createLocalFhirStore } from "../server/localFhir.js";
-import { defaultFhirStorageRoot } from "../src/lib/fhir-root.js";
+import { createLocalFhirHandler, createLocalFhirStore } from "../server/localFhir.js";
+import { assertFhirRootWritable, defaultFhirStorageRoot } from "../src/lib/fhir-root.js";
 import {
   logAccountsMissingFromStore,
   logMissingPractitionerOnLogin,
@@ -31,6 +31,49 @@ test("INTEGRAMED_FHIR_ROOT selects the local FHIR directory and otherwise stays 
     if (previous === undefined) delete process.env.INTEGRAMED_FHIR_ROOT;
     else process.env.INTEGRAMED_FHIR_ROOT = previous;
     fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a local FHIR root that exists but is not writable fails with the chown hint", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-ok-"));
+  assert.doesNotThrow(() => assertFhirRootWritable(dir));
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  if (typeof process.getuid === "function" && process.getuid() === 0) return;
+  const readonly = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-ro-"));
+  fs.chmodSync(readonly, 0o555);
+  try {
+    assert.throws(() => assertFhirRootWritable(readonly), /uid 1001/);
+    assert.throws(() => assertFhirRootWritable(readonly), /chown -R 1001:1001/);
+  } finally {
+    fs.chmodSync(readonly, 0o755);
+    fs.rmSync(readonly, { recursive: true, force: true });
+  }
+});
+
+test("a local FHIR write error is a 500 OperationOutcome and does not throw", () => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-handler-"));
+  const previous = process.env.INTEGRAMED_FHIR_ROOT;
+  process.env.INTEGRAMED_FHIR_ROOT = root;
+  try {
+    const handler = createLocalFhirHandler(root);
+    fs.chmodSync(root, 0o555);
+    let result;
+    assert.doesNotThrow(() => {
+      result = handler.handleFhirRequest("POST", "/Patient", {}, {
+        resourceType: "Patient",
+        name: [{ family: "Prueba" }],
+      });
+    });
+    assert.equal(result.status, 500);
+    assert.equal(result.body.resourceType, "OperationOutcome");
+    assert.match(result.body.issue[0].diagnostics, /No se pudo completar/);
+  } finally {
+    fs.chmodSync(root, 0o755);
+    if (previous === undefined) delete process.env.INTEGRAMED_FHIR_ROOT;
+    else process.env.INTEGRAMED_FHIR_ROOT = previous;
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

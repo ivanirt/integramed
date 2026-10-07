@@ -228,4 +228,17 @@ test("the auth root defaults to data/auth and must be writable", () => {
   const blocked = path.join(dir, "not-a-directory");
   fs.writeFileSync(blocked, "x");
   assert.throws(() => assertAuthRootWritable(blocked), /no se puede escribir/);
+  assert.throws(() => assertAuthRootWritable(blocked), /Monta un volumen/);
+
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) {
+    const readonly = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-ro-"));
+    fs.chmodSync(readonly, 0o555);
+    try {
+      assert.throws(() => assertAuthRootWritable(readonly), /uid 1001/);
+      assert.throws(() => assertAuthRootWritable(readonly), /chown -R 1001:1001/);
+    } finally {
+      fs.chmodSync(readonly, 0o755);
+      fs.rmSync(readonly, { recursive: true, force: true });
+    }
+  }
 });

@@ -90,7 +90,13 @@ export function createLocalFhirStore(projectRoot) {
       .filter(Boolean);
   }
 
-  fs.mkdirSync(dataDir, { recursive: true });
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+  } catch (err) {
+    // An existing root-owned volume throws EACCES here. Startup probes the
+    // directory and exits with the chown hint instead of crashing on import.
+    if (err?.code !== 'EACCES' && err?.code !== 'EPERM') throw err;
+  }
 
   return { readResource, writeResource, deleteResource, listType, dataDir };
 }
@@ -291,6 +297,16 @@ export function createLocalFhirHandler(projectRoot, { publicBaseUrl } = {}) {
   }
 
   function handleFhirRequest(method, rawPath, query = {}, body) {
+    try {
+      return dispatchFhirRequest(method, rawPath, query, body);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'FHIR store failure';
+      console.error('[FHIR] local store request failed:', detail);
+      return outcome('error', 'exception', 'No se pudo completar la operación FHIR local.', 500);
+    }
+  }
+
+  function dispatchFhirRequest(method, rawPath, query = {}, body) {
     const verb = String(method || 'GET').toUpperCase();
     const parsed = parseFhirTarget(rawPath);
     if (!parsed.ok) return outcome('error', 'invalid', 'URL de FHIR no válida', 400);

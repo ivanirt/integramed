@@ -14,6 +14,7 @@ import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
 import { parseFhirTarget } from '../src/lib/fhir-path.js';
 import { defaultAuthStorageRoot } from '../src/lib/auth-root.js';
+import { assertFhirRootWritable, defaultFhirStorageRoot } from '../src/lib/fhir-root.js';
 import { logAccountsMissingFromStore, readAccountEntries } from '../src/lib/missing-practitioner.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -425,11 +426,28 @@ function canonicalFhirPath(req) {
   return [parsed.type, parsed.id, ...parsed.extra].filter(Boolean).join('/');
 }
 
+function sendLocalFhir(res, run) {
+  try {
+    return sendFhirResult(res, run());
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'FHIR store failure';
+    console.error('[FHIR] local store request failed:', detail);
+    if (res.headersSent) return undefined;
+    return res.status(500).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: 'No se pudo completar la operación FHIR local.'
+      }]
+    });
+  }
+}
+
 app.all('/fhir*', (req, res) => {
   if (rejectNonCanonicalFhir(req, res)) return undefined;
   // req.method only. X-HTTP-Method-Override is not read.
-  const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
-  return sendFhirResult(res, result);
+  return sendLocalFhir(res, () => localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body));
 });
 
 // FHIR Proxy Endpoint (local store or remote)
@@ -437,8 +455,7 @@ app.all('/api/fhir/*', async (req, res) => {
   if (rejectNonCanonicalFhir(req, res)) return undefined;
   const fhirPath = canonicalFhirPath(req);
   if (isLocalFhirMode()) {
-    const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
-    return sendFhirResult(res, result);
+    return sendLocalFhir(res, () => localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body));
   }
 
   if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
@@ -548,6 +565,12 @@ if (process.env.FHIR_PROXY_NO_LISTEN !== '1') {
     console.log(`[FHIR Proxy] PORT=${process.env.PORT} is ignored. Loopback proxy listens on ${PORT}. Next.js serves HTTP on port 3000.`);
   }
   if (isLocalFhirMode()) {
+    try {
+      assertFhirRootWritable(defaultFhirStorageRoot(DATA_ROOT));
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
     const ids = localFhir.store.listType('Practitioner').map((resource) => resource?.id).filter(Boolean);
     logAccountsMissingFromStore(readAccountEntries(defaultAuthStorageRoot(PROJECT_ROOT)), ids);
   }

@@ -7,6 +7,7 @@ import { findAccountForStaff, readAccounts } from "@/lib/credentials";
 import { LOGIN_ERROR } from "@/lib/password-reset";
 import { checkLoginPassword } from "@/lib/passwords";
 import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
+import { enforceRoute } from "@/lib/enforce-action";
 
 export async function GET() {
   return NextResponse.json({ user: await getSession() });
@@ -22,13 +23,18 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
 
   if (action === "logout") {
+    const denied = enforceRoute("authLogout", null);
+    if (denied) return denied;
     await clearSession();
     return NextResponse.json({ ok: true });
   }
 
   if (action === "switch-role") {
     const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Sin sesión" }, { status: 401 });
+    const denied = enforceRoute("authSwitchRole", session?.role ?? null);
+    if (denied || !session) {
+      return denied ?? NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
     const role = body.role as RoleId;
     const staff = await listStaff();
     const me = staff.find((s) => s.id === session.id);
@@ -38,6 +44,9 @@ export async function POST(request: Request) {
     await createSession({ ...session, role });
     return NextResponse.json({ user: { ...session, role } });
   }
+
+  const denied = enforceRoute("authLogin", null);
+  if (denied) return denied;
 
   const login = String(body.login || body.email || "").trim().toLowerCase();
   const password = String(body.password || "");

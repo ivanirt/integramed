@@ -26,10 +26,47 @@ export const DEFAULT_HOURS: ClinicHours = {
 };
 
 function findByIdentifier(list: FhirResource[], system: string, value?: string) {
+  const wanted = String(value ?? "").trim();
+  if (!system || !wanted) return undefined;
   return list.find((r) => {
     const ids = (r.identifier as { system?: string; value?: string }[]) || [];
-    return ids.some((i) => i.system === system && (!value || i.value === value));
+    return ids.some((i) => i.system === system && i.value === wanted);
   });
+}
+
+const SLOT_MIN = 5;
+const SLOT_MAX = 240;
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Reject a practitioner schedule that is not seven HH:MM days with a sane slot. */
+export function assertValidPractitionerHours(hours: unknown): asserts hours is ClinicHours {
+  if (!hours || typeof hours !== "object" || Array.isArray(hours)) {
+    throw new Error("El horario no es válido.");
+  }
+  const record = hours as ClinicHours;
+  if (!Number.isInteger(record.slotDurationMinutes) || record.slotDurationMinutes < SLOT_MIN || record.slotDurationMinutes > SLOT_MAX) {
+    throw new Error("La duración del hueco debe ser un número entero entre 5 y 240 minutos.");
+  }
+  if (!record.days || typeof record.days !== "object" || Array.isArray(record.days)) {
+    throw new Error("El horario no es válido.");
+  }
+  const keys = Object.keys(record.days);
+  if (keys.length !== 7 || keys.some((key) => !/^[0-6]$/.test(key))) {
+    throw new Error("El horario debe incluir los siete días de la semana.");
+  }
+  for (const key of ["0", "1", "2", "3", "4", "5", "6"]) {
+    const day = record.days[Number(key)];
+    const label = DAY_NAMES[Number(key)];
+    if (!day || typeof day !== "object" || typeof day.enabled !== "boolean") {
+      throw new Error(`El día ${label} no es válido.`);
+    }
+    if (typeof day.start !== "string" || typeof day.end !== "string" || !CLOCK.test(day.start) || !CLOCK.test(day.end)) {
+      throw new Error(`Usa el formato HH:MM en ${label}.`);
+    }
+    if (day.start >= day.end) {
+      throw new Error(`En ${label} la hora de inicio tiene que ser anterior a la de cierre.`);
+    }
+  }
 }
 
 export async function loadModules(): Promise<{ id?: string; modules: Record<string, boolean> }> {
@@ -82,8 +119,10 @@ export async function saveHours(hours: ClinicHours, id?: string) {
 }
 
 export async function loadPractitionerHours(practitionerId: string): Promise<{ id?: string; hours: ClinicHours }> {
+  const id = String(practitionerId ?? "").trim();
+  if (!id) throw new Error("Falta el identificador del profesional.");
   const schedules = await fhirSearch("Schedule");
-  const match = findByIdentifier(schedules, SYSTEMS.practitionerHours, practitionerId);
+  const match = findByIdentifier(schedules, SYSTEMS.practitionerHours, id);
   if (!match) {
     const clinic = await loadHours();
     return { hours: clinic.hours };
@@ -98,6 +137,8 @@ export async function savePractitionerHours(input: {
   hours: ClinicHours;
   id?: string;
 }) {
+  assertValidPractitionerHours(input.hours);
+  const hours = input.hours;
   const resource = withExtension(
     {
       resourceType: "Schedule",
@@ -105,10 +146,10 @@ export async function savePractitionerHours(input: {
       active: true,
       identifier: [{ system: SYSTEMS.practitionerHours, value: input.practitionerId }],
       actor: [{ reference: `Practitioner/${input.practitionerId}`, display: input.practitionerName }],
-      comment: `Consulta ${input.hours.slotDurationMinutes} min`,
+      comment: `Consulta ${hours.slotDurationMinutes} min`,
     },
     SYSTEMS.hoursExtension,
-    input.hours,
+    hours,
   );
   return input.id ? fhirUpdate(resource) : fhirCreate(resource);
 }

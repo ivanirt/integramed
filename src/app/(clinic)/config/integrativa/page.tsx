@@ -1,7 +1,9 @@
 import { loadIntegrativeCatalog } from "@/lib/integrative";
 import { IntegrativeCatalogForm } from "@/components/consult/IntegrativeCatalogForm";
+import { requireAdmin } from "@/lib/require";
 
 export default async function IntegrativaConfigPage() {
+  await requireAdmin();
   const { items, id } = await loadIntegrativeCatalog();
   return (
     <div>

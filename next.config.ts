@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
+// Tests that boot `next dev` in parallel each get their own output directory.
+// Production and `next build` keep `.next` unless this is a relative test dir.
+const distDir = process.env.NEXT_DIST_DIR;
 const nextConfig: NextConfig = {
+  ...(distDir && /^\.next-[a-z0-9-]+$/.test(distDir) ? { distDir } : {}),
   async redirects() {
     return [
       { source: "/patients", destination: "/pacientes", permanent: false },

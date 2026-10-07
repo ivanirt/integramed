@@ -11,6 +11,7 @@ import {
   RESET_IP_WINDOW_MS,
 } from "@/lib/password-reset";
 import { lookupStaffForAuth } from "@/lib/staff-lookup";
+import { enforceRoute } from "@/lib/enforce-action";
 
 const emailBuckets = new Map<string, number[]>();
 const ipBuckets = new Map<string, number[]>();
@@ -24,6 +25,9 @@ function clientIp(request: Request): string {
 }
 
 export async function POST(request: Request) {
+  const denied = enforceRoute("authRequestReset", null);
+  if (denied) return denied;
+
   let body: { email?: unknown } = {};
   try {
     body = (await request.json()) as { email?: unknown };

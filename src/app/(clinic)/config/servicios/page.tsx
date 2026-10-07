@@ -1,8 +1,10 @@
 import { fhirSearch } from "@/lib/fhir";
 import { saveServiceAction, deleteResourceAction } from "@/lib/actions";
 import { Button, Field, Input } from "@/components/ui";
+import { requireAdmin } from "@/lib/require";
 
 export default async function ServiciosPage() {
+  await requireAdmin();
   const services = await fhirSearch("HealthcareService");
   return (
     <div>

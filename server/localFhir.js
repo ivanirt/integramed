@@ -241,16 +241,29 @@ export function createLocalFhirHandler(projectRoot, { publicBaseUrl } = {}) {
       return json(200, { resourceType: 'Bundle', type: 'searchset', total, entry: [] });
     }
     const count = Math.min(Math.max(Number(query._count || 50) || 50, 1), 500);
-    items = items.slice(0, count);
-    return json(200, {
+    const offsetRaw = Number(query._offset || 0);
+    const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : 0;
+    const pageItems = items.slice(offset, offset + count);
+    const bundle = {
       resourceType: 'Bundle',
       type: 'searchset',
       total,
-      entry: items.map((resource) => ({
+      entry: pageItems.map((resource) => ({
         fullUrl: `${baseUrl}/${resource.resourceType}/${resource.id}`,
         resource
       }))
-    });
+    };
+    if (offset + pageItems.length < total) {
+      const next = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (key === '_offset' || key === '_summary') continue;
+        next.set(key, String(value));
+      }
+      next.set('_count', String(count));
+      next.set('_offset', String(offset + pageItems.length));
+      bundle.link = [{ relation: 'next', url: `${baseUrl}/${type}?${next}` }];
+    }
+    return json(200, bundle);
   }
 
   function create(type, body) {

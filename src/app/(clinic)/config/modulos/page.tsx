@@ -1,7 +1,9 @@
 import { loadModules } from "@/lib/clinic-config";
 import { ModulesForm } from "@/components/ModulesForm";
+import { requireAdmin } from "@/lib/require";
 
 export default async function ModulosPage() {
+  await requireAdmin();
   const { modules, id } = await loadModules();
   return (
     <div>

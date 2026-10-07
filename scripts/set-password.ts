@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { createLocalFhirStore } from "../server/localFhir.js";
 import { findAuthStaff } from "../server/staffLookup.js";
 import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
+import { findCredentialAccount } from "../src/lib/account-lookup.js";
 import { blankAccount, mutateAccounts } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
@@ -27,7 +28,7 @@ function usage(): never {
   console.error("Uso: npm run set-password -- <correo-o-usuario> [--must-change|--no-must-change]");
   console.error("Sin --no-must-change la contraseña queda temporal y hay que cambiarla al entrar.");
   console.error("La contraseña se escribe en un prompt oculto, o en una sola línea de stdin si no hay terminal.");
-  console.error("No la pongas como argumento ni en SET_PASSWORD. Esa variable está en desuso y se ignora.");
+  console.error("No la pongas como argumento ni en el entorno. Si SET_PASSWORD está definida, se ignora.");
   process.exit(1);
 }
 
@@ -92,9 +93,11 @@ async function main() {
   const passwordHash = await hashPassword(secret);
   const queryIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query);
   mutateAccounts((accounts) => {
-    const index = accounts.findIndex(
-      (account) => account.practitionerId === staff.id || account.email === query || account.email === staff.email,
-    );
+    const match = findCredentialAccount(accounts, {
+      id: staff.id,
+      email: queryIsEmail ? query : staff.email,
+    });
+    const index = match ? accounts.indexOf(match) : -1;
     const next = index === -1 ? blankAccount(staff.id, queryIsEmail ? query : staff.email, true) : accounts[index];
     next.practitionerId = staff.id;
     if (queryIsEmail) next.email = query;

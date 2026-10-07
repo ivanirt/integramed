@@ -13,7 +13,8 @@ import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
 
 export async function GET() {
   const user = await getSession();
-  if (user?.mustChangePassword) {
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (user.mustChangePassword) {
     return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
   }
   return NextResponse.json({ user });
@@ -80,6 +81,10 @@ export async function POST(request: Request) {
   const role = requested && user.roles.includes(requested) ? requested : user.primaryRole;
   const session = { id: user.id, name: user.name, login: user.login, role };
   const mustChangePassword = account?.mustChangePassword === true;
-  await createSession(session, { pwdAt: decision.pwdAt, mustChange: mustChangePassword });
+  await createSession(session, {
+    pwdAt: decision.pwdAt,
+    mustChange: mustChangePassword,
+    email: account?.email,
+  });
   return NextResponse.json({ user: { ...session, mustChangePassword } });
 }

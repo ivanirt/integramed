@@ -21,18 +21,38 @@ export function resetPasswordChangeLimits(): void {
   ipBuckets.clear();
 }
 
-/** Traefik sets X-Real-IP. The first X-Forwarded-For hop is caller-controlled, so use the last one. */
-export function passwordChangeClientAddress(header: (name: string) => string | null): string {
-  const real = header("x-real-ip")?.trim();
-  if (real) return real;
-  const forwarded = header("x-forwarded-for");
-  if (!forwarded) return "local";
-  const hops = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
-  return hops[hops.length - 1] || "local";
+/** Dokploy/Traefik should set TRUST_PROXY=1. Otherwise client-supplied forwarding headers are ignored. */
+export function trustProxyHeaders(env: NodeJS.ProcessEnv = process.env): boolean {
+  return String(env.TRUST_PROXY || "").trim() === "1";
 }
 
-export function allowPasswordChangeAttempt(userId: string, ip: string, now = Date.now()): boolean {
+/**
+ * IP key for the change-password limiter.
+ * With TRUST_PROXY, Traefik's X-Real-IP wins, otherwise the last X-Forwarded-For hop.
+ * Without it, those headers are ignored. A missing socket address returns null so the
+ * caller keeps only the per-user limit and does not share one bucket across everyone.
+ */
+export function passwordChangeClientAddress(
+  header: (name: string) => string | null,
+  options?: { trustProxy?: boolean; remoteAddress?: string | null },
+): string | null {
+  const trust = options?.trustProxy ?? trustProxyHeaders();
+  if (trust) {
+    const real = header("x-real-ip")?.trim();
+    if (real) return real;
+    const forwarded = header("x-forwarded-for");
+    if (forwarded) {
+      const hops = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+      if (hops.length) return hops[hops.length - 1];
+    }
+  }
+  const remote = options?.remoteAddress?.trim();
+  return remote || null;
+}
+
+export function allowPasswordChangeAttempt(userId: string, ip: string | null, now = Date.now()): boolean {
   const userOk = rateLimitAllow(userBuckets, `user:${userId}`, now, CHANGE_PASSWORD_LIMIT, CHANGE_PASSWORD_WINDOW_MS);
+  if (!ip) return userOk;
   const ipOk = rateLimitAllow(ipBuckets, `ip:${ip}`, now, CHANGE_PASSWORD_IP_LIMIT, CHANGE_PASSWORD_WINDOW_MS);
   return userOk && ipOk;
 }

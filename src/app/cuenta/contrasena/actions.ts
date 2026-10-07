@@ -14,7 +14,7 @@ import { createSession, getSession } from "@/lib/session";
 
 export type ChangePasswordState = { ok: true } | { ok: false; error: string } | null;
 
-async function requestIp(): Promise<string> {
+async function requestIp(): Promise<string | null> {
   const headerStore = await headers();
   return passwordChangeClientAddress((name) => headerStore.get(name));
 }
@@ -33,7 +33,7 @@ export async function changePasswordAction(
   const currentPassword = String(formData.get("currentPassword") || "");
   const nextPassword = String(formData.get("password") || "");
   const confirm = String(formData.get("confirm") || "");
-  const account = findCredentialAccount(readAccounts(), { id: user.id, login: user.login });
+  const account = findCredentialAccount(readAccounts(), { id: user.id, email: user.email });
   if (account && !credentialLinkedToPractitioner(account, user.id)) {
     return { ok: false, error: "La sesión no es válida. Vuelve a entrar." };
   }
@@ -55,7 +55,7 @@ export async function changePasswordAction(
 
   await createSession(
     { id: user.id, name: user.name, login: user.login, role: user.role },
-    { pwdAt: changedAt, mustChange: false },
+    { pwdAt: changedAt, mustChange: false, email: user.email || account?.email },
   );
   return { ok: true };
 }

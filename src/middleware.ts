@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isAcceptableSecret, verifySessionToken } from "@/lib/session-edge";
 import { isPublicPath } from "@/lib/public-path";
 import {
+  CHANGE_PASSWORD_PATH,
   PASSWORD_CHANGE_REQUIRED_ERROR,
   passwordChangeAccess,
 } from "@/lib/password-change-gate";
@@ -21,6 +22,22 @@ function denied(pathname: string) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   return null;
+}
+
+function changePasswordPost(pathname: string, method: string) {
+  return method === "POST" && pathname === CHANGE_PASSWORD_PATH;
+}
+
+/** A rejected POST that never reads the body otherwise surfaces as ECONNRESET. */
+async function rejectPasswordChange(request: NextRequest) {
+  if (request.method.toUpperCase() === "POST") {
+    try {
+      await request.arrayBuffer();
+    } catch {
+      /* the client already closed the body */
+    }
+  }
+  return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
 }
 
 export async function middleware(request: NextRequest) {
@@ -43,10 +60,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session.mustChange) {
+    if (request.headers.has("next-action") && !changePasswordPost(pathname, method)) {
+      return rejectPasswordChange(request);
+    }
     const access = passwordChangeAccess(pathname, method);
     if (access !== "allow") {
       if (access === "deny" || request.headers.has("next-action")) {
-        return NextResponse.json({ error: PASSWORD_CHANGE_REQUIRED_ERROR }, { status: 403 });
+        return rejectPasswordChange(request);
       }
       const url = request.nextUrl.clone();
       url.pathname = "/cuenta/contrasena";

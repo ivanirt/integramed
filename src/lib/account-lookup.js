@@ -1,7 +1,21 @@
 /**
- * One lookup for login, sessions, the proxy, and password changes.
- * A practitioner id match wins. An email match is only a fallback so a
- * recreated Practitioner cannot be treated as "no account".
+ * Operator sessions that have no accounts.json row.
+ * seed-yeshua signs one of these for the loopback proxy. A clinic cookie cannot use the id
+ * without SESSION_SECRET, which already lets the holder sign any session.
+ */
+export const SERVICE_SESSION_IDS = new Set(["seed-yeshua"]);
+
+export function isServiceSession(session) {
+  const id = String(session?.id || "").trim();
+  return SERVICE_SESSION_IDS.has(id);
+}
+
+/**
+ * One lookup for login, sessions, the proxy, password changes, and the CLIs.
+ * A practitioner id match wins, even when an earlier row shares the email.
+ * Email is a fallback so a recreated Practitioner is not treated as "no account".
+ * `login` is used only when it contains "@" and `email` was not passed. A username
+ * login is not an email. Callers that authorize a cookie pass the signed `email` claim.
  */
 export function findCredentialAccount(accounts, query) {
   const list = Array.isArray(accounts) ? accounts : [];

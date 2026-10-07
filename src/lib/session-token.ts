@@ -4,6 +4,8 @@ export type SessionClaims = {
   id: string;
   name: string;
   login: string;
+  /** Pinned account email. Authorization uses this, not `login`, which may be a username. */
+  email?: string;
   role: string;
   pwdAt: number;
   exp: number;
@@ -18,6 +20,7 @@ export function buildSessionToken(claims: SessionClaims, secret: string): string
       id: claims.id,
       name: claims.name,
       login: claims.login,
+      ...(claims.email ? { email: claims.email } : {}),
       role: claims.role,
       pwdAt: claims.pwdAt,
       mustChange: claims.mustChange === true,

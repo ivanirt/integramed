@@ -132,6 +132,32 @@ test("the proxy blocks every clinical call while mustChangePassword is set", asy
     });
     assert.equal(emailOnlyHealth.status, 200);
     assert.deepEqual(await emailOnlyHealth.json(), { ok: true });
+
+    writeAccounts(root, [
+      { practitionerId: "prac-renamed", email: "named@clinic.test", passwordChangedAt: 900, mustChangePassword: true },
+    ]);
+    const username = signSession(
+      { id: "prac-named", name: "Named", login: "okuser", role: "admin", pwdAt: 400, mustChange: false },
+      SESSION_SECRET,
+    );
+    const usernameHit = await request(server, username);
+    assert.equal(usernameHit.status, 401);
+    assert.equal(usernameHit.text.includes("resourceType"), false);
+    const emailClaim = signSession(
+      {
+        id: "prac-named",
+        name: "Named",
+        login: "okuser",
+        email: "named@clinic.test",
+        role: "admin",
+        pwdAt: 900,
+        mustChange: false,
+      },
+      SESSION_SECRET,
+    );
+    const claimedHit = await request(server, emailClaim);
+    assert.equal(claimedHit.status, 401);
+    assert.equal(claimedHit.text.includes("resourceType"), false);
   } finally {
     if (previous === undefined) delete process.env.INTEGRAMED_AUTH_ROOT;
     else process.env.INTEGRAMED_AUTH_ROOT = previous;

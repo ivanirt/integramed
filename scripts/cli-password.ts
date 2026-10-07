@@ -15,14 +15,46 @@ export function warnDeprecatedPasswordEnv(): void {
   }
 }
 
+/** True for --password, --pass, -p, and the same flags with the value attached (`-psecret`, `--password=…`). */
+export function isPasswordArgument(arg: string): boolean {
+  const name = arg.split("=", 1)[0];
+  return name.startsWith("--pass") || name.startsWith("-p");
+}
+
 export function rejectPasswordArguments(argv: string[]): void {
   for (const arg of argv) {
-    const name = arg.split("=", 1)[0];
-    if (name === "--password" || name === "--pass" || name === "-p") {
-      console.error("No pases la contraseña como argumento. Se lee del prompt oculto o de stdin.");
-      process.exit(1);
-    }
+    if (!isPasswordArgument(arg)) continue;
+    console.error("No pases la contraseña como argumento. Se lee del prompt oculto o de stdin.");
+    process.exit(1);
   }
+}
+
+/**
+ * One raw chunk from the hidden prompt.
+ * A newline ends the entry. Anything after the first newline is a second line and is rejected.
+ */
+export function appendHiddenChunk(
+  value: string,
+  chunk: string,
+): { kind: "continue"; value: string } | { kind: "submit"; value: string } | { kind: "reject" } | { kind: "interrupt" } {
+  if (chunk === "\u0003") return { kind: "interrupt" };
+  const breakAt = chunk.search(/\r|\n/);
+  if (breakAt >= 0) {
+    let next = value;
+    for (const char of chunk.slice(0, breakAt)) {
+      if (char.charCodeAt(0) >= 32) next += char;
+    }
+    const rest = chunk.slice(breakAt).replace(/[\r\n]/g, "");
+    if (rest.length > 0) return { kind: "reject" };
+    return { kind: "submit", value: next };
+  }
+  if (chunk === "\u007f" || chunk === "\b") return { kind: "continue", value: value.slice(0, -1) };
+  if (chunk === "\u0015") return { kind: "continue", value: "" };
+  let next = value;
+  for (const char of chunk) {
+    if (char.charCodeAt(0) >= 32) next += char;
+  }
+  return { kind: "continue", value: next };
 }
 
 function readHidden(prompt: string): Promise<string> {
@@ -53,32 +85,25 @@ function readHidden(prompt: string): Promise<string> {
       stdin.pause();
     };
     const onData = (key: string) => {
-      if (key === "\u0003") {
+      const step = appendHiddenChunk(value, key);
+      if (step.kind === "interrupt") {
         stdout.write("\n");
         cleanup();
         process.exit(130);
       }
-      if (key === "\r" || key === "\n" || key.endsWith("\n") || key.endsWith("\r")) {
-        const extra = key.replace(/[\r\n]/g, "");
-        if (extra && extra.charCodeAt(0) >= 32) value += extra;
+      if (step.kind === "reject") {
         stdout.write("\n");
         cleanup();
-        resolve(value);
+        console.error("La contraseña tiene que ir en una sola línea.");
+        process.exit(1);
+      }
+      if (step.kind === "submit") {
+        stdout.write("\n");
+        cleanup();
+        resolve(step.value);
         return;
       }
-      if (key === "\u007f" || key === "\b") {
-        value = value.slice(0, -1);
-        return;
-      }
-      if (key === "\u0015") {
-        value = "";
-        return;
-      }
-      let printable = "";
-      for (const char of key) {
-        if (char.charCodeAt(0) >= 32) printable += char;
-      }
-      value += printable;
+      value = step.value;
     };
     stdin.on("data", onData);
   });

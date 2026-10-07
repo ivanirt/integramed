@@ -17,6 +17,7 @@ import {
   allowPasswordChangeAttempt,
   commitPasswordChange,
   evaluatePasswordChange,
+  CHANGE_PASSWORD_IP_LIMIT,
   passwordChangeClientAddress,
   resetPasswordChangeLimits,
 } from "../src/lib/password-change.ts";
@@ -30,6 +31,7 @@ import { isSessionPasswordCurrent } from "../src/lib/session-stamp.js";
 import { logoutRequestAllowed } from "../src/lib/request-origin.ts";
 import { verifySessionToken } from "../src/lib/session-edge.ts";
 import { buildSessionToken } from "../src/lib/session-token.ts";
+import { appendHiddenChunk, isPasswordArgument } from "../scripts/cli-password.ts";
 
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const SECRET = "s".repeat(48);
@@ -276,16 +278,46 @@ test("an account linked only by email does not authorize the new practitioner", 
   assert.equal(credentialLinkedToPractitioner(findCredentialAccount(accounts, { id: "prac-old" }), "prac-old"), true);
   assert.equal(passwordChangeRequired(session, accounts, true), true);
   assert.equal(isSessionPasswordCurrent(session, accounts), false);
+
+  const username = { id: "prac-admin", login: "okuser", pwdAt: 900, mustChange: false };
+  assert.equal(findCredentialAccount(accounts, { id: username.id, email: undefined }), undefined);
+  assert.equal(isSessionPasswordCurrent(username, accounts), false);
+  assert.equal(passwordChangeRequired(username, accounts, true), true);
+  const claimed = { id: "prac-admin", email: "admin@clinic.test", login: "okuser", pwdAt: 900 };
+  assert.equal(findCredentialAccount(accounts, { id: claimed.id, email: claimed.email })?.practitionerId, "prac-old");
+  assert.equal(isSessionPasswordCurrent(claimed, accounts), false);
+  assert.equal(isSessionPasswordCurrent({ id: "seed-yeshua", login: "seed-yeshua", pwdAt: 0 }, accounts), true);
 });
 
-test("the change-password client address uses X-Real-IP or the last forwarded hop", () => {
+test("the change-password limiter ignores proxy headers unless TRUST_PROXY=1", () => {
   const header = (map: Record<string, string>) => (name: string) => map[name] ?? null;
-  assert.equal(passwordChangeClientAddress(header({ "x-forwarded-for": "1.1.1.1, 10.0.0.8" })), "10.0.0.8");
+  const spoofed = header({ "x-real-ip": "10.1.1.1", "x-forwarded-for": "1.1.1.1, 10.0.0.8" });
+  assert.equal(passwordChangeClientAddress(spoofed, { trustProxy: false }), null);
+  assert.equal(passwordChangeClientAddress(header({ "x-real-ip": "10.1.1.1" }), { trustProxy: true }), "10.1.1.1");
   assert.equal(
-    passwordChangeClientAddress(header({ "x-real-ip": "10.1.1.1", "x-forwarded-for": "1.1.1.1, 10.0.0.8" })),
-    "10.1.1.1",
+    passwordChangeClientAddress(header({ "x-forwarded-for": "1.1.1.1, 10.0.0.8" }), { trustProxy: true }),
+    "10.0.0.8",
   );
-  assert.equal(passwordChangeClientAddress(header({})), "local");
+  assert.equal(
+    passwordChangeClientAddress(header({}), { trustProxy: false, remoteAddress: "192.0.2.10" }),
+    "192.0.2.10",
+  );
+
+  resetPasswordChangeLimits();
+  const now = 1_700_000_000_000;
+  for (let i = 0; i < CHANGE_PASSWORD_LIMIT; i += 1) {
+    assert.equal(allowPasswordChangeAttempt("prac-a", null, now + i), true);
+  }
+  assert.equal(allowPasswordChangeAttempt("prac-a", null, now + 20), false);
+  assert.equal(allowPasswordChangeAttempt("prac-b", null, now + 20), true);
+
+  resetPasswordChangeLimits();
+  for (let i = 0; i < CHANGE_PASSWORD_IP_LIMIT; i += 1) {
+    assert.equal(allowPasswordChangeAttempt(`ip-user-${i}`, "10.0.0.8", now + i), true);
+  }
+  assert.equal(allowPasswordChangeAttempt("prac-next", "10.0.0.8", now + 40), false);
+  assert.equal(allowPasswordChangeAttempt("prac-next", "10.0.0.9", now + 40), true);
+  resetPasswordChangeLimits();
 });
 
 test("logout rejects a foreign Origin and a null Origin", () => {
@@ -301,7 +333,27 @@ test("logout rejects a foreign Origin and a null Origin", () => {
     logoutRequestAllowed({
       headers: headers({ origin: "https://clinic.test", "x-forwarded-host": "clinic.test", host: "internal" }),
     }),
+    false,
+  );
+  const production = { NODE_ENV: "production", APP_BASE_URL: "https://clinic.test" };
+  assert.equal(
+    logoutRequestAllowed(
+      { headers: headers({ origin: "https://clinic.test", "x-forwarded-host": "evil.test", host: "internal" }) },
+      production,
+    ),
     true,
+  );
+  assert.equal(
+    logoutRequestAllowed({ headers: headers({ origin: "http://clinic.test", host: "clinic.test" }) }, production),
+    false,
+  );
+  assert.equal(
+    logoutRequestAllowed({ headers: headers({ origin: "https://evil.test", host: "clinic.test" }) }, production),
+    false,
+  );
+  assert.equal(
+    logoutRequestAllowed({ headers: headers({ origin: "https://clinic.test" }) }, { NODE_ENV: "production" }),
+    false,
   );
 });
 
@@ -455,4 +507,35 @@ test("the interactive prompt hides the password and requires confirmation", { ti
   assert.equal(account?.mustChangePassword, true);
   assert.equal(await bcrypt.compare(temporary, account?.passwordHash || ""), true);
   assert.equal(fs.readFileSync(path.join(authRoot, "accounts.json"), "utf8").includes(temporary), false);
+});
+
+test("a pasted second line is rejected and attached password flags are not echoed", async () => {
+  assert.deepEqual(appendHiddenChunk("", "linea-uno\nlinea-dos\n"), { kind: "reject" });
+  assert.deepEqual(appendHiddenChunk("linea-", "uno\n"), { kind: "submit", value: "linea-uno" });
+  assert.equal(isPasswordArgument("--prefix"), false);
+  assert.equal(isPasswordArgument("--must-change"), false);
+  const secret = password();
+  for (const flag of [`-p${secret}`, `--password=${secret}`, `--pass${secret}`]) {
+    assert.equal(isPasswordArgument(flag), true);
+    const rejected = await run("scripts/set-password.ts", [flag], cliEnv(fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-")), fs.mkdtempSync(path.join(os.tmpdir(), "integramed-fhir-"))), "");
+    assert.notEqual(rejected.code, 0);
+    assert.equal(`${rejected.stdout}\n${rejected.stderr}`.includes(secret), false);
+    assert.match(rejected.stderr, /argumento/);
+  }
+});
+
+test("operator messages do not tell anyone to put a password in the environment", () => {
+  for (const file of [
+    "src/instrumentation-node.ts",
+    "src/lib/mailer.ts",
+    "src/lib/password-reset.ts",
+    "scripts/dev.mjs",
+    "README.md",
+    ".env.example",
+  ]) {
+    const text = fs.readFileSync(file, "utf8");
+    assert.equal(text.includes("con SET_PASSWORD"), false, file);
+    assert.equal(text.includes("SET_PASSWORD='"), false, file);
+    assert.equal(text.includes('SET_PASSWORD="'), false, file);
+  }
 });

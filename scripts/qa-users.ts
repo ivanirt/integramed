@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createLocalFhirStore } from "../server/localFhir.js";
 import { defaultAuthStorageRoot } from "../src/lib/auth-root.js";
+import { findCredentialAccount } from "../src/lib/account-lookup.js";
 import { blankAccount, readAccounts, writeAccounts, type CredentialAccount } from "../src/lib/credentials.ts";
 import { hashPassword } from "../src/lib/passwords.ts";
 import { validateNewPassword } from "../src/lib/password-reset.ts";
@@ -112,7 +113,8 @@ function upsertCredential(
   replacePassword: boolean,
 ) {
   const accounts = readAccounts(accountsRoot(root));
-  const index = accounts.findIndex((account) => account.practitionerId === practitionerId || account.email === email);
+  const match = findCredentialAccount(accounts, { id: practitionerId, email });
+  const index = match ? accounts.indexOf(match) : -1;
   if (index === -1) {
     const account = blankAccount(practitionerId, email, true);
     if (passwordHash) {

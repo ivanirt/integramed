@@ -18,6 +18,16 @@ process.env.FHIR_PROXY_SECRET = FHIR_PROXY_SECRET;
 process.env.FHIR_MODE = "local";
 process.env.FHIR_PROXY_NO_LISTEN = "1";
 process.env.INTEGRAMED_FHIR_ROOT = fhirRoot;
+const authRoot = fs.mkdtempSync(path.join(os.tmpdir(), "integramed-auth-"));
+process.env.INTEGRAMED_AUTH_ROOT = authRoot;
+fs.mkdirSync(authRoot, { recursive: true });
+fs.writeFileSync(
+  path.join(authRoot, "accounts.json"),
+  JSON.stringify({
+    revision: 1,
+    accounts: [{ practitionerId: "prac-1", email: "prac-1@clinic.test", passwordChangedAt: 0, mustChangePassword: false }],
+  }),
+);
 delete process.env.PORT;
 
 const { app } = await import("../server/index.js");

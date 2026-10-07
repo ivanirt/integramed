@@ -17,6 +17,8 @@ export type SessionUser = {
 export type ActiveSession = SessionUser & {
   /** From accounts.json, not from the cookie. Missing flag means false. */
   mustChangePassword: boolean;
+  /** Signed account email. Empty when the cookie was issued before that claim. */
+  email: string;
 };
 
 const COOKIE = SESSION_COOKIE;
@@ -35,7 +37,12 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-type TokenBody = SessionUser & { exp: number; pwdAt?: number; mustChange?: boolean };
+type TokenBody = SessionUser & { exp: number; pwdAt?: number; mustChange?: boolean; email?: string };
+
+function pinnedEmail(value: unknown): string {
+  const email = String(value || "").trim().toLowerCase();
+  return email.includes("@") ? email : "";
+}
 
 function readToken(token: string | undefined): TokenBody | null {
   if (!token) return null;
@@ -57,29 +64,28 @@ function readToken(token: string | undefined): TokenBody | null {
   }
 }
 
-async function currentPwdAt(): Promise<number> {
-  const store = await cookies();
-  return readToken(store.get(COOKIE)?.value)?.pwdAt || 0;
-}
-
-function mustChangeFromFile(user: SessionUser, explicit?: boolean): boolean {
+function mustChangeFromFile(user: SessionUser, email: string, explicit?: boolean): boolean {
   const loaded = readAccountsResult();
   if (!loaded.ok) return true;
-  const fromFile = passwordChangeRequired({ id: user.id, login: user.login }, loaded.accounts, true);
+  const fromFile = passwordChangeRequired({ id: user.id, email }, loaded.accounts, true);
   return fromFile || explicit === true;
 }
 
 export async function createSession(
   user: SessionUser,
-  options?: { pwdAt?: number; mustChange?: boolean },
+  options?: { pwdAt?: number; mustChange?: boolean; email?: string },
 ): Promise<void> {
-  const pwdAt = options && typeof options.pwdAt === "number" ? options.pwdAt : await currentPwdAt();
-  const mustChange = mustChangeFromFile(user, options?.mustChange);
+  const store = await cookies();
+  const current = readToken(store.get(COOKIE)?.value);
+  const email = pinnedEmail(options?.email || current?.email);
+  const pwdAt = options && typeof options.pwdAt === "number" ? options.pwdAt : current?.pwdAt || 0;
+  const mustChange = mustChangeFromFile(user, email, options?.mustChange);
   const token = buildSessionToken(
     {
       id: user.id,
       name: user.name,
       login: user.login,
+      email,
       role: user.role,
       pwdAt,
       mustChange,
@@ -87,7 +93,6 @@ export async function createSession(
     },
     secret(),
   );
-  const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -110,7 +115,7 @@ export async function getSession(): Promise<ActiveSession | null> {
   if (!data?.id || !KNOWN_ROLES.has(data.role)) return null;
   const loaded = readAccountsResult();
   if (!loaded.ok) return null;
-  const identity = { id: data.id, login: data.login, pwdAt: data.pwdAt };
+  const identity = { id: data.id, email: pinnedEmail(data.email), pwdAt: data.pwdAt };
   if (!isSessionPasswordCurrent(identity, loaded.accounts)) return null;
   const mustChangePassword = passwordChangeRequired(identity, loaded.accounts, true);
   return {
@@ -119,5 +124,6 @@ export async function getSession(): Promise<ActiveSession | null> {
     login: data.login,
     role: data.role as RoleId,
     mustChangePassword,
+    email: identity.email,
   };
 }

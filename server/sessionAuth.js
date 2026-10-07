@@ -55,6 +55,7 @@ export function verifySessionToken(token, secret) {
       id: String(data.id),
       name: String(data.name || ''),
       login: String(data.login || ''),
+      email: typeof data.email === 'string' && data.email.includes('@') ? data.email.trim().toLowerCase() : '',
       role: data.role,
       exp: data.exp,
       pwdAt: typeof data.pwdAt === 'number' && Number.isFinite(data.pwdAt) ? data.pwdAt : 0,
@@ -120,10 +121,11 @@ export function requireClinicAccess(req, res, next) {
   }
   const user = sessionFromRequest(req);
   const stamps = readPasswordStamps();
-  if (!stamps.ok || !user || !isSessionPasswordCurrent(user, stamps.accounts)) {
+  const identity = user ? { id: user.id, email: user.email, pwdAt: user.pwdAt } : null;
+  if (!stamps.ok || !identity || !isSessionPasswordCurrent(identity, stamps.accounts)) {
     return res.status(401).json({ error: 'No autorizado' });
   }
-  if (passwordChangeRequired(user, stamps.accounts, true)) {
+  if (passwordChangeRequired(identity, stamps.accounts, true)) {
     return res.status(403).json({ error: 'Debes cambiar tu contraseña.' });
   }
   if (isVaultWrite(req) && user.role !== 'admin') {

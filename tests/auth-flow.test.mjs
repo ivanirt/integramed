@@ -104,6 +104,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   const orphanPassword = `${randomBytes(18).toString("base64url")}d4`;
   const tempEmail = "qa+temp@integramed.local";
   const orphanEmail = "qa+orphan@integramed.local";
+  const namedEmail = "qa+named@integramed.local";
   const store = createLocalFhirStore(dataRoot);
   store.writeResource(practitioner("prac-admin", adminEmail, "admin", "Ivan"));
   store.writeResource(roleResource("role-admin", "prac-admin", "admin"));
@@ -113,6 +114,18 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   store.writeResource(roleResource("role-temp", "prac-temp", "admin"));
   store.writeResource(practitioner("prac-new", orphanEmail, "admin", "Nueva"));
   store.writeResource(roleResource("role-new", "prac-new", "admin"));
+  store.writeResource({
+    resourceType: "Practitioner",
+    id: "prac-named",
+    active: true,
+    name: [{ use: "official", family: "Prueba", given: ["Named"] }],
+    telecom: [{ system: "email", value: namedEmail }],
+    identifier: [
+      { system: LOGIN_SYSTEM, value: "okuser" },
+      { system: ROLE_SYSTEM, value: "admin" },
+    ],
+  });
+  store.writeResource(roleResource("role-named", "prac-named", "admin"));
   const adminAccount = blankAccount("prac-admin", adminEmail, true);
   const doctorAccount = blankAccount("prac-doctor", doctorEmail, true);
   doctorAccount.passwordHash = await bcrypt.hash(doctorPassword, 4);
@@ -125,7 +138,9 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   orphanAccount.passwordHash = await bcrypt.hash(orphanPassword, 4);
   orphanAccount.passwordChangedAt = 500;
   orphanAccount.mustChangePassword = true;
-  writeAccounts([adminAccount, doctorAccount, tempAccount, orphanAccount], authRoot);
+  const namedAccount = blankAccount("prac-named", namedEmail, true);
+  namedAccount.passwordChangedAt = 400;
+  writeAccounts([adminAccount, doctorAccount, tempAccount, orphanAccount, namedAccount], authRoot);
 
   const proxyPort = await freePort();
   const webPort = await freePort();
@@ -253,6 +268,11 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
     const home = await fetch(`${origin}/`, { headers: { cookie: session.split(";")[0] }, redirect: "manual" });
     assert.equal(home.status, 200);
     assert.match(await home.text(), /Inicio/);
+    const sedes = await fetch(`${origin}/config/sedes`, { headers: { cookie: session.split(";")[0] } });
+    assert.equal(sedes.status, 200);
+    const sedesHtml = await sedes.text();
+    const actionId = sedesHtml.match(/\$ACTION_ID_([^\s"']+)/)?.[1];
+    assert.ok(actionId, sedesHtml.slice(0, 500));
 
     const doctor = await fetch(`${origin}/api/auth`, {
       method: "POST",
@@ -282,8 +302,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
       SESSION_SECRET,
     )}`;
     const staleHome = await fetch(`${origin}/`, { headers: { cookie: staleCookie }, redirect: "manual" });
-    assert.equal(staleHome.status, 307);
-    assert.match(staleHome.headers.get("location") || "", /\/acceso/);
+    assert.equal(staleHome.status, 401);
     assert.equal((await staleHome.text()).includes("Inicio"), false);
 
     const quietCookie = `integramed_session=${buildSessionToken(
@@ -325,6 +344,19 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
     });
     assert.equal(action.status, 403);
     assert.deepEqual(await action.json(), { error: "Debes cambiar tu contraseña." });
+    const foreignAction = await fetch(`${origin}/acceso`, {
+      method: "POST",
+      headers: {
+        cookie: forcedCookie.split(";")[0],
+        "next-action": actionId,
+        origin,
+        "content-type": "text/plain",
+      },
+      body: "[]",
+      redirect: "manual",
+    });
+    assert.equal(foreignAction.status, 403);
+    assert.deepEqual(await foreignAction.json(), { error: "Debes cambiar tu contraseña." });
 
     const orphan = await fetch(`${origin}/api/auth`, {
       method: "POST",
@@ -346,8 +378,8 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
       SESSION_SECRET,
     )}`;
     const emailOnlyHome = await fetch(`${origin}/`, { headers: { cookie: emailOnlyCookie }, redirect: "manual" });
-    assert.equal(emailOnlyHome.status, 307);
-    assert.match(emailOnlyHome.headers.get("location") || "", /\/acceso/);
+    assert.equal(emailOnlyHome.status, 401);
+    assert.equal((await emailOnlyHome.text()).includes("Inicio"), false);
     const emailOnlyProxy = await fetch(`http://127.0.0.1:${proxyPort}/api/fhir/Patient`, {
       headers: {
         cookie: emailOnlyCookie,
@@ -356,6 +388,53 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
     });
     assert.equal(emailOnlyProxy.status, 401);
     assert.equal((await emailOnlyProxy.text()).includes("resourceType"), false);
+
+    const stored = JSON.parse(fs.readFileSync(path.join(authRoot, "accounts.json"), "utf8"));
+    const namedRow = stored.accounts.find((item) => item.email === namedEmail);
+    namedRow.practitionerId = "prac-renamed";
+    namedRow.passwordChangedAt = 900;
+    namedRow.mustChangePassword = true;
+    fs.writeFileSync(path.join(authRoot, "accounts.json"), JSON.stringify(stored));
+    const usernameCookie = `integramed_session=${buildSessionToken(
+      {
+        id: "prac-named",
+        name: "Named",
+        login: "okuser",
+        role: "admin",
+        pwdAt: 400,
+        mustChange: false,
+        exp: Date.now() + 60_000,
+      },
+      SESSION_SECRET,
+    )}`;
+    const usernameApi = await fetch(`${origin}/api/auth`, { headers: { cookie: usernameCookie } });
+    assert.equal(usernameApi.status, 401);
+    const usernameProxy = await fetch(`http://127.0.0.1:${proxyPort}/api/fhir/Patient`, {
+      headers: { cookie: usernameCookie, "x-integramed-proxy-secret": FHIR_PROXY_SECRET },
+    });
+    assert.equal(usernameProxy.status, 401);
+    assert.equal((await usernameProxy.text()).includes("resourceType"), false);
+    const usernamePage = await fetch(`${origin}/config/sedes`, {
+      headers: { cookie: usernameCookie },
+      redirect: "manual",
+    });
+    assert.equal(usernamePage.status, 401);
+    assert.equal((await usernamePage.text()).includes("Organizaciones"), false);
+    const claimedCookie = `integramed_session=${buildSessionToken(
+      {
+        id: "prac-named",
+        name: "Named",
+        login: "okuser",
+        email: namedEmail,
+        role: "admin",
+        pwdAt: 900,
+        mustChange: false,
+        exp: Date.now() + 60_000,
+      },
+      SESSION_SECRET,
+    )}`;
+    const claimedApi = await fetch(`${origin}/api/auth`, { headers: { cookie: claimedCookie } });
+    assert.equal(claimedApi.status, 401);
 
     const foreignLogout = await fetch(`${origin}/api/auth/logout`, {
       method: "POST",

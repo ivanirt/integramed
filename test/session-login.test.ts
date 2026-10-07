@@ -51,7 +51,8 @@ test("a password change invalidates cookies issued before it", () => {
   assert.equal(isSessionPasswordCurrent({ id: "prac-ivan", pwdAt: 100 }, accounts), true);
   assert.equal(isSessionPasswordCurrent({ id: "prac-ivan", pwdAt: 99 }, accounts), false);
   assert.equal(isSessionPasswordCurrent({ id: "prac-ivan" }, accounts), false);
-  assert.equal(isSessionPasswordCurrent({ id: "someone-else", pwdAt: 0 }, accounts), true);
+  assert.equal(isSessionPasswordCurrent({ id: "someone-else", pwdAt: 0 }, accounts), false);
+  assert.equal(isSessionPasswordCurrent({ id: "seed-yeshua", pwdAt: 0 }, accounts), true);
 });
 
 test("login and session sources do not restore a shared password or the example secret", () => {

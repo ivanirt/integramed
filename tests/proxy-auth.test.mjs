@@ -105,6 +105,22 @@ test("PHI and config routes reject missing and forged sessions", async () => {
       assert.equal(variant.text.includes("serverUrl"), false, variantPath);
     }
 
+    const vaultStatus = await request(server, "GET", "/api/ai/vault-status", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.notEqual(vaultStatus.status, 200);
+    assert.equal(vaultStatus.text.includes("vault-es"), false);
+    assert.equal(vaultStatus.text.includes("vault-en"), false);
+    assert.equal(/\/(workspace|home|app|Users)\//.test(vaultStatus.text), false);
+    const vaultAdmin = await request(server, "GET", "/api/ai/vault-status", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.notEqual(vaultAdmin.status, 200);
+    assert.equal(vaultAdmin.text.includes("vault-es"), false);
+    assert.equal(/\/(workspace|home|app|Users)\//.test(vaultAdmin.text), false);
+
     const healthAdmin = await request(server, "GET", "/api/health", {
       token: admin(),
       secret: FHIR_PROXY_SECRET,

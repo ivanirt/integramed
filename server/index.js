@@ -240,22 +240,6 @@ app.all('/api/config', requireRole('fhirConfig'), (req, res) => {
   });
 });
 
-app.get('/api/ai/vault-status', (req, res) => {
-  const language = normalizeVaultLanguage(req.query?.language);
-  const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
-  try {
-    const notes = loadVaultNotes(vaultPath);
-    res.json({
-      exists: notes.length > 0,
-      noteCount: notes.length,
-      path: vaultPath,
-      language
-    });
-  } catch (err) {
-    res.status(500).json({ exists: false, noteCount: 0, error: err.message, path: vaultPath, language });
-  }
-});
-
 app.post('/api/ai/consult', requireRole('clinicalAi'), async (req, res) => {
   const apiKey = String(process.env.CLINICAL_AI_KEY || process.env.OPENROUTER_API_KEY || '').trim();
   const model = String(process.env.CLINICAL_AI_MODEL || 'openai/gpt-4o').trim();

@@ -1,4 +1,8 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import fs from 'fs';
+import { isSessionPasswordCurrent } from '../src/lib/session-stamp.js';
+import { accountsFile } from '../src/lib/auth-root.js';
+import { isPractitionerMutation } from '../src/lib/fhir-path.js';
 
 export const SESSION_COOKIE = 'integramed_session';
 export const MIN_SECRET_LENGTH = 32;
@@ -51,7 +55,8 @@ export function verifySessionToken(token, secret) {
       name: String(data.name || ''),
       login: String(data.login || ''),
       role: data.role,
-      exp: data.exp
+      exp: data.exp,
+      pwdAt: typeof data.pwdAt === 'number' && Number.isFinite(data.pwdAt) ? data.pwdAt : 0
     };
   } catch {
     return null;
@@ -93,14 +98,31 @@ export function isVaultWrite(req) {
   return method !== 'GET' && method !== 'HEAD';
 }
 
+export function readPasswordStamps(root) {
+  try {
+    const raw = fs.readFileSync(accountsFile(root), 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.accounts) ? parsed.accounts : [];
+  } catch {
+    return [];
+  }
+}
+
+export { isPractitionerMutation };
+
 export function requireClinicAccess(req, res, next) {
   if (!proxySecretOk(req)) {
     return res.status(401).json({ error: 'No autorizado' });
   }
   const user = sessionFromRequest(req);
-  if (!user) return res.status(401).json({ error: 'No autorizado' });
+  if (!user || !isSessionPasswordCurrent(user, readPasswordStamps())) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
   if (isVaultWrite(req) && user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administración puede modificar la bóveda.' });
+  }
+  if (isPractitionerMutation(req) && user.role !== 'admin') {
+    return res.status(403).json({ error: 'Solo administración puede modificar un Practitioner.' });
   }
   req.clinicUser = user;
   return next();

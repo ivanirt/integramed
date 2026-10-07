@@ -25,7 +25,10 @@ test("edge and node verifiers accept a signed session and reject forgeries", asy
   assert.equal(edge?.role, "doctor");
   assert.equal(node?.login, "ivan");
 
-  const forged = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+  const dot = token.indexOf(".");
+  const signature = token.slice(dot + 1);
+  const flipped = signature[0] === "A" ? "B" : "A";
+  const forged = `${token.slice(0, dot + 1)}${flipped}${signature.slice(1)}`;
   assert.equal(await verifySessionToken(forged, SECRET), null);
   assert.equal(verifyNode(forged, SECRET), null);
   assert.equal(await verifySessionToken(token, "t".repeat(48)), null);

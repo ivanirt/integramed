@@ -1,19 +1,12 @@
-import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { clearSession, createSession, getSession } from "@/lib/session";
-import { ensureBootstrapStaff, listStaff } from "@/lib/staff";
+import { lookupStaffForAuth } from "@/lib/staff-lookup";
+import { listStaff } from "@/lib/staff";
 import type { RoleId } from "@/lib/roles";
-
-function masterPassword(): string {
-  return (process.env.CLINIC_MASTER_PASSWORD || "").trim();
-}
-
-function passwordMatches(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
+import { findAccountForStaff, readAccounts } from "@/lib/credentials";
+import { LOGIN_ERROR } from "@/lib/password-reset";
+import { checkLoginPassword } from "@/lib/passwords";
+import { logMissingPractitionerOnLogin } from "@/lib/missing-practitioner.js";
 
 export async function GET() {
   return NextResponse.json({ user: await getSession() });
@@ -48,46 +41,31 @@ export async function POST(request: Request) {
 
   const login = String(body.login || body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  const master = masterPassword();
-  if (!master) {
-    console.error("[auth] CLINIC_MASTER_PASSWORD is not set; master login is disabled.");
-    return NextResponse.json(
-      { error: "El acceso no está disponible. Contacta a administración." },
-      { status: 503 },
-    );
-  }
   if (!login || !password) {
     return NextResponse.json({ error: "Usuario y contraseña son necesarios." }, { status: 400 });
   }
-  if (!passwordMatches(password, master)) {
-    return NextResponse.json({ error: "Contraseña incorrecta." }, { status: 401 });
+
+  let user;
+  try {
+    user = await lookupStaffForAuth(login);
+  } catch (err) {
+    console.error("lookupStaffForAuth", err instanceof Error ? err.message : "failed");
+    return NextResponse.json(
+      { error: "No se pudo consultar el personal. Inténtalo más tarde." },
+      { status: 503 },
+    );
+  }
+  const accounts = readAccounts();
+  const account = user ? findAccountForStaff(accounts, user.id, user.email) : undefined;
+  const decision = await checkLoginPassword(password, account);
+  if (!decision.ok || !user) {
+    if (!user) logMissingPractitionerOnLogin(login, accounts);
+    return NextResponse.json({ error: LOGIN_ERROR }, { status: 401 });
   }
 
-  let staff: Awaited<ReturnType<typeof listStaff>> = [];
-  try {
-    staff = await listStaff();
-  } catch (err) {
-    console.error("listStaff", err);
-  }
-  let user = staff.find((s) => s.login.toLowerCase() === login || s.email.toLowerCase() === login);
-  if (!user && (login === "ivan" || login === "ivan_renteria@integramed.com")) {
-    try {
-      staff = await ensureBootstrapStaff();
-      user = staff.find((s) => s.login.toLowerCase() === login || s.email.toLowerCase() === login);
-    } catch (err) {
-      console.error("ensureBootstrapStaff", err);
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "No se pudo crear el Practitioner." },
-        { status: 502 },
-      );
-    }
-  }
-  if (!user) {
-    return NextResponse.json({ error: "No hay un Practitioner con ese acceso." }, { status: 404 });
-  }
   const requested = body.role as RoleId;
   const role = requested && user.roles.includes(requested) ? requested : user.primaryRole;
   const session = { id: user.id, name: user.name, login: user.login, role };
-  await createSession(session);
+  await createSession(session, { pwdAt: decision.pwdAt });
   return NextResponse.json({ user: session });
 }

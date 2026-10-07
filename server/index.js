@@ -3,13 +3,18 @@ import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
-import { isAcceptableSecret, requireClinicAccess } from './sessionAuth.js';
+import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessionAuth.js';
+import { findAuthStaff } from './staffLookup.js';
+import { isAuthLookupQuery } from '../src/lib/auth-query.js';
 import { resolveAiBaseUrl } from './aiAllowlist.js';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
 import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
 import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
+import { parseFhirTarget } from '../src/lib/fhir-path.js';
+import { defaultAuthStorageRoot } from '../src/lib/auth-root.js';
+import { logAccountsMissingFromStore, readAccountEntries } from '../src/lib/missing-practitioner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,7 +67,6 @@ app.use(express.json({
   type: ['application/json', 'application/fhir+json', 'application/*+json'],
   limit: '10mb'
 }));
-app.use(requireClinicAccess);
 
 // Config
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
@@ -70,12 +74,81 @@ let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
 let FHIR_MODE = String(process.env.FHIR_MODE || '').toLowerCase() === 'local' ? 'local' : 'proxy';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
+const DATA_ROOT = process.env.INTEGRAMED_DATA_ROOT
+  ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
+  : PROJECT_ROOT;
 const LOCAL_FHIR_PUBLIC = `http://127.0.0.1:${process.env.PORT || 3001}/fhir`;
-const localFhir = createLocalFhirHandler(PROJECT_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
+const localFhir = createLocalFhirHandler(DATA_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
 
 function isLocalFhirMode() {
   return FHIR_MODE === 'local';
 }
+
+function bundleResources(data) {
+  if (!data) return [];
+  if (data.resourceType === 'Bundle') {
+    return (data.entry || []).map((item) => item?.resource).filter(Boolean);
+  }
+  if (data.resourceType) return [data];
+  return [];
+}
+
+async function remoteSearch(relativePath) {
+  if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
+    throw new Error('FHIR_BASE_URL and FHIR_AUTH_TOKEN must be configured on the proxy server.');
+  }
+  const targetUrl = `${FHIR_BASE_URL.replace(/\/$/, '')}/${relativePath}`;
+  const response = await fetchFhirWithRetry(targetUrl, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${FHIR_AUTH_TOKEN}`,
+      Accept: 'application/fhir+json, application/json'
+    }
+  });
+  if (!response.ok) return [];
+  return bundleResources(await response.json());
+}
+
+// Pre-auth identity lookup. The proxy secret is required. A session is not.
+// Clinical routes stay behind requireClinicAccess and still need both.
+app.post('/api/internal/staff-lookup', async (req, res) => {
+  if (!proxySecretOk(req)) return res.status(401).json({ error: 'No autorizado' });
+  const rawQuery = String(req.body?.q ?? '');
+  if (!isAuthLookupQuery(rawQuery)) return res.status(400).json({ error: 'Consulta inválida' });
+  const q = rawQuery.trim();
+  try {
+    let practitioners = [];
+    let roles = [];
+    if (isLocalFhirMode()) {
+      practitioners = localFhir.store.listType('Practitioner');
+      roles = localFhir.store.listType('PractitionerRole');
+    } else {
+      const encoded = encodeURIComponent(q);
+      const [byLogin, byEmail] = await Promise.all([
+        remoteSearch(`Practitioner?identifier=${encodeURIComponent(`https://integramed.app/fhir/login|${q}`)}&_count=20`),
+        remoteSearch(`Practitioner?email=${encoded}&_count=20`)
+      ]);
+      const seen = new Set();
+      practitioners = [...byLogin, ...byEmail].filter((item) => {
+        if (!item?.id || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return item.resourceType === 'Practitioner';
+      });
+      const roleLists = await Promise.all(
+        practitioners.map((item) => remoteSearch(`PractitionerRole?practitioner=${encodeURIComponent(`Practitioner/${item.id}`)}&_count=20`))
+      );
+      roles = roleLists.flat();
+    }
+    const staff = findAuthStaff(practitioners, roles, q);
+    if (!staff) return res.status(404).json({ error: 'No encontrado' });
+    return res.json(staff);
+  } catch (err) {
+    console.error('[staff-lookup]', err instanceof Error ? err.message : 'failed');
+    return res.status(503).json({ error: 'No se pudo consultar el personal' });
+  }
+});
+
+app.use(requireClinicAccess);
 
 console.log(`[FHIR] Mode: ${FHIR_MODE}${isLocalFhirMode() ? ` (${LOCAL_FHIR_PUBLIC})` : FHIR_BASE_URL ? ` → ${FHIR_BASE_URL}` : ''}`);
 console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);
@@ -306,17 +379,45 @@ function parseFhirQuery(url) {
   return query;
 }
 
+function rejectNonCanonicalFhir(req, res) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok) {
+    res.status(400).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'invalid', diagnostics: 'URL de FHIR no válida' }]
+    });
+    return true;
+  }
+  if (parsed.nonCanonical) {
+    res.status(404).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'not-found', diagnostics: `${parsed.rawType} not found` }]
+    });
+    return true;
+  }
+  return false;
+}
+
+function canonicalFhirPath(req) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok || parsed.kind === 'base') return '';
+  if (parsed.kind === 'metadata') return 'metadata';
+  return [parsed.type, parsed.id, ...parsed.extra].filter(Boolean).join('/');
+}
+
 app.all('/fhir*', (req, res) => {
-  const fhirPath = req.path.replace(/^\/fhir\/?/, '');
-  const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  // req.method only. X-HTTP-Method-Override is not read.
+  const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
   return sendFhirResult(res, result);
 });
 
 // FHIR Proxy Endpoint (local store or remote)
 app.all('/api/fhir/*', async (req, res) => {
-  const fhirPath = req.params[0] || '';
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  const fhirPath = canonicalFhirPath(req);
   if (isLocalFhirMode()) {
-    const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
+    const result = localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body);
     return sendFhirResult(res, result);
   }
 
@@ -419,6 +520,10 @@ export { app };
 
 if (process.env.FHIR_PROXY_NO_LISTEN !== '1') {
   assertProxySecrets();
+  if (isLocalFhirMode()) {
+    const ids = localFhir.store.listType('Practitioner').map((resource) => resource?.id).filter(Boolean);
+    logAccountsMissingFromStore(readAccountEntries(defaultAuthStorageRoot(PROJECT_ROOT)), ids);
+  }
   const server = app.listen(PORT, HOST, () => {
     console.log(`IntegraMed FHIR Proxy listening on http://${HOST}:${PORT}`);
   });

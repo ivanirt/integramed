@@ -39,7 +39,11 @@ scratch/
 cookies.txt
 *.tsbuildinfo
 
-# Local FHIR store and vault source toggles
+# Local FHIR store, auth secrets, and vault source toggles
 data/fhir/
+data/auth/
 data/vault-source-settings.json
+
+# Generated QA passwords. Never commit.
+.local/
 

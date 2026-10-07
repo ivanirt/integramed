@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { signSession } from "../server/sessionAuth.js";
 
 const SESSION_SECRET = "s".repeat(48);
@@ -105,6 +108,200 @@ test("vault relink rejects traversal and non-admin writes", async () => {
       },
     });
     assert.equal(traversal.status, 400);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("non-admin sessions cannot write Practitioner resources", async () => {
+  const server = await listen(app);
+  try {
+    const denied = await request(server, "PUT", "/api/fhir/Practitioner/prac-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: {
+        resourceType: "Practitioner",
+        id: "prac-sec",
+        telecom: [{ system: "email", value: "attacker@evil.test" }],
+      },
+    });
+    assert.equal(denied.status, 403);
+
+    const bundle = await request(server, "POST", "/fhir", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: {
+        resourceType: "Bundle",
+        type: "transaction",
+        entry: [
+          {
+            request: { method: "PUT", url: "Practitioner/prac-sec" },
+            resource: { resourceType: "Practitioner", id: "prac-sec" },
+          },
+        ],
+      },
+    });
+    assert.equal(bundle.status, 403);
+
+    const missing = await request(server, "GET", "/api/fhir/Practitioner/prac-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(missing.status, 404);
+
+    const created = await request(server, "POST", "/api/fhir/Practitioner", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Practitioner", id: "prac-sec", active: true },
+    });
+    assert.equal(created.status, 201);
+
+    const removed = await request(server, "DELETE", "/api/fhir/Practitioner/prac-sec", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(removed.status, 204);
+
+    const patient = await request(server, "POST", "/api/fhir/Patient", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Patient", id: "pat-sec", active: true },
+    });
+    assert.equal(patient.status, 201);
+    const dropPatient = await request(server, "DELETE", "/api/fhir/Patient/pat-sec", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(dropPatient.status, 204);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("practitioner write bypasses are rejected for non-admin sessions", async () => {
+  const server = await listen(app);
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const id = "prac-bypass";
+  const canonicalFile = path.join(root, "data", "fhir", "Practitioner", `${id}.json`);
+  const lowerFile = path.join(root, "data", "fhir", "practitioner", `${id}.json`);
+  const bundle = (url, method = "DELETE") => ({
+    resourceType: "Bundle",
+    type: "transaction",
+    entry: [{ request: { method, url } }],
+  });
+  try {
+    const created = await request(server, "POST", "/api/fhir/Practitioner", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Practitioner", id, active: true },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(fs.existsSync(canonicalFile), true);
+
+    const cases = [
+      bundle(`fhir/Practitioner/${id}`),
+      bundle(`https://example.com/Practitioner/${id}`),
+      bundle(`./Practitioner/${id}`),
+      bundle(`Practitioner/${id}`),
+    ];
+    for (const body of cases) {
+      const denied = await request(server, "POST", "/fhir", {
+        token: doctor(),
+        secret: FHIR_PROXY_SECRET,
+        body,
+      });
+      assert.equal(denied.status, 403, body.entry[0].request.url);
+      assert.equal(fs.existsSync(canonicalFile), true);
+    }
+
+    const batch = await request(server, "POST", "/fhir", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: { ...bundle(`Practitioner/${id}`), type: "batch" },
+    });
+    assert.equal(batch.status, 403);
+
+    const unparsed = await request(server, "POST", "/fhir", {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: bundle("%%%"),
+    });
+    assert.equal(unparsed.status, 403);
+    const adminUnparsed = await request(server, "POST", "/fhir", {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+      body: bundle("%%%"),
+    });
+    assert.equal(adminUnparsed.status, 400);
+    assert.equal(fs.existsSync(canonicalFile), true);
+
+    const lowerDoctor = await request(server, "PUT", `/api/fhir/practitioner/${id}`, {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Practitioner", id, active: false },
+    });
+    assert.equal(lowerDoctor.status, 403);
+    const lowerAdmin = await request(server, "PUT", `/api/fhir/practitioner/${id}`, {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+      body: { resourceType: "Practitioner", id, active: false },
+    });
+    assert.equal(lowerAdmin.status, 404);
+    assert.equal(fs.existsSync(lowerFile), false);
+    assert.equal(fs.existsSync(canonicalFile), true);
+
+    const overrideGet = await request(server, "GET", `/api/fhir/Practitioner/${id}`, {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      headers: { "x-http-method-override": "DELETE" },
+    });
+    assert.equal(overrideGet.status, 200);
+    const overridePut = await request(server, "PUT", `/api/fhir/Practitioner/${id}`, {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+      headers: { "x-http-method-override": "GET" },
+      body: { resourceType: "Practitioner", id, active: false },
+    });
+    assert.equal(overridePut.status, 403);
+    const stillThere = await request(server, "GET", `/api/fhir/Practitioner/${id}`, {
+      token: doctor(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    assert.equal(stillThere.status, 200);
+    assert.match(stillThere.text, /"active":\s*true/);
+    assert.match(stillThere.text, /"versionId":\s*"1"/);
+  } finally {
+    await request(server, "DELETE", `/api/fhir/Practitioner/${id}`, {
+      token: admin(),
+      secret: FHIR_PROXY_SECRET,
+    });
+    fs.rmSync(lowerFile, { force: true });
+    await stop(server);
+  }
+});
+
+test("staff-lookup rejects pipes and control characters", async () => {
+  const server = await listen(app);
+  try {
+    const headers = {
+      token: undefined,
+      secret: FHIR_PROXY_SECRET,
+    };
+    const pipe = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan|admin@clinic.test" },
+    });
+    assert.equal(pipe.status, 400);
+    const control = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan\n@clinic.test" },
+    });
+    assert.equal(control.status, 400);
+    const login = await request(server, "POST", "/api/internal/staff-lookup", {
+      ...headers,
+      body: { q: "ivan" },
+    });
+    assert.equal(login.status, 404);
   } finally {
     await stop(server);
   }

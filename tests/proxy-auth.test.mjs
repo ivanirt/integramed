@@ -95,6 +95,16 @@ test("PHI and config routes reject missing and forged sessions", async () => {
     assert.equal(healthDoctor.text.includes("serverUrl"), false);
     assert.equal(healthDoctor.text.includes("patientCount"), false);
 
+    for (const variantPath of ["/API/health", "/api/health/"]) {
+      const variant = await request(server, "GET", variantPath, {
+        token: doctor(),
+        secret: FHIR_PROXY_SECRET,
+      });
+      assert.notEqual(variant.status, 200, variantPath);
+      assert.equal(variant.text.includes("patientCount"), false, variantPath);
+      assert.equal(variant.text.includes("serverUrl"), false, variantPath);
+    }
+
     const healthAdmin = await request(server, "GET", "/api/health", {
       token: admin(),
       secret: FHIR_PROXY_SECRET,

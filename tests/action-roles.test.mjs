@@ -1,53 +1,112 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { ACTION_ROLES, ROLES, authorizeAction, authorizePage } from "../src/lib/action-roles.js";
 import { acceptAuthStaff } from "../src/lib/staff-lookup.ts";
 
-const SERVER_ACTION_FILES = [
-  ["src/components/LeaveManager.tsx", "deleteLeaveAction"],
-  ["src/app/(clinic)/config/festivos/page.tsx", "deleteHolidayAction"],
-  ["src/app/(clinic)/config/servicios/page.tsx", "deleteResourceAction"],
-];
+const ALL = ["doctor", "therapist", "nurse", "receptionist", "admin", "lab", "pharmacist"];
+const ADMIN = ["admin"];
+const AGENDA = ["doctor", "therapist", "nurse", "receptionist", "admin"];
+const CONSULT = ["doctor", "therapist", "nurse", "admin"];
+const PRESCRIBE = ["doctor", "therapist", "admin"];
+const STUDY_ORDER = ["doctor", "therapist", "nurse", "admin"];
+const STUDY_REPORT = ["doctor", "therapist", "lab", "admin"];
+const OWN_SCHEDULE = ["doctor", "therapist", "nurse", "admin"];
+const PHARMACY = ["pharmacist", "admin"];
 
-const ROUTE_CALLS = [
-  ["src/app/api/auth/route.ts", "authLogin"],
-  ["src/app/api/auth/route.ts", "authLogout"],
-  ["src/app/api/auth/route.ts", "authSwitchRole"],
-  ["src/app/api/auth/recuperar/route.ts", "authRequestReset"],
-  ["src/app/api/auth/restablecer/route.ts", "authCompleteReset"],
-  ["src/app/api/ai/clinical/route.ts", "clinicalAi"],
-];
+const EXPECTED_ROLES = {
+  createPatientAction: ALL,
+  createAppointmentAction: AGENDA,
+  moveAppointmentAction: AGENDA,
+  startConsultFromAppointment: CONSULT,
+  saveSoapAction: CONSULT,
+  saveVitalsAction: CONSULT,
+  beginDoctorConsultAction: CONSULT,
+  finalizeConsultAction: CONSULT,
+  saveIntegrativeCatalogAction: ADMIN,
+  createMedicationRequestAction: PRESCRIBE,
+  createServiceRequestAction: STUDY_ORDER,
+  saveDiagnosticReportAction: STUDY_REPORT,
+  saveHoursAction: ADMIN,
+  savePractitionerHoursAction: OWN_SCHEDULE,
+  saveHolidayAction: ADMIN,
+  deleteHolidayAction: ADMIN,
+  deleteResourceAction: ADMIN,
+  saveLeaveAction: OWN_SCHEDULE,
+  deleteLeaveAction: OWN_SCHEDULE,
+  saveModulesAction: ADMIN,
+  saveOrgAction: ADMIN,
+  saveLocationAction: ADMIN,
+  saveServiceAction: ADMIN,
+  saveStaffAction: ADMIN,
+  saveInventoryAction: PHARMACY,
+  authLogin: "public",
+  authLogout: "public",
+  authRequestReset: "public",
+  authCompleteReset: "public",
+  authSwitchRole: ALL,
+  clinicalAi: CONSULT,
+  fhirConfig: ADMIN,
+  fhirHealth: ADMIN,
+  vaultWrite: ADMIN,
+  practitionerWrite: ADMIN,
+  configPage: ADMIN,
+  personalPage: ADMIN,
+};
+
+function sourceFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...sourceFiles(full));
+    else if (/\.(ts|tsx|js|mjs)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
 
 test("every server action is in the allow-list and enforces it", () => {
-  const src = fs.readFileSync("src/lib/actions.ts", "utf8");
-  const names = [...src.matchAll(/export async function (\w+)/g)].map((match) => match[1]);
-  assert.ok(names.length >= 20);
-  for (const name of names) {
-    const start = src.indexOf(`export async function ${name}`);
-    const next = src.indexOf("\nexport async function ", start + 10);
-    const body = src.slice(start, next === -1 ? undefined : next);
-    assert.match(body, new RegExp(`enforceAction\\("${name}"`), name);
-    assert.equal(Object.prototype.hasOwnProperty.call(ACTION_ROLES, name), true, name);
-  }
-  for (const [file, callee] of SERVER_ACTION_FILES) {
+  const actionNames = new Set(Object.keys(ACTION_ROLES));
+  const serverFiles = sourceFiles("src").filter((file) => fs.readFileSync(file, "utf8").includes('"use server"'));
+  assert.ok(serverFiles.length >= 2);
+  for (const file of serverFiles) {
     const text = fs.readFileSync(file, "utf8");
-    assert.match(text, /"use server"/, file);
-    assert.match(text, new RegExp(`\\b${callee}\\b`), file);
+    const exports = [...text.matchAll(/export async function (\w+)/g)].map((match) => match[1]);
+    if (exports.length > 0) {
+      for (const name of exports) {
+        assert.equal(actionNames.has(name), true, `${file} ${name}`);
+        const start = text.indexOf(`export async function ${name}`);
+        const next = text.indexOf("\nexport async function ", start + 10);
+        const body = text.slice(start, next === -1 ? undefined : next);
+        assert.match(body, new RegExp(`enforceAction\\("${name}"`), `${file} ${name}`);
+      }
+      continue;
+    }
+    const called = [...actionNames].filter((name) => new RegExp(`\\b${name}\\s*\\(`).test(text));
+    assert.ok(called.length > 0, `${file} has use server but calls no mapped action`);
   }
-  for (const [file, action] of ROUTE_CALLS) {
+
+  const routes = sourceFiles("src").filter((file) => file.endsWith(`${path.sep}route.ts`));
+  for (const file of routes) {
     const text = fs.readFileSync(file, "utf8");
-    assert.match(text, new RegExp(`enforceRoute\\("${action}"`), `${file} ${action}`);
-    assert.equal(Object.prototype.hasOwnProperty.call(ACTION_ROLES, action), true, action);
+    const mutating = [...text.matchAll(/export async function (POST|PUT|PATCH|DELETE)\b/g)].map((match) => match[1]);
+    if (mutating.length === 0) continue;
+    const enforced = [...text.matchAll(/enforceRoute\(\s*"([^"]+)"/g)].map((match) => match[1]);
+    assert.ok(enforced.length > 0, `${file} ${mutating.join(",")} has no enforceRoute`);
+    for (const action of enforced) assert.equal(actionNames.has(action), true, `${file} ${action}`);
   }
 });
 
 test("unknown actions and roles are denied, and each listed action has an allow decision", () => {
   assert.equal(authorizeAction("not-a-real-action", "admin"), "forbidden");
   assert.equal(authorizeAction("", "admin"), "forbidden");
-  for (const [action, allowed] of Object.entries(ACTION_ROLES)) {
+  assert.deepEqual(Object.keys(ACTION_ROLES).sort(), Object.keys(EXPECTED_ROLES).sort());
+  for (const [action, allowed] of Object.entries(EXPECTED_ROLES)) {
+    assert.deepEqual(ACTION_ROLES[action], allowed, action);
     if (allowed === "public") {
       assert.equal(authorizeAction(action, null), "ok", action);
+      assert.equal(authorizeAction(action, "doctor"), "ok", action);
       assert.equal(authorizeAction(action, "owner"), "ok", action);
       continue;
     }
@@ -59,9 +118,6 @@ test("unknown actions and roles are denied, and each listed action has an allow 
       const decision = allowed.includes(role) ? "ok" : "forbidden";
       assert.equal(authorizeAction(action, role), decision, `${action} ${role}`);
     }
-    assert.equal(authorizeAction(action, allowed[0]), "ok", action);
-    const lower = ROLES.find((role) => !allowed.includes(role));
-    if (lower) assert.equal(authorizeAction(action, lower), "forbidden", `${action} ${lower}`);
   }
 });
 

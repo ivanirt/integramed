@@ -3,7 +3,7 @@ import fs from 'fs';
 import { isSessionPasswordCurrent } from '../src/lib/session-stamp.js';
 import { accountsFile } from '../src/lib/auth-root.js';
 import { isPractitionerMutation } from '../src/lib/fhir-path.js';
-import { authorizeAction } from '../src/lib/action-roles.js';
+import { authorizeAction, denialMessage } from '../src/lib/action-roles.js';
 
 export const SESSION_COOKIE = 'integramed_session';
 export const MIN_SECRET_LENGTH = 32;
@@ -125,13 +125,17 @@ export function requireClinicAccess(req, res, next) {
   if (isPractitionerMutation(req) && authorizeAction('practitionerWrite', user.role) !== 'ok') {
     return res.status(403).json({ error: 'Solo administración puede modificar un Practitioner.' });
   }
-  const pathOnly = String(req.path || '');
-  if ((pathOnly === '/api/config' || pathOnly === '/api/health') && authorizeAction(pathOnly === '/api/health' ? 'fhirHealth' : 'fhirConfig', user.role) !== 'ok') {
-    return res.status(403).json({ error: 'Solo administración puede hacer eso.' });
-  }
-  if (pathOnly === '/api/ai/consult' && String(req.method || '').toUpperCase() === 'POST' && authorizeAction('clinicalAi', user.role) !== 'ok') {
-    return res.status(403).json({ error: 'Esa acción no está disponible para tu rol.' });
-  }
   req.clinicUser = user;
   return next();
+}
+
+export function requireRole(action) {
+  return function requireMappedRole(req, res, next) {
+    const user = req.clinicUser;
+    if (!user) return res.status(401).json({ error: 'No autorizado' });
+    if (authorizeAction(action, user.role) !== 'ok') {
+      return res.status(403).json({ error: denialMessage(action) });
+    }
+    return next();
+  };
 }

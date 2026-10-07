@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
-import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessionAuth.js';
+import { isAcceptableSecret, proxySecretOk, requireClinicAccess, requireRole } from './sessionAuth.js';
 import { findAuthStaff } from './staffLookup.js';
 import { isAuthLookupQuery } from '../src/lib/auth-query.js';
 import { resolveAiBaseUrl } from './aiAllowlist.js';
@@ -61,6 +61,8 @@ function describeFetchError(err) {
 }
 
 const app = express();
+app.enable('case sensitive routing');
+app.enable('strict routing');
 const HOST = '127.0.0.1';
 
 // Loopback FHIR proxy port. This is not the public Next.js port (3000) and it
@@ -176,7 +178,7 @@ console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);
 console.log(`[Clinical AI] Vault EN: ${resolveVaultPath('en', PROJECT_ROOT)}`);
 
 // Health check and status endpoint
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', requireRole('fhirHealth'), async (req, res) => {
   if (isLocalFhirMode()) {
     const patientCount = localFhir.patientCount();
     return res.json({
@@ -232,7 +234,7 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-app.all('/api/config', (req, res) => {
+app.all('/api/config', requireRole('fhirConfig'), (req, res) => {
   res.status(405).json({
     error: 'La configuración FHIR solo se cambia con variables de entorno (FHIR_MODE, FHIR_BASE_URL, FHIR_AUTH_TOKEN).'
   });
@@ -254,7 +256,7 @@ app.get('/api/ai/vault-status', (req, res) => {
   }
 });
 
-app.post('/api/ai/consult', async (req, res) => {
+app.post('/api/ai/consult', requireRole('clinicalAi'), async (req, res) => {
   const apiKey = String(process.env.CLINICAL_AI_KEY || process.env.OPENROUTER_API_KEY || '').trim();
   const model = String(process.env.CLINICAL_AI_MODEL || 'openai/gpt-4o').trim();
   let baseUrl;

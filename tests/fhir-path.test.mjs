@@ -72,6 +72,9 @@ test("protocol-relative FHIR urls fail closed", () => {
   );
   assert.equal(parseFhirTarget("https://example.com/Practitioner/abc").rawType, "Practitioner");
   assert.equal(parseFhirTarget("/fhir/Practitioner/1").rawType, "Practitioner");
+  assert.equal(parseFhirTarget("/fhir//evil.com/Patient").ok, false);
+  assert.equal(parseFhirTarget("NotARealType/1").ok, false);
+  assert.equal(parseFhirTarget("/fhir/Patient/1").canonical, "Patient");
 });
 
 test("X-HTTP-Method-Override does not change the FHIR method", () => {

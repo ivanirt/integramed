@@ -17,16 +17,25 @@ export type SessionUser = {
 const COOKIE = SESSION_COOKIE;
 const sessionOverride = new AsyncLocalStorage<SessionUser | null>();
 
-/** In-process actor for tests. Production refuses it, and HTTP requests cannot set it. */
+function actionTestActor(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.INTEGRAMED_ACTION_TEST === "1";
+}
+
+function testSession(): SessionUser | null | undefined {
+  if (!actionTestActor()) return undefined;
+  return sessionOverride.getStore();
+}
+
+/** In-process actor for the action harness. HTTP requests cannot set it. */
 export function withSession<T>(user: SessionUser | null, run: () => Promise<T>): Promise<T> {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("withSession is unavailable in production");
+  if (!actionTestActor()) {
+    throw new Error("withSession is unavailable");
   }
   return sessionOverride.run(user, run);
 }
 
 export function overriddenSession(): SessionUser | null | undefined {
-  return sessionOverride.getStore();
+  return testSession();
 }
 
 function secret(): string {
@@ -66,7 +75,7 @@ function readToken(token: string | undefined): TokenBody | null {
 }
 
 async function currentPwdAt(): Promise<number> {
-  if (sessionOverride.getStore() !== undefined) return 0;
+  if (testSession() !== undefined) return 0;
   const store = await cookies();
   return readToken(store.get(COOKIE)?.value)?.pwdAt || 0;
 }
@@ -84,7 +93,7 @@ export async function createSession(user: SessionUser, options?: { pwdAt?: numbe
     },
     secret(),
   );
-  if (sessionOverride.getStore() !== undefined) return;
+  if (testSession() !== undefined) return;
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
@@ -96,13 +105,13 @@ export async function createSession(user: SessionUser, options?: { pwdAt?: numbe
 }
 
 export async function clearSession(): Promise<void> {
-  if (sessionOverride.getStore() !== undefined) return;
+  if (testSession() !== undefined) return;
   const store = await cookies();
   store.delete(COOKIE);
 }
 
 export async function getSession(): Promise<SessionUser | null> {
-  const overridden = sessionOverride.getStore();
+  const overridden = testSession();
   if (overridden !== undefined) return overridden;
   const store = await cookies();
   const token = store.get(COOKIE)?.value;

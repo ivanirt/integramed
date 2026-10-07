@@ -1,15 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { fhirCreate, fhirDelete, fhirRead, fhirSearch, fhirUpdate, displayName, type FhirResource } from "./fhir";
-import { saveHours, saveHoliday, saveLeave, saveModules, savePractitionerHours, type ClinicHours } from "./clinic-config";
+import { loadPractitionerHours, saveHours, saveHoliday, saveLeave, saveModules, savePractitionerHours, type ClinicHours } from "./clinic-config";
 import { saveIntegrativeCatalog, type IntegrativeModality } from "./integrative";
 import { upsertStaff } from "./staff";
 import type { RoleId } from "./roles";
 import { SYSTEMS } from "./roles";
+import { OWN_RECORD_MESSAGE } from "./action-roles.js";
 import { VITAL_FIELDS } from "./vitals";
 import { addMinutesToFhirDateTime, toFhirDateTime } from "./agenda";
-import { enforceAction } from "./enforce-action";
+import { enforceAction, sessionPractitionerId } from "./enforce-action";
 
 function revalidate(path: string) {
   if (process.env.INTEGRAMED_ACTION_TEST === "1") return;
@@ -314,17 +316,19 @@ export async function saveHoursAction(hours: ClinicHours, id?: string) {
   revalidate("/config/horario");
 }
 
-export async function savePractitionerHoursAction(hours: ClinicHours, practitionerId: string, id?: string) {
-  await enforceAction("savePractitionerHoursAction", { practitionerId });
-  const practitioner = await fhirRead("Practitioner", practitionerId);
+export async function savePractitionerHoursAction(hours: ClinicHours, practitionerId: string) {
+  const user = await enforceAction("savePractitionerHoursAction", { practitionerId });
+  const ownerId = sessionPractitionerId(user, practitionerId);
+  const practitioner = await fhirRead("Practitioner", ownerId);
+  const existing = await loadPractitionerHours(ownerId);
   await savePractitionerHours({
-    practitionerId,
+    practitionerId: ownerId,
     practitionerName: displayName(practitioner),
     hours,
-    id,
+    id: existing.id,
   });
   revalidate("/horario");
-  revalidate(`/personal/${practitionerId}`);
+  revalidate(`/personal/${ownerId}`);
 }
 
 export async function saveHolidayAction(formData: FormData) {
@@ -346,8 +350,9 @@ export async function deleteResourceAction(type: string, id: string, path: strin
 }
 
 export async function saveLeaveAction(formData: FormData) {
-  const practitionerId = String(formData.get("practitionerId"));
-  await enforceAction("saveLeaveAction", { practitionerId });
+  const requested = String(formData.get("practitionerId") || "");
+  const user = await enforceAction("saveLeaveAction", { practitionerId: requested });
+  const practitionerId = sessionPractitionerId(user, requested);
   const practitioner = await fhirRead("Practitioner", practitionerId);
   await saveLeave({
     practitionerId,
@@ -362,16 +367,20 @@ export async function saveLeaveAction(formData: FormData) {
 }
 
 export async function deleteLeaveAction(id: string, practitionerId: string) {
-  await enforceAction("deleteLeaveAction", { practitionerId });
+  const user = await enforceAction("deleteLeaveAction");
   const schedule = await fhirRead("Schedule", id);
-  const ref = ((schedule.actor as { reference?: string }[]) || [])[0]?.reference;
-  if (ref && ref !== `Practitioner/${practitionerId}`) {
-    throw new Error("Esa ausencia no corresponde a este profesional.");
+  if (user.role !== "admin") {
+    const identifiers = (schedule.identifier as { system?: string }[]) || [];
+    const isLeave = identifiers.some((item) => item.system === SYSTEMS.leave);
+    const ref = ((schedule.actor as { reference?: string }[]) || [])[0]?.reference;
+    if (!isLeave || ref !== `Practitioner/${user.id}`) {
+      redirect(`/?aviso=${encodeURIComponent(OWN_RECORD_MESSAGE)}`);
+    }
   }
   await fhirDelete("Schedule", id);
   revalidate("/ausencias");
   revalidate("/config/ausencias");
-  revalidate(`/personal/${practitionerId}`);
+  revalidate(`/personal/${user.role === "admin" ? practitionerId || user.id : user.id}`);
 }
 
 export async function saveModulesAction(modules: Record<string, boolean>, id?: string) {

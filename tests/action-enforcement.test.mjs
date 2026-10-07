@@ -8,6 +8,7 @@ import test from "node:test";
 import { isRedirectError } from "next/dist/client/components/redirect-error.js";
 import { signSession } from "../server/sessionAuth.js";
 import { DEFAULT_HOURS } from "../src/lib/clinic-config.ts";
+import { SYSTEMS } from "../src/lib/roles.ts";
 import { withSession } from "../src/lib/session.ts";
 import * as actions from "../src/lib/actions.ts";
 import { POST as authPost } from "../src/app/api/auth/route.ts";
@@ -351,34 +352,84 @@ test("each sensitive action denies a lower role and lets an allowed role succeed
     await withSession(actor("admin", "prac-admin"), () => actions.saveHoursAction(hours));
     assert.ok(JSON.parse(await snapshot()).Schedule.length >= 1);
 
-    await expectDenied("practitioner hours other", "doctor", "prac-doc", () =>
-      actions.savePractitionerHoursAction(hours, "prac-other"),
+    const clinicIds = JSON.parse(await snapshot()).Schedule;
+    assert.equal(clinicIds.length, 1);
+    const clinicId = clinicIds[0];
+    const clinicBefore = await readResource("Schedule", clinicId);
+    const stolen = structuredClone(hours);
+    stolen.slotDurationMinutes = 5;
+    await withSession(actor("doctor", "prac-doc"), () =>
+      actions.savePractitionerHoursAction(stolen, "prac-other", clinicId),
     );
+    const clinicAfterSteal = await readResource("Schedule", clinicId);
+    assert.equal(clinicAfterSteal.body.identifier?.[0]?.system, clinicBefore.body.identifier?.[0]?.system, "foreign id");
+    assert.equal(clinicAfterSteal.body.identifier?.[0]?.value, "clinic", "foreign id");
+    assert.equal(JSON.stringify(clinicAfterSteal.body.actor), JSON.stringify(clinicBefore.body.actor), "foreign id");
+
+    await withSession(actor("admin", "prac-admin"), () => actions.savePractitionerHoursAction(hours, "prac-other"));
+    const withOther = JSON.parse(await snapshot()).Schedule;
+    let otherId = "";
+    for (const id of withOther) {
+      const row = await readResource("Schedule", id);
+      if (row.body.actor?.[0]?.reference === "Practitioner/prac-other") otherId = id;
+    }
+    assert.ok(otherId, "foreign id");
+    const otherBefore = await readResource("Schedule", otherId);
+    await withSession(actor("doctor", "prac-doc"), () =>
+      actions.savePractitionerHoursAction(stolen, "prac-other", otherId),
+    );
+    const otherAfter = await readResource("Schedule", otherId);
+    assert.equal(otherAfter.body.actor?.[0]?.reference, "Practitioner/prac-other", "foreign id");
+    assert.equal(otherAfter.body.identifier?.[0]?.value, "prac-other", "foreign id");
+    assert.equal(otherAfter.body.comment, otherBefore.body.comment, "foreign id");
+    const clinicStill = await readResource("Schedule", clinicId);
+    assert.equal(clinicStill.body.identifier?.[0]?.value, "clinic", "foreign id");
+
     await withSession(actor("doctor", "prac-doc"), () => actions.savePractitionerHoursAction(hours, "prac-doc"));
-    const schedules = JSON.parse(await snapshot()).Schedule;
-    assert.ok(schedules.length >= 2);
 
     await expectDenied("holiday", "doctor", "prac-doc", () =>
       actions.saveHolidayAction(form({ date: "2026-12-25", name: "Navidad" })),
     );
+    const beforeHoliday = JSON.parse(await snapshot()).Schedule;
     await withSession(actor("admin", "prac-admin"), () =>
       actions.saveHolidayAction(form({ date: "2026-12-25", name: "Navidad" })),
     );
-    const holidayId = JSON.parse(await snapshot()).Schedule.find((id) => !schedules.includes(id));
+    const holidayId = JSON.parse(await snapshot()).Schedule.find((id) => !beforeHoliday.includes(id));
     assert.ok(holidayId);
     await expectDenied("delete holiday", "nurse", "prac-nurse", () => actions.deleteHolidayAction(holidayId));
+    await expectDenied("delete holiday as leave", "doctor", "prac-doc", () =>
+      actions.deleteLeaveAction(holidayId, "prac-doc"),
+    );
+    await expectDenied("delete clinic hours as leave", "doctor", "prac-doc", () =>
+      actions.deleteLeaveAction(clinicId, ""),
+    );
+    assert.equal((await readResource("Schedule", holidayId)).status, 200, "holiday");
+    assert.equal((await readResource("Schedule", clinicId)).body.identifier?.[0]?.value, "clinic", "clinic-hours");
     await withSession(actor("admin", "prac-admin"), () => actions.deleteHolidayAction(holidayId));
     assert.equal((await readResource("Schedule", holidayId)).status, 404);
 
-    await expectDenied("leave other", "doctor", "prac-doc", () =>
-      actions.saveLeaveAction(form({ practitionerId: "prac-other", start: "2026-11-01", end: "2026-11-02", reason: "Viaje" })),
-    );
+    const beforeEmpty = JSON.parse(await snapshot()).Schedule;
     await withSession(actor("doctor", "prac-doc"), () =>
-      actions.saveLeaveAction(form({ practitionerId: "prac-doc", start: "2026-11-01", end: "2026-11-02", reason: "Viaje" })),
+      actions.saveLeaveAction(form({ practitionerId: "", start: "2026-11-01", end: "2026-11-02", reason: "Viaje" })),
     );
-    const afterLeave = JSON.parse(await snapshot()).Schedule;
-    const leaveId = afterLeave.find((id) => !schedules.includes(id) && id !== holidayId);
-    assert.ok(leaveId);
+    const afterEmpty = JSON.parse(await snapshot()).Schedule;
+    const createdIds = afterEmpty.filter((id) => !beforeEmpty.includes(id));
+    assert.equal(createdIds.length, 1, "empty practitionerId");
+    const ownLeave = await readResource("Schedule", createdIds[0]);
+    assert.equal(ownLeave.body.actor?.[0]?.reference, "Practitioner/prac-doc", "empty practitionerId");
+    assert.equal(ownLeave.body.identifier?.[0]?.system, SYSTEMS.leave, "empty practitionerId");
+    const leaveId = createdIds[0];
+
+    await withSession(actor("admin", "prac-admin"), () =>
+      actions.saveLeaveAction(form({ practitionerId: "prac-other", start: "2026-11-08", end: "2026-11-09", reason: "Congreso" })),
+    );
+    const foreignLeaveId = JSON.parse(await snapshot()).Schedule.find((id) => !afterEmpty.includes(id));
+    assert.ok(foreignLeaveId);
+    await expectDenied("foreign leave id", "doctor", "prac-doc", () =>
+      actions.deleteLeaveAction(foreignLeaveId, "prac-doc"),
+    );
+    assert.equal((await readResource("Schedule", foreignLeaveId)).body.actor?.[0]?.reference, "Practitioner/prac-other");
+
     await expectDenied("delete leave", "receptionist", "prac-rec", () => actions.deleteLeaveAction(leaveId, "prac-doc"));
     await withSession(actor("doctor", "prac-doc"), () => actions.deleteLeaveAction(leaveId, "prac-doc"));
     assert.equal((await readResource("Schedule", leaveId)).status, 404);

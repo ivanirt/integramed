@@ -5,6 +5,8 @@ export const FHIR_RESOURCE_TYPES = [
   "Encounter",
   "Observation",
   "Condition",
+  "Composition",
+  "ServiceRequest",
   "MedicationRequest",
   "Medication",
   "AllergyIntolerance",
@@ -93,7 +95,8 @@ export function parseFhirTarget(input) {
   }
 
   const canonical = CANONICAL_BY_LOWER.get(rawType.toLowerCase()) || null;
-  const nonCanonical = Boolean(canonical && rawType !== canonical);
+  if (!canonical) return { ok: false };
+  const nonCanonical = Boolean(rawType !== canonical);
   return {
     ok: true,
     kind: "type",

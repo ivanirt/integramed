@@ -27,7 +27,10 @@ export async function fhirProxyHeaders(extra?: HeadersInit): Promise<Headers> {
     );
   }
   headers.set("x-integramed-proxy-secret", secret);
-  const actor = overriddenSession();
+  const actor =
+    process.env.NODE_ENV !== "production" && process.env.INTEGRAMED_ACTION_TEST === "1"
+      ? overriddenSession()
+      : undefined;
   if (actor) {
     const sessionSecret = (process.env.SESSION_SECRET || "").trim();
     const token = buildSessionToken(

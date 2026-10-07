@@ -48,8 +48,10 @@ EXPOSE 3000
 VOLUME ["/app/data/auth", "/app/data/fhir"]
 # Readiness: GET http://127.0.0.1:3000/healthz
 # Port 3000 is Next.js, the published listener. No cookie and no secret.
-# The FHIR proxy on 127.0.0.1:3001 is not this check.
+# That route also asks the loopback proxy GET /healthz (1s timeout, no auth).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "scripts/healthcheck.mjs"]
 USER integramed
-CMD ["npm", "start"]
+# Supervisor is PID 1 so docker stop's SIGTERM exits 0. A child that exits
+# on its own exits the container non-zero. See scripts/supervise.mjs.
+CMD ["node", "scripts/supervise.mjs"]

@@ -100,8 +100,8 @@ jobs:
             integramed:ci
           trap 'docker logs integramed-ci; docker rm -f integramed-ci >/dev/null 2>&1 || true' EXIT
           for _ in $(seq 1 40); do
-            if curl -fsS -H "Cookie: integramed_session=${token}" http://127.0.0.1:3000/ci-static.txt | grep -qx 'integramed-static-ok'; then
-              curl -fsS http://127.0.0.1:3000/healthz | grep -q '"ok":true'
+            if curl -fsS -H "Cookie: integramed_session=${token}" http://127.0.0.1:3000/ci-static.txt | grep -qx 'integramed-static-ok' \
+              && curl -fsS http://127.0.0.1:3000/healthz | grep -q '"ok":true'; then
               docker exec integramed-ci node scripts/healthcheck.mjs
               docker exec integramed-ci node --input-type=module -e '
                 const open = await fetch("http://127.0.0.1:3001/healthz");

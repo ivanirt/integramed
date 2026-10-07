@@ -69,6 +69,12 @@ jobs:
           exposed="$(docker inspect --format '{{json .Config.ExposedPorts}}' integramed:ci)"
           echo "Exposed ports: ${exposed}"
           test "${exposed}" = '{"3000/tcp":{}}'
+          image_user="$(docker inspect --format '{{.Config.User}}' integramed:ci)"
+          echo "User: ${image_user}"
+          test "${image_user}" = "integramed"
+          health_test="$(docker inspect --format '{{json .Config.Healthcheck.Test}}' integramed:ci)"
+          echo "Healthcheck: ${health_test}"
+          echo "${health_test}" | grep -q 'scripts/healthcheck.mjs'
           env_json="$(docker inspect --format '{{json .Config.Env}}' integramed:ci)"
           case "${env_json}" in
             *SESSION_SECRET*|*FHIR_PROXY_SECRET*)
@@ -95,7 +101,14 @@ jobs:
           trap 'docker logs integramed-ci; docker rm -f integramed-ci >/dev/null 2>&1 || true' EXIT
           for _ in $(seq 1 40); do
             if curl -fsS -H "Cookie: integramed_session=${token}" http://127.0.0.1:3000/ci-static.txt | grep -qx 'integramed-static-ok'; then
+              curl -fsS http://127.0.0.1:3000/healthz | grep -q '"ok":true'
+              docker exec integramed-ci node scripts/healthcheck.mjs
               docker exec integramed-ci node --input-type=module -e '
+                const open = await fetch("http://127.0.0.1:3001/healthz");
+                if (open.status !== 200) {
+                  console.error("expected 200 from proxy /healthz, got", open.status);
+                  process.exit(1);
+                }
                 const res = await fetch("http://127.0.0.1:3001/api/health");
                 if (res.status !== 401) {
                   console.error("expected 401 from the loopback proxy, got", res.status);

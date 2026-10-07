@@ -119,6 +119,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   delete baseEnv.SMTP_PASS;
   delete baseEnv.MAIL_FROM;
   delete baseEnv.CLINIC_MASTER_PASSWORD;
+  delete baseEnv.PORT;
   baseEnv.SESSION_SECRET = SESSION_SECRET;
   baseEnv.FHIR_PROXY_SECRET = FHIR_PROXY_SECRET;
   baseEnv.FHIR_MODE = "local";
@@ -130,7 +131,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   const proxy = spawnLogged(process.execPath, ["server/index.js"], {
     ...baseEnv,
     NODE_ENV: "development",
-    PORT: String(proxyPort),
+    FHIR_PROXY_PORT: String(proxyPort),
   });
   const web = spawnLogged(
     process.execPath,

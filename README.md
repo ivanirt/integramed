@@ -16,7 +16,7 @@ Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes
 Si omites `SESSION_SECRET` o `FHIR_PROXY_SECRET`, `npm run dev` inventa un secreto aleatorio solo para ese proceso. No se imprime ni se guarda. En producción el proceso no arranca sin ellos.
 
 - UI: [http://localhost:3000](http://localhost:3000)
-- Proxy FHIR: solo en `127.0.0.1:3001` (no lo publiques). La UI habla con él en el mismo equipo.
+- Proxy FHIR: solo en `127.0.0.1:3001` (no lo publiques). La UI habla con él en el mismo equipo. El puerto del proxy es `FHIR_PROXY_PORT` (por defecto 3001). `PORT` no mueve ni a Next ni al proxy.
 
 El acceso es con la contraseña personal de cada Practitioner. No hay contraseña compartida de clínica: si `CLINIC_MASTER_PASSWORD` sigue en el entorno, el login la ignora. Quien aún no tiene contraseña personal usa «¿Olvidaste tu contraseña?». El enlace solo sale al correo fijado en `accounts.json` por `create-user` o `set-password`. Si ese correo no está fijado, la respuesta es la misma y no se envía nada. Cambiar el email del Practitioner en FHIR no cambia el destino.
 
@@ -80,6 +80,12 @@ Qué probar con cada rol: [docs/QA.md](docs/QA.md).
 ## Producción (Dokploy)
 
 Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el servicio: `SESSION_SECRET` y `FHIR_PROXY_SECRET`. `FHIR_MODE`, `FHIR_BASE_URL` y `FHIR_AUTH_TOKEN` se leen del entorno; la pantalla `/config/fhir` ya no los cambia en caliente. La IA clínica usa `CLINICAL_AI_KEY` y `CLINICAL_AI_BASE` (host en `CLINICAL_AI_HOST_ALLOWLIST`, por defecto `openrouter.ai`).
+
+Next escucha en el puerto 3000 (`next start -p 3000`). El proxy FHIR escucha en `127.0.0.1` y en `FHIR_PROXY_PORT` (por defecto 3001; `FHIR_PROXY_URL` tiene que coincidir). La imagen no define `PORT`. Si Dokploy lo inyecta, los dos procesos lo ignoran: no pasa el proxy al puerto público ni saca a Next del 3000.
+
+El HEALTHCHECK del contenedor pide `GET http://127.0.0.1:3000/healthz` (Next, el puerto publicado). No lleva cookie ni secreto y responde `{ "ok": true }`. No consulta FHIR. El estado FHIR sigue en `GET /api/health` del proxy y pide sesión. El mismo `GET /healthz` existe en el proxy (puerto 3001) para un chequeo interno; el HEALTHCHECK no usa ese puerto.
+
+El proceso corre como el usuario `integramed` (uid 1001, gid 1001). Los volúmenes `/app/data/auth` y `/app/data/fhir` tienen que ser escribibles por ese uid. Si el volumen se creó con la imagen anterior (root), un `chown` a `1001:1001` en el host deja las contraseñas y el FHIR escribibles. Sin permiso de escritura en auth, Next sale y el contenedor termina.
 
 Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_BASE_URL` (el origen público https, sin barra final). En producción, si `APP_BASE_URL` falta o no es https, el arranque avisa, la respuesta sigue siendo la misma y no se genera enlace. No definas `PASSWORD_RESET_LOG_LINK` en producción: se ignora.
 

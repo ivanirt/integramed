@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "concurrently": "^9.1.2",
     "dotenv": "^16.4.7",
     "express": "^4.22.3",
     "next": "^15.5.25",
@@ -38,6 +37,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.1.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
     "tailwindcss": "^4.3.3",

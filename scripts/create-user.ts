@@ -76,7 +76,8 @@ function loginOf(resource: Practitioner) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const mode = String(process.env.FHIR_MODE || "local").toLowerCase();
+  const { resolvedFhirMode } = await import("../src/lib/fhir-mode.js");
+  const mode = resolvedFhirMode(process.env, "local");
   if (mode !== "local") {
     console.warn(
       `[create-user] FHIR_MODE=${mode}. Este comando solo escribe el almacén local data/fhir. Con proxy remoto la app no verá al usuario.`,

@@ -51,7 +51,13 @@ function readStore(root: string): AccountStore {
       : [];
     const revision = Number(parsed.revision || 0);
     return { accounts, revision: Number.isFinite(revision) && revision >= 0 ? revision : 0 };
-  } catch {
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code || "") : "";
+    if (code === "EACCES" || code === "EPERM") {
+      console.error(
+        `No se pudo leer accounts.json (${credentialFile(root)}): ${code}. El proceso corre como uid 1001. chown -R 1001:1001 ${root}`,
+      );
+    }
     return { accounts: [], revision: 0 };
   }
 }

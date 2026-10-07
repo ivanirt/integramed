@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import {
-  loadVaultNotes,
+  loadLanguageVaultNotes,
   resolveVaultPath,
   normalizeVaultLanguage,
   invalidateVaultCache
 } from './clinicalVault.js';
+import { vaultReadRoots } from '../src/lib/vault-root.js';
 import {
   collectSources,
   serializeNote,
@@ -32,9 +33,24 @@ function languageFrom(req) {
   return normalizeVaultLanguage(req.query?.language || req.body?.language || req.headers['x-ui-language']);
 }
 
+function readLanguageNote(language, projectRoot, relative) {
+  const roots = [...vaultReadRoots(language, projectRoot)].reverse();
+  let missing = null;
+  for (const root of roots) {
+    try {
+      const file = readNoteFile(root, relative);
+      if (file) return file;
+    } catch (error) {
+      missing = error;
+    }
+  }
+  if (missing) throw missing;
+  return null;
+}
+
 function loadEnabledNotes(projectRoot, language) {
   const vaultPath = resolveVaultPath(language, projectRoot);
-  const notes = loadVaultNotes(vaultPath);
+  const notes = loadLanguageVaultNotes(language, projectRoot);
   const settings = loadVaultSourceSettings(projectRoot);
   const disabled = settings[language]?.disabled || [];
   return {
@@ -67,11 +83,10 @@ export function registerVaultRoutes(app, { PROJECT_ROOT }) {
   app.get('/api/vault/note', (req, res) => {
     try {
       const language = languageFrom(req);
-      const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
       const relative = decodeURIComponent(String(req.query.file || ''));
-      const file = readNoteFile(vaultPath, relative);
+      const file = readLanguageNote(language, PROJECT_ROOT, relative);
       if (!file) return res.status(404).json({ error: 'Nota no encontrada' });
-      const notes = loadVaultNotes(vaultPath);
+      const notes = loadLanguageVaultNotes(language, PROJECT_ROOT);
       const note = notes.find((item) => item.file === file.file);
       const graph = buildLinkGraph(notes);
       res.json({
@@ -172,8 +187,10 @@ export function registerVaultRoutes(app, { PROJECT_ROOT }) {
       const suggestions = Array.isArray(req.body?.suggestions)
         ? req.body.suggestions
         : suggestAutoLinks(enabledNotes);
-      const result = applyAutoLinks(vaultPath, enabledNotes, suggestions);
-      res.json({ ok: true, ...result, remaining: suggestAutoLinks(loadVaultNotes(vaultPath)) });
+      const fallbacks = vaultReadRoots(language, PROJECT_ROOT).filter((root) => path.resolve(root) !== path.resolve(vaultPath));
+      const result = applyAutoLinks(vaultPath, enabledNotes, suggestions, fallbacks);
+      invalidateVaultCache(vaultPath);
+      res.json({ ok: true, ...result, remaining: suggestAutoLinks(loadLanguageVaultNotes(language, PROJECT_ROOT)) });
     } catch (err) {
       const status = err.message === 'Ruta de nota no válida' ? 400 : 500;
       res.status(status).json({ error: err.message });
@@ -224,11 +241,10 @@ export function registerVaultRoutes(app, { PROJECT_ROOT }) {
   app.post('/api/vault/export', (req, res) => {
     try {
       const language = languageFrom(req);
-      const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
-      const notes = loadVaultNotes(vaultPath);
+      const notes = loadLanguageVaultNotes(language, PROJECT_ROOT);
       const selected = listExportFiles(notes, req.body?.files || req.query.files?.split(',').filter(Boolean));
       const zipFiles = selected.map((note) => {
-        const file = readNoteFile(vaultPath, note.file);
+        const file = readLanguageNote(language, PROJECT_ROOT, note.file);
         return { name: note.file, content: file?.content || note.body || '' };
       });
       const archive = buildZipArchive(zipFiles);

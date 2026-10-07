@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { migrateVaultStorage, vaultSettingsFile } from '../src/lib/vault-root.js';
 
 function settingsPath(projectRoot) {
-  return path.join(projectRoot, 'data', 'vault-source-settings.json');
+  migrateVaultStorage(projectRoot);
+  return vaultSettingsFile(projectRoot);
 }
 
 function emptySettings() {

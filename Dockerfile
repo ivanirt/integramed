@@ -12,10 +12,15 @@ COPY . .
 # create them when missing so the runtime copy never fails the build.
 RUN mkdir -p public modules
 RUN npm run build
+# The build cache is not needed at runtime. Leaving it makes the later
+# chown of .next/cache copy the whole tree into a second layer.
+RUN rm -rf .next/cache
 # The build needs TypeScript, Tailwind, and ESLint. The runner does not:
 # `node --experimental-strip-types` is built into Node 22 and is what
-# create-user, set-password, and seed:yeshua use.
-RUN npm prune --omit=dev
+# create-user, set-password, and seed:yeshua use. Scoped dirs can survive
+# prune as empty folders; they are not imported.
+RUN npm prune --omit=dev \
+  && rm -rf node_modules/@tailwindcss node_modules/@types
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
@@ -27,6 +32,7 @@ ENV NODE_ENV=production
 ENV FHIR_PROXY_PORT=3001
 ENV INTEGRAMED_AUTH_ROOT=/app/data/auth
 ENV INTEGRAMED_FHIR_ROOT=/app/data/fhir
+ENV INTEGRAMED_VAULT_ROOT=/app/data/vault
 # npm start logs under HOME. Keep that off the image tree.
 ENV HOME=/tmp
 
@@ -44,14 +50,14 @@ COPY --from=builder /app/modules ./modules
 # Password CLIs and the FHIR proxy load these at runtime (strip-types + relative imports).
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src/lib ./src/lib
-# Writable paths only. Next writes its image and fetch caches under
-# .next/cache; the prebuilt server output stays root-owned. Credential and
-# FHIR data, plus the vault trees the proxy edits, are the other writes.
-# There is no root entrypoint. Existing volumes need a one-time host chown.
-RUN mkdir -p /app/data/auth /app/data/fhir /app/.next/cache \
-  && chown -R integramed:integramed /app/data /app/.next/cache /app/vault-es /app/vault-en
+# Writable paths only. Next writes its image and fetch caches under an empty
+# .next/cache; the prebuilt server output stays root-owned. vault-es and
+# vault-en stay root-owned: they are the bundled notes. Imports and settings
+# go to /app/data/vault. There is no root entrypoint.
+RUN mkdir -p /app/data/auth /app/data/fhir /app/data/vault /app/.next/cache \
+  && chown -R integramed:integramed /app/data /app/.next/cache
 EXPOSE 3000
-VOLUME ["/app/data/auth", "/app/data/fhir"]
+VOLUME ["/app/data/auth", "/app/data/fhir", "/app/data/vault"]
 # Readiness: GET http://127.0.0.1:3000/healthz
 # Port 3000 is Next.js, the published listener. No cookie and no secret.
 # That route also asks the loopback proxy GET /healthz (1s timeout, cached 3s, no auth).

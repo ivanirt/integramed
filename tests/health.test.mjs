@@ -138,7 +138,8 @@ test("spawned proxy serves /healthz on FHIR_PROXY_PORT when PORT is 3000", async
 
 test("Next /healthz is public and checks the proxy without auth", async () => {
   const { isPublicPath } = await import("../src/lib/public-path.ts");
-  const { GET, clearProxyHealthCache } = await import("../src/app/healthz/route.ts");
+  const { GET } = await import("../src/app/healthz/route.ts");
+  const { clearProxyHealthCache } = await import("../src/lib/proxy-health.js");
   const middlewareSource = fs.readFileSync(path.join(repo, "src/middleware.ts"), "utf8");
   assert.match(middlewareSource, /isPublicPath\(pathname\)/);
 
@@ -175,7 +176,8 @@ test("Next /healthz is public and checks the proxy without auth", async () => {
 });
 
 test("Next /healthz reuses the proxy result for a few seconds", async () => {
-  const { GET, clearProxyHealthCache } = await import("../src/app/healthz/route.ts");
+  const { GET } = await import("../src/app/healthz/route.ts");
+  const { clearProxyHealthCache } = await import("../src/lib/proxy-health.js");
   clearProxyHealthCache();
   let hits = 0;
   const stub = await listen((req, res) => {

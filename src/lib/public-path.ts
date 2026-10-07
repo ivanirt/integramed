@@ -7,7 +7,7 @@ export function isPublicPath(pathname: string): boolean {
   if (pathname === "/healthz") return true;
   return (
     PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
-    pathname.startsWith("/_next") ||
+    pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico"
   );
 }

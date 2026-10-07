@@ -12,6 +12,10 @@ COPY . .
 # create them when missing so the runtime copy never fails the build.
 RUN mkdir -p public modules
 RUN npm run build
+# The build needs TypeScript, Tailwind, and ESLint. The runner does not:
+# `node --experimental-strip-types` is built into Node 22 and is what
+# create-user, set-password, and seed:yeshua use.
+RUN npm prune --omit=dev
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
@@ -40,15 +44,18 @@ COPY --from=builder /app/modules ./modules
 # Password CLIs and the FHIR proxy load these at runtime (strip-types + relative imports).
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src/lib ./src/lib
-# Writable paths only: credential and FHIR data, Next's runtime cache, and the
-# vault trees the proxy edits. The rest of /app stays root-owned and read-only.
+# Writable paths only. Next writes its image and fetch caches under
+# .next/cache; the prebuilt server output stays root-owned. Credential and
+# FHIR data, plus the vault trees the proxy edits, are the other writes.
+# There is no root entrypoint. Existing volumes need a one-time host chown.
 RUN mkdir -p /app/data/auth /app/data/fhir /app/.next/cache \
-  && chown -R integramed:integramed /app/data /app/.next /app/vault-es /app/vault-en
+  && chown -R integramed:integramed /app/data /app/.next/cache /app/vault-es /app/vault-en
 EXPOSE 3000
 VOLUME ["/app/data/auth", "/app/data/fhir"]
 # Readiness: GET http://127.0.0.1:3000/healthz
 # Port 3000 is Next.js, the published listener. No cookie and no secret.
-# That route also asks the loopback proxy GET /healthz (1s timeout, no auth).
+# That route also asks the loopback proxy GET /healthz (1s timeout, cached 3s, no auth).
+# This command aborts its own fetch after 3s, inside the 5s HEALTHCHECK timeout.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "scripts/healthcheck.mjs"]
 USER integramed

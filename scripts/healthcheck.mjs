@@ -4,12 +4,14 @@
 // Port: 3000 (Next.js, `next start -p 3000`, the port EXPOSE publishes)
 //
 // Next's /healthz also asks the loopback proxy GET /healthz (FHIR_PROXY_URL,
-// 1s, no secret, no upstream FHIR). PORT, if Dokploy sets it, is not this URL.
+// 1s, cached 3s, no secret, no upstream FHIR). PORT, if Dokploy sets it, is
+// not this URL. This fetch itself stops after 3s so a hung Next cannot use
+// the whole HEALTHCHECK timeout.
 
 const url = "http://127.0.0.1:3000/healthz";
 
 try {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
   if (!res.ok) {
     console.error(`healthcheck ${url} returned ${res.status}`);
     process.exit(1);

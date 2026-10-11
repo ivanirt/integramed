@@ -23,7 +23,7 @@ export function HoursForm({
       className="space-y-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (practitionerId) await savePractitionerHoursAction(hours, practitionerId, fhirId);
+        if (practitionerId) await savePractitionerHoursAction(hours, practitionerId);
         else await saveHoursAction(hours, fhirId);
         setStatus("Horario guardado en Schedule.");
       }}

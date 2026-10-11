@@ -5,6 +5,8 @@ export const FHIR_RESOURCE_TYPES = [
   "Encounter",
   "Observation",
   "Condition",
+  "Composition",
+  "ServiceRequest",
   "MedicationRequest",
   "Medication",
   "AllergyIntolerance",
@@ -26,6 +28,11 @@ export const FHIR_RESOURCE_TYPES = [
 const CANONICAL_BY_LOWER = new Map(FHIR_RESOURCE_TYPES.map((type) => [type.toLowerCase(), type]));
 const ENTRY_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]);
 
+/** Protocol-relative URLs (`//host/...`) are not a FHIR path. Fail closed. */
+function isProtocolRelative(value) {
+  return String(value || "").replace(/\\/g, "/").startsWith("//");
+}
+
 /**
  * One parser for proxy routes and Bundle entry URLs.
  * Strips the origin, leading "./" or "/", and the fhir or api/fhir base,
@@ -35,7 +42,7 @@ const ENTRY_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"])
 export function parseFhirTarget(input) {
   if (input == null) return { ok: false };
   let value = String(input).trim();
-  if (!value) return { ok: false };
+  if (!value || isProtocolRelative(value)) return { ok: false };
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
     let url;
@@ -45,6 +52,7 @@ export function parseFhirTarget(input) {
       return { ok: false };
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false };
+    if (isProtocolRelative(url.pathname)) return { ok: false };
     value = `${url.pathname}${url.search}`;
   }
 
@@ -87,7 +95,8 @@ export function parseFhirTarget(input) {
   }
 
   const canonical = CANONICAL_BY_LOWER.get(rawType.toLowerCase()) || null;
-  const nonCanonical = Boolean(canonical && rawType !== canonical);
+  if (!canonical) return { ok: false };
+  const nonCanonical = Boolean(rawType !== canonical);
   return {
     ok: true,
     kind: "type",
@@ -118,6 +127,7 @@ function baseResult(query) {
 function unwrapFhirPath(value) {
   let current = value;
   for (let pass = 0; pass < 8; pass += 1) {
+    if (isProtocolRelative(current)) return null;
     const stripped = stripFhirBase(current);
     let decoded;
     try {
@@ -125,6 +135,7 @@ function unwrapFhirPath(value) {
     } catch {
       return null;
     }
+    if (isProtocolRelative(decoded)) return null;
     if (decoded === current) return stripFhirBase(decoded);
     current = decoded;
   }

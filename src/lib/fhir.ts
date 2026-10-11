@@ -58,17 +58,31 @@ async function request(path: string, init: RequestInit = {}): Promise<unknown> {
   return data;
 }
 
+function searchPage(data: FhirBundle | FhirResource | null, type: string): FhirResource[] {
+  return bundleResources(data, type);
+}
+
 export async function fhirSearch(type: string, params: Record<string, string> = {}): Promise<FhirResource[]> {
-  const qs = new URLSearchParams({ _count: "200", ...params });
-  const data = (await request(`${type}?${qs}`)) as FhirBundle | FhirResource;
-  if (data?.resourceType === type) return [data as FhirResource];
-  if (data?.resourceType === "Bundle") {
-    const entry = (data as FhirBundle).entry ?? [];
-    return entry
-      .map((e: { resource?: FhirResource }) => e.resource)
-      .filter((r: FhirResource | undefined): r is FhirResource => Boolean(r && r.resourceType === type));
+  const count = params._count || "200";
+  const seen = new Map<string, FhirResource>();
+  let offset = Number(params._offset || "0");
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+  for (let page = 0; page < 100; page += 1) {
+    const qs = new URLSearchParams({ ...params, _count: count, _offset: String(offset) });
+    const data = (await request(`${type}?${qs}`)) as FhirBundle | FhirResource;
+    const batch = searchPage(data, type);
+    const before = seen.size;
+    for (const resource of batch) {
+      const key = resource.id ? String(resource.id) : `sin-id-${seen.size}`;
+      if (!seen.has(key)) seen.set(key, resource);
+    }
+    if (batch.length === 0 || seen.size === before) break;
+    const total = data?.resourceType === "Bundle" ? data.total : undefined;
+    offset += batch.length;
+    if (typeof total === "number" && offset >= total) break;
+    if (batch.length < Number(count)) break;
   }
-  return [];
+  return [...seen.values()];
 }
 
 export async function fhirRead(type: string, id: string) {

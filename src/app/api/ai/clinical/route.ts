@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { proxyFetch } from "@/lib/proxy";
+import { enforceRoute } from "@/lib/enforce-action";
 
 export async function POST(req: Request) {
   const user = await getSession();
-  if (!user) return NextResponse.json({ error: "No hay sesión" }, { status: 401 });
+  const denied = enforceRoute("clinicalAi", user?.role ?? null);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const res = await proxyFetch("/api/ai/consult", {

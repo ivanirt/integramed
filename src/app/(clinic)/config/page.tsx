@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/require";
 
-export default function ConfigIndex() {
+export default async function ConfigIndex() {
+  await requireAdmin();
   redirect("/config/horario");
 }

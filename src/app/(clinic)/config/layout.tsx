@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireScreen } from "@/lib/require";
+import { requireAdmin } from "@/lib/require";
 
 const LINKS = [
   { href: "/personal", label: "Profesionales" },
@@ -15,7 +15,7 @@ const LINKS = [
 ];
 
 export default async function ConfigLayout({ children }: { children: React.ReactNode }) {
-  await requireScreen("config");
+  await requireAdmin();
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="font-serif text-4xl">Configuración</h1>

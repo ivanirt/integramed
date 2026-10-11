@@ -112,6 +112,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
 
   const proxyPort = await freePort();
   const webPort = await freePort();
+  const distDir = `.next-auth-${process.pid}`;
   const baseEnv = { ...process.env };
   delete baseEnv.FHIR_PROXY_NO_LISTEN;
   delete baseEnv.SMTP_HOST;
@@ -127,6 +128,7 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
   baseEnv.INTEGRAMED_AUTH_ROOT = authRoot;
   baseEnv.CLINICAL_AI_KEY = "";
   baseEnv.NEXT_TELEMETRY_DISABLED = "1";
+  baseEnv.NEXT_DIST_DIR = distDir;
 
   const proxy = spawnLogged(process.execPath, ["server/index.js"], {
     ...baseEnv,
@@ -256,5 +258,6 @@ test("login, forgot-password, and reset go through Next and the real proxy", { t
     throw new Error(`${detail}\n--- web ---\n${web.text().slice(-4000)}\n--- proxy ---\n${proxy.text().slice(-2000)}`);
   } finally {
     await Promise.all([stop(web.child), stop(proxy.child)]);
+    fs.rmSync(path.join(repo, distDir), { recursive: true, force: true });
   }
 });

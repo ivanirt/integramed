@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { ADMIN_ONLY_MESSAGE, authorizePage } from "@/lib/action-roles.js";
 import { isAcceptableSecret, verifySessionToken } from "@/lib/session-edge";
 import { isPublicPath } from "@/lib/public-path";
 
@@ -28,6 +29,18 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/acceso";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+  if (authorizePage(pathname, session.role) === "forbidden") {
+    if (wantsJson(pathname)) {
+      return NextResponse.json({ error: ADMIN_ONLY_MESSAGE }, { status: 403 });
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    url.searchParams.set("aviso", ADMIN_ONLY_MESSAGE);
+    const response = NextResponse.redirect(url);
+    response.headers.set("cache-control", "no-store");
+    return response;
   }
   return NextResponse.next();
 }

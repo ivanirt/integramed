@@ -252,7 +252,7 @@ describe("seedClinicaYeshua", () => {
 
 describe("seed proxy auth", () => {
   it("signs a short-lived admin session and refuses a non-loopback proxy", () => {
-    const headers = seedProxyHeaders({ SESSION_SECRET, FHIR_PROXY_SECRET });
+    const headers = seedProxyHeaders({ NODE_ENV: "test", SESSION_SECRET, FHIR_PROXY_SECRET });
     assert.equal(headers["x-integramed-proxy-secret"], FHIR_PROXY_SECRET);
     const token = headers.cookie.slice("integramed_session=".length);
     const user = verifySessionToken(token, SESSION_SECRET);
@@ -261,7 +261,7 @@ describe("seed proxy auth", () => {
     assert.equal(user.login, "seed-yeshua");
     assert.ok(user.exp > Date.now());
     assert.ok(user.exp - Date.now() <= 10 * 60 * 1000);
-    assert.throws(() => seedProxyHeaders({ SESSION_SECRET: "short", FHIR_PROXY_SECRET }));
+    assert.throws(() => seedProxyHeaders({ NODE_ENV: "test", SESSION_SECRET: "short", FHIR_PROXY_SECRET }));
     assert.throws(() => proxyOriginFromEnv("https://fhir.example.test/fhir"));
     assert.equal(proxyOriginFromEnv("http://127.0.0.1:3001"), "http://127.0.0.1:3001");
   });

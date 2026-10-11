@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { fhirRead, fhirSearch, readExtension, SYSTEMS, displayName, type FhirResource } from "@/lib/fhir";
 import { requireScreen } from "@/lib/require";
+import { loadAccessModules } from "@/lib/clinic-config";
 import { loadIntegrativeCatalog } from "@/lib/integrative";
+import { canAccess } from "@/lib/roles";
 import { hasEncounterVitals, latestVitals, type HistoryNote } from "@/lib/vitals";
 import { ConsultWorkspace } from "@/components/consult/ConsultWorkspace";
 import Link from "next/link";
@@ -82,11 +84,12 @@ export default async function ConsultPage({
     redirect(`/consulta/${id}/signos?paciente=${patientId}`);
   }
 
-  const [patient, compositions, observations, catalog] = await Promise.all([
+  const [patient, compositions, observations, catalog, accessModules] = await Promise.all([
     patientId ? fhirRead("Patient", patientId) : Promise.resolve(null),
     fhirSearch("Composition"),
     patientId ? fhirSearch("Observation", { subject: `Patient/${patientId}` }) : Promise.resolve([]),
     loadIntegrativeCatalog(),
+    loadAccessModules().catch(() => ({}) as Record<string, boolean>),
   ]);
 
   const vitalsHere = hasEncounterVitals(observations, id);
@@ -154,6 +157,7 @@ export default async function ConsultPage({
       history={history}
       catalog={catalog.items}
       activeModalities={soap.modalities}
+      irisScreen={canAccess(user.role, "iris", accessModules)}
     />
   );
 }

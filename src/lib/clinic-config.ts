@@ -1,4 +1,6 @@
 import { fhirCreate, fhirSearch, fhirUpdate, readExtension, withExtension, SYSTEMS, type FhirResource } from "./fhir";
+import { DEFAULT_MODALITIES, loadIntegrativeCatalog } from "./integrative";
+import { resolveIridologyAccess } from "./iridology-access";
 import { DAY_NAMES, DEFAULT_MODULES } from "./roles";
 
 export type DayHours = {
@@ -41,6 +43,21 @@ export async function loadModules(): Promise<{ id?: string; modules: Record<stri
   if (!match) return { modules: { ...DEFAULT_MODULES } };
   const payload = readExtension(match, SYSTEMS.payload) as Record<string, boolean> | null;
   return { id: match.id, modules: { ...DEFAULT_MODULES, ...(payload || {}) } };
+}
+
+/** Module flags for nav and requireScreen. The iris screen reads `iridology`, not `iris`. */
+export async function loadAccessModules(): Promise<Record<string, boolean>> {
+  const { modules } = await loadModules();
+  let modalities = DEFAULT_MODALITIES.map((item) => ({ ...item }));
+  try {
+    modalities = (await loadIntegrativeCatalog()).items;
+  } catch {
+    modalities = DEFAULT_MODALITIES.map((item) => ({ ...item }));
+  }
+  const access = resolveIridologyAccess(modules, modalities);
+  const next: Record<string, boolean> = { ...modules, iridology: access.enabled };
+  delete next.iris;
+  return next;
 }
 
 export async function saveModules(modules: Record<string, boolean>, id?: string) {

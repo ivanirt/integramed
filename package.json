@@ -15,6 +15,7 @@
     "start": "node scripts/supervise.mjs",
     "start:fhir": "node server/index.js",
     "lint": "eslint",
+    "test:iris": "tsx --test src/lib/iris-map.test.ts src/lib/iris-path.test.ts src/lib/iris-fit.test.ts src/lib/iris-mask.test.ts src/lib/iridology-access.test.ts",
     "create-user": "node --experimental-strip-types scripts/create-user.ts",
     "set-password": "node --experimental-strip-types scripts/set-password.ts",
     "seed:test-users": "node --experimental-strip-types scripts/seed-test-users.ts",
@@ -41,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "overrides": {

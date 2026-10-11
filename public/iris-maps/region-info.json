@@ -1,0 +1,270 @@
+{
+  "_comment": "Optional glosses keyed by data-organ, lowercased and without accents. Missing keys fall back to the SVG name. This file is not medical advice.",
+  "estomago": {
+    "en": "Stomach",
+    "note": "Zona gástrica del mapa. No es un hallazgo clínico."
+  },
+  "piloro": {
+    "en": "Pylorus"
+  },
+  "borde pupilar (anillo del estomago)": {
+    "en": "Pupillary border (stomach ring)",
+    "note": "Anillo. En el mapa actual el trazo es una corona, no un sector."
+  },
+  "colon transverso": {
+    "en": "Transverse colon"
+  },
+  "intestino delgado": {
+    "en": "Small intestine"
+  },
+  "ciego": {
+    "en": "Cecum"
+  },
+  "duo": {
+    "en": "Duodenum"
+  },
+  "colon ascendente": {
+    "en": "Ascending colon"
+  },
+  "colon descendente": {
+    "en": "Descending colon"
+  },
+  "sigmoides": {
+    "en": "Sigmoid colon"
+  },
+  "placas de peyer": {
+    "en": "Peyer's patches"
+  },
+  "mes": {
+    "en": "Mesentery",
+    "note": "El nombre se repite en más de un tramo. La lista los agrupa y el clic los resalta juntos."
+  },
+  "sistema nervioso autonomo": {
+    "en": "Autonomic nervous system",
+    "note": "Banda del mapa. No describe un diagnóstico del sistema nervioso."
+  },
+  "centro vital": {
+    "en": "Vital center"
+  },
+  "area 5 sentidos": {
+    "en": "Five senses area"
+  },
+  "ego presion art": {
+    "en": "Ego, blood pressure"
+  },
+  "centro de la palabra": {
+    "en": "Speech center"
+  },
+  "desarrollo mental": {
+    "en": "Mental development"
+  },
+  "frente sien": {
+    "en": "Forehead / temple"
+  },
+  "ojo": {
+    "en": "Eye"
+  },
+  "nariz": {
+    "en": "Nose"
+  },
+  "lengua boca": {
+    "en": "Tongue / mouth"
+  },
+  "amigdalas": {
+    "en": "Tonsils"
+  },
+  "laringe": {
+    "en": "Larynx"
+  },
+  "faringe": {
+    "en": "Pharynx"
+  },
+  "tiroides": {
+    "en": "Thyroid"
+  },
+  "cuerdas vocales": {
+    "en": "Vocal cords"
+  },
+  "traquea": {
+    "en": "Trachea"
+  },
+  "esofago": {
+    "en": "Esophagus"
+  },
+  "omoplato": {
+    "en": "Scapula"
+  },
+  "vejiga": {
+    "en": "Bladder"
+  },
+  "ut pro": {
+    "en": "Uterus / prostate"
+  },
+  "vagina": {
+    "en": "Vagina"
+  },
+  "perineo pubis": {
+    "en": "Perineum / pubis"
+  },
+  "adren": {
+    "en": "Adrenal"
+  },
+  "rinon": {
+    "en": "Kidney"
+  },
+  "rod": {
+    "en": "Knee"
+  },
+  "pie": {
+    "en": "Foot"
+  },
+  "ingle": {
+    "en": "Groin"
+  },
+  "pared abdominal": {
+    "en": "Abdominal wall"
+  },
+  "peritoneo": {
+    "en": "Peritoneum"
+  },
+  "pelvis": {
+    "en": "Pelvis"
+  },
+  "pan": {
+    "en": "Pancreas"
+  },
+  "testiculo ovario": {
+    "en": "Testicle / ovary"
+  },
+  "ovario testiculo": {
+    "en": "Ovary / testicle"
+  },
+  "abd superior": {
+    "en": "Upper abdomen"
+  },
+  "diafragma": {
+    "en": "Diaphragm"
+  },
+  "vesic": {
+    "en": "Gallbladder"
+  },
+  "higado": {
+    "en": "Liver"
+  },
+  "mano brazo": {
+    "en": "Hand / arm"
+  },
+  "brazo mano": {
+    "en": "Arm / hand"
+  },
+  "costillas": {
+    "en": "Ribs"
+  },
+  "torax": {
+    "en": "Thorax"
+  },
+  "pleura": {
+    "en": "Pleura"
+  },
+  "bronquiolos": {
+    "en": "Bronchioles"
+  },
+  "pulmon inf": {
+    "en": "Lower lung"
+  },
+  "pulmon medio": {
+    "en": "Middle lung"
+  },
+  "pulmon sup": {
+    "en": "Upper lung"
+  },
+  "pulmon": {
+    "en": "Lung"
+  },
+  "hombro": {
+    "en": "Shoulder"
+  },
+  "cuello": {
+    "en": "Neck"
+  },
+  "oido": {
+    "en": "Ear"
+  },
+  "mastoides": {
+    "en": "Mastoid"
+  },
+  "medula": {
+    "en": "Medulla"
+  },
+  "impulso sexual": {
+    "en": "Sexual impulse"
+  },
+  "sensitividad": {
+    "en": "Sensitivity"
+  },
+  "bronquios": {
+    "en": "Bronchi"
+  },
+  "g pit": {
+    "en": "Pituitary"
+  },
+  "p t": {
+    "en": "Parathyroid"
+  },
+  "apend": {
+    "en": "Appendix"
+  },
+  "mandibula superior": {
+    "en": "Upper jaw"
+  },
+  "mandibula inferior": {
+    "en": "Lower jaw"
+  },
+  "mentalidad innata": {
+    "en": "Innate mentality"
+  },
+  "perversion": {
+    "en": "Perversion"
+  },
+  "obsesion": {
+    "en": "Obsession"
+  },
+  "alucinacion": {
+    "en": "Hallucination"
+  },
+  "espalda alta": {
+    "en": "Upper back"
+  },
+  "espalda media": {
+    "en": "Mid back"
+  },
+  "espalda baja": {
+    "en": "Lower back"
+  },
+  "sistema circulatorio y linfatico": {
+    "en": "Circulatory and lymphatic system",
+    "note": "Anillo exterior del mapa."
+  },
+  "piel": {
+    "en": "Skin",
+    "note": "Anillo más externo del mapa."
+  },
+  "aorta (ao)": {
+    "en": "Aorta"
+  },
+  "corazon": {
+    "en": "Heart"
+  },
+  "pl sol": {
+    "en": "Solar plexus"
+  },
+  "bazo": {
+    "en": "Spleen"
+  },
+  "escroto perineo": {
+    "en": "Scrotum / perineum"
+  },
+  "recto": {
+    "en": "Rectum"
+  }
+}

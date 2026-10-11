@@ -33,6 +33,7 @@ jobs:
           export SESSION_SECRET="$(openssl rand -base64 48)"
           export FHIR_PROXY_SECRET="$(openssl rand -base64 48)"
           npm test
+          npm run test:iris
 
       - name: Build
         run: |

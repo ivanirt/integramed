@@ -2,18 +2,123 @@
 
 Clínica FHIR R4. Interfaz Next.js 15 (tono Maferefun) y proxy Express para el almacén FHIR local o Medblocks.
 
-Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas. El cliente Vite anterior está en `legacy-client/`.
+Los datos clínicos se escriben en recursos FHIR. No hay Postgres para pacientes, citas ni notas.
 
 ## Local
 
-1. Copia `.env.example` a `.env` si falta `SESSION_SECRET` y `FHIR_PROXY_URL`.
-2. `npm install`
-3. `npm run dev`
+1. Copia `.env.example` a `.env`.
+2. Define secretos propios (no dejes los valores vacíos en un entorno real):
+   - `SESSION_SECRET` — `openssl rand -base64 48` (mínimo 32 caracteres; el valor de ejemplo antiguo se rechaza).
+   - `FHIR_PROXY_SECRET` — otro secreto, con el mismo comando. Lo comparten Next.js y el proxy.
+3. `npm install`
+4. `npm run dev`
+
+Si omites `SESSION_SECRET` o `FHIR_PROXY_SECRET`, `npm run dev` inventa un secreto aleatorio solo para ese proceso. No se imprime ni se guarda. En producción el proceso no arranca sin ellos.
 
 - UI: [http://localhost:3000](http://localhost:3000)
-- FHIR proxy: [http://localhost:3001](http://localhost:3001) (`GET /fhir/metadata`)
+- Proxy FHIR: solo en `127.0.0.1:3001` (no lo publiques). La UI habla con él en el mismo equipo. El puerto del proxy es `FHIR_PROXY_PORT` (por defecto 3001). `PORT` no mueve ni a Next ni al proxy.
 
-Acceso de demostración: usuario `ivan`, contraseña `IntegraMed27`. El primer login crea el Practitioner si el FHIR está vacío.
+El acceso es con la contraseña personal de cada Practitioner. No hay contraseña compartida de clínica: si `CLINIC_MASTER_PASSWORD` sigue en el entorno, el login la ignora. Quien aún no tiene contraseña personal usa «¿Olvidaste tu contraseña?». El enlace solo sale al correo fijado en `accounts.json` por `create-user` o `set-password`. Si ese correo no está fijado, la respuesta es la misma y no se envía nada. Cambiar el email del Practitioner en FHIR no cambia el destino.
+
+El login ya no crea al Practitioner `ivan` solo. El primer administrador se da de alta con `npm run create-user` (abajo) o tiene que existir ya en FHIR.
+
+## Usuario ivanirt@gmail.com
+
+Crea el Practitioner del propietario sin contraseña (el comando es idempotente y no guarda claves en el repo):
+
+```bash
+npm run create-user -- ivanirt@gmail.com --given Ivan --family Renteria --role admin
+```
+
+Para asignar la contraseña desde el servidor, sin escribirla en un archivo ni en el registro:
+
+```bash
+SET_PASSWORD='…' npm run set-password -- ivanirt@gmail.com
+```
+
+La contraseña se lee de `SET_PASSWORD` (o de una línea en stdin). No la pongas como argumento del comando. El mismo comando la reemplaza si ya existía. `CREATE_USER_PASSWORD` en el entorno hace lo mismo solo al crear, y no pisa una contraseña que ya esté guardada.
+
+Con SMTP configurado, o en local con `PASSWORD_RESET_LOG_LINK=1`:
+
+1. Abre [http://localhost:3000/acceso](http://localhost:3000/acceso).
+2. Pulsa «¿Olvidaste tu contraseña?».
+3. Escribe `ivanirt@gmail.com`.
+4. Sin SMTP el enlace no se imprime, salvo ese flag en desarrollo. Sale en la consola del proceso `web` (no en la del proxy FHIR). Dura 45 minutos y es de un solo uso.
+5. Ábrelo, elige la contraseña y entra con ese correo.
+
+Si faltan `SMTP_HOST` o `MAIL_FROM`, `npm run dev` y el arranque de producción avisan en el registro. La respuesta al usuario sigue siendo la misma y no incluye enlace.
+
+## Correo con Gmail
+
+Copia `.env.example` a `.env` y rellena:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ivanirt@gmail.com
+SMTP_PASS=la-contraseña-de-aplicación
+MAIL_FROM=ivanirt@gmail.com
+APP_BASE_URL=http://localhost:3000
+```
+
+`SMTP_PASS` no es la contraseña normal de Google. En la cuenta: Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones → crear una para Correo. Pega los 16 caracteres en `SMTP_PASS`. `MAIL_FROM` debe ser esa misma cuenta.
+
+En producción, si faltan `SMTP_HOST` o `MAIL_FROM`, el proceso avisa al arrancar. La solicitud responde igual que si el correo existiera y no escribe el enlace en ningún registro. Un fallo de SMTP tampoco escribe el enlace. En ese caso la contraseña se asigna con `npm run set-password`.
+
+## Usuarios de prueba por rol
+
+Crea un Practitioner por cada rol definido en `src/lib/roles.ts`. Los correos son `qa+<rol>@integramed.local`. La contraseña se genera al ejecutar y solo se escribe en `.local/test-users.json` (no se commitea y no se imprime).
+
+```bash
+npm run seed:test-users
+npm run seed:test-users -- --rotate   # regenera contraseñas, sin duplicar usuarios
+npm run remove-test-users             # borra solo esos usuarios de prueba
+```
+
+Qué probar con cada rol: [docs/QA.md](docs/QA.md).
+
+## Producción (Dokploy)
+
+Publica solo el puerto 3000. No publiques el 3001. Variables obligatorias en el servicio: `SESSION_SECRET` y `FHIR_PROXY_SECRET`. `FHIR_MODE`, `FHIR_BASE_URL` y `FHIR_AUTH_TOKEN` se leen del entorno; la pantalla `/config/fhir` ya no los cambia en caliente. La IA clínica usa `CLINICAL_AI_KEY` y `CLINICAL_AI_BASE` (host en `CLINICAL_AI_HOST_ALLOWLIST`, por defecto `openrouter.ai`).
+
+Next escucha en el puerto 3000 (`next start -p 3000`). El proxy FHIR escucha en `127.0.0.1` y en `FHIR_PROXY_PORT` (por defecto 3001; `FHIR_PROXY_URL` tiene que coincidir). La imagen no define `PORT`. Si Dokploy lo inyecta, los dos procesos lo ignoran: no pasa el proxy al puerto público ni saca a Next del 3000.
+
+El HEALTHCHECK del contenedor pide `GET http://127.0.0.1:3000/healthz` (Next, el puerto publicado) y corta esa petición a los 3 segundos. No lleva cookie ni secreto. Next, a su vez, pide `GET /healthz` del proxy (`FHIR_PROXY_URL`, 1 segundo, sin secreto) y responde `{ "ok": true }` solo si ese probe contesta. El resultado se reutiliza 3 segundos. Si el proxy no responde, la respuesta es 503 `{ "ok": false }`. No reenvía el cuerpo del proxy ni consulta el FHIR remoto. El estado FHIR sigue en `GET /api/health` del proxy y pide sesión.
+
+El proceso corre como el usuario `integramed` (uid 1001, gid 1001). La imagen no arranca como root y no trae un entrypoint que cambie dueños. Dentro de la imagen, uid 1001 solo puede escribir en `/app/data`, `/app/.next/cache` y los árboles `vault-es` y `vault-en`. El resto de `/app/.next` queda de root.
+
+Los volúmenes `/app/data/auth` y `/app/data/fhir` tienen que ser escribibles por uid 1001 antes del primer arranque. Si el volumen o el bind mount de Dokploy se creó con la imagen anterior (root), haz el chown una sola vez en el host, con el contenedor parado:
+
+```bash
+# volumen nombrado de Docker
+docker run --rm -v <volumen-auth>:/data alpine chown -R 1001:1001 /data
+docker run --rm -v <volumen-fhir>:/data alpine chown -R 1001:1001 /data
+
+# bind mount: la ruta es la del host, la que Dokploy monta en el servicio
+sudo chown -R 1001:1001 /ruta/del/host/auth /ruta/del/host/fhir
+```
+
+Si además montas `vault-es` o `vault-en` desde el host, el mismo `chown -R 1001:1001` sobre esas rutas. Sin ese montaje, las copias de la imagen ya pertenecen a 1001. Sin permiso de escritura en auth, Next sale y el contenedor termina.
+
+La imagen de producción no incluye las devDependencies (ESLint, TypeScript, Tailwind). `create-user`, `set-password` y `seed:yeshua` siguen en la imagen: Node 22 los ejecuta con `--experimental-strip-types`, sin el paquete `typescript`.
+
+Para que el restablecimiento llegue por correo también hacen falta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_BASE_URL` (el origen público https, sin barra final). En producción, si `APP_BASE_URL` falta o no es https, el arranque avisa, la respuesta sigue siendo la misma y no se genera enlace. No definas `PASSWORD_RESET_LOG_LINK` en producción: se ignora.
+
+Las contraseñas y los tokens viven en `accounts.json`, dentro de `INTEGRAMED_AUTH_ROOT` (por defecto `data/auth`, en la imagen `/app/data/auth`). El almacén FHIR local vive en `INTEGRAMED_FHIR_ROOT` (por defecto `data/fhir`, en la imagen `/app/data/fhir`). En Dokploy monta los dos volúmenes persistentes: `/app/data/auth` y `/app/data/fhir`. Sin el de auth, un redeploy borra las contraseñas. Sin el de FHIR, las contraseñas siguen y el Practitioner no: el login responde 401 y el registro avisa qué cuenta quedó sin Practitioner. Si el directorio de auth no se puede escribir, Next sale con error y el contenedor termina con un código distinto de cero. Si el directorio existe pero el usuario del contenedor (uid 1001) no puede escribir, el mensaje pide `chown -R 1001:1001` sobre ese volumen. Con `FHIR_MODE=local`, el proxy hace la misma prueba sobre `INTEGRAMED_FHIR_ROOT` antes de escuchar: si no puede escribir, sale enseguida en lugar de marcarse sano y caer en la primera escritura clínica. `node scripts/supervise.mjs` es el proceso principal. Antes de arrancar a Next y al proxy comprueba auth y, con `FHIR_MODE=local`, FHIR, y escribe cada problema a la vez. Si Next o el proxy salen solos, aunque el código sea 0, el registro nombra cuál fue, el código o la señal, y el código con el que termina el contenedor (distinto de cero). `docker stop` (SIGTERM o SIGINT a ese proceso) termina con código 0 y deja una línea de apagado limpio.
+
+Quien ya tenía sesión sigue con esa cookie hasta que expire, hasta que cambies `SESSION_SECRET`, o hasta que cambie su contraseña. El middleware de borde comprueba la firma, la caducidad y el rol. No lee `accounts.json`, así que no ve si la contraseña cambió. Las rutas sensibles, por ejemplo `/api/cie`, llaman a `getSession()`, que sí rechaza una cookie anterior al cambio de contraseña.
+
+Quien nunca definió contraseña usa «¿Olvidaste tu contraseña?» y necesita el correo ya fijado en `accounts.json`. El login responde «Contraseña incorrecta.» igual si el usuario no existe, si no tiene contraseña o si la contraseña no coincide.
+
+## Clínica Yeshua
+
+Con el proxy en marcha y el mismo `.env` (`SESSION_SECRET`, `FHIR_PROXY_SECRET`, `FHIR_PROXY_URL` en loopback):
+
+```bash
+npm run seed:yeshua
+```
+
+Crea la organización, la sede de Naucalpan, los consultorios, los servicios y los profesionales (correo y rol). No guarda contraseñas. Firma una sesión corta de administración con `SESSION_SECRET` y la envía al proxy junto con `FHIR_PROXY_SECRET`. Si el recurso ya existe, lo actualiza sin duplicarlo.
 
 ## Navegación
 

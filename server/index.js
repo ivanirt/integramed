@@ -1,14 +1,21 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import tls from 'node:tls';
 import { fileURLToPath } from 'url';
+import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessionAuth.js';
+import { findAuthStaff } from './staffLookup.js';
+import { isAuthLookupQuery } from '../src/lib/auth-query.js';
+import { resolveAiBaseUrl } from './aiAllowlist.js';
 import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
 import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
 import { noteUsesSources } from './vaultSourceTags.js';
 import { createLocalFhirHandler, sendFhirResult } from './localFhir.js';
+import { parseFhirTarget } from '../src/lib/fhir-path.js';
+import { defaultAuthStorageRoot } from '../src/lib/auth-root.js';
+import { assertFhirRootWritable, defaultFhirStorageRoot } from '../src/lib/fhir-root.js';
+import { logAccountsMissingFromStore, readAccountEntries } from '../src/lib/missing-practitioner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,10 +61,22 @@ function describeFetchError(err) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const HOST = '127.0.0.1';
 
-// Middlewares
-app.use(cors());
+// Loopback FHIR proxy port. This is not the public Next.js port (3000) and it
+// does not follow PORT: Dokploy may set PORT for the published service, and
+// older images used PORT=3001 for this proxy. Either value must not move the
+// listener or collide with Next.
+export function proxyListenPort(env = process.env) {
+  const raw = env.FHIR_PROXY_PORT;
+  if (raw == null || String(raw).trim() === '') return 3001;
+  const port = Number(String(raw).trim());
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return port;
+}
+
+const PORT = proxyListenPort();
+
 app.use(express.json({
   type: ['application/json', 'application/fhir+json', 'application/*+json'],
   limit: '10mb'
@@ -69,12 +88,88 @@ let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
 let FHIR_MODE = String(process.env.FHIR_MODE || '').toLowerCase() === 'local' ? 'local' : 'proxy';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
-const LOCAL_FHIR_PUBLIC = `http://localhost:${process.env.PORT || 3001}/fhir`;
-const localFhir = createLocalFhirHandler(PROJECT_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
+const DATA_ROOT = process.env.INTEGRAMED_DATA_ROOT
+  ? path.resolve(process.env.INTEGRAMED_DATA_ROOT)
+  : PROJECT_ROOT;
+const LOCAL_FHIR_PUBLIC = `http://127.0.0.1:${PORT || 3001}/fhir`;
+const localFhir = createLocalFhirHandler(DATA_ROOT, { publicBaseUrl: LOCAL_FHIR_PUBLIC });
 
 function isLocalFhirMode() {
   return FHIR_MODE === 'local';
 }
+
+function bundleResources(data) {
+  if (!data) return [];
+  if (data.resourceType === 'Bundle') {
+    return (data.entry || []).map((item) => item?.resource).filter(Boolean);
+  }
+  if (data.resourceType) return [data];
+  return [];
+}
+
+async function remoteSearch(relativePath) {
+  if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
+    throw new Error('FHIR_BASE_URL and FHIR_AUTH_TOKEN must be configured on the proxy server.');
+  }
+  const targetUrl = `${FHIR_BASE_URL.replace(/\/$/, '')}/${relativePath}`;
+  const response = await fetchFhirWithRetry(targetUrl, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${FHIR_AUTH_TOKEN}`,
+      Accept: 'application/fhir+json, application/json'
+    }
+  });
+  if (!response.ok) return [];
+  return bundleResources(await response.json());
+}
+
+// Pre-auth identity lookup. The proxy secret is required. A session is not.
+// Clinical routes stay behind requireClinicAccess and still need both.
+app.post('/api/internal/staff-lookup', async (req, res) => {
+  if (!proxySecretOk(req)) return res.status(401).json({ error: 'No autorizado' });
+  const rawQuery = String(req.body?.q ?? '');
+  if (!isAuthLookupQuery(rawQuery)) return res.status(400).json({ error: 'Consulta inválida' });
+  const q = rawQuery.trim();
+  try {
+    let practitioners = [];
+    let roles = [];
+    if (isLocalFhirMode()) {
+      practitioners = localFhir.store.listType('Practitioner');
+      roles = localFhir.store.listType('PractitionerRole');
+    } else {
+      const encoded = encodeURIComponent(q);
+      const [byLogin, byEmail] = await Promise.all([
+        remoteSearch(`Practitioner?identifier=${encodeURIComponent(`https://integramed.app/fhir/login|${q}`)}&_count=20`),
+        remoteSearch(`Practitioner?email=${encoded}&_count=20`)
+      ]);
+      const seen = new Set();
+      practitioners = [...byLogin, ...byEmail].filter((item) => {
+        if (!item?.id || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return item.resourceType === 'Practitioner';
+      });
+      const roleLists = await Promise.all(
+        practitioners.map((item) => remoteSearch(`PractitionerRole?practitioner=${encodeURIComponent(`Practitioner/${item.id}`)}&_count=20`))
+      );
+      roles = roleLists.flat();
+    }
+    const staff = findAuthStaff(practitioners, roles, q);
+    if (!staff) return res.status(404).json({ error: 'No encontrado' });
+    return res.json(staff);
+  } catch (err) {
+    console.error('[staff-lookup]', err instanceof Error ? err.message : 'failed');
+    return res.status(503).json({ error: 'No se pudo consultar el personal' });
+  }
+});
+
+// Liveness for the Docker HEALTHCHECK and other unauthenticated probes.
+// No cookie, no proxy secret, and no call to the upstream FHIR server.
+// FHIR status stays on GET /api/health, behind requireClinicAccess.
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true });
+});
+
+app.use(requireClinicAccess);
 
 console.log(`[FHIR] Mode: ${FHIR_MODE}${isLocalFhirMode() ? ` (${LOCAL_FHIR_PUBLIC})` : FHIR_BASE_URL ? ` → ${FHIR_BASE_URL}` : ''}`);
 console.log(`[Clinical AI] Vault ES: ${resolveVaultPath('es', PROJECT_ROOT)}`);
@@ -137,19 +232,9 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Update config dynamically if requested
-app.post('/api/config', (req, res) => {
-  const { fhirBaseUrl, fhirAuthToken, fhirMode } = req.body;
-  if (fhirMode === 'local' || fhirMode === 'proxy') FHIR_MODE = fhirMode;
-  if (fhirBaseUrl) FHIR_BASE_URL = fhirBaseUrl.trim();
-  if (fhirAuthToken) FHIR_AUTH_TOKEN = fhirAuthToken.trim();
-
-  res.json({
-    success: true,
-    message: 'Configuration updated',
-    mode: FHIR_MODE,
-    serverUrl: isLocalFhirMode() ? LOCAL_FHIR_PUBLIC : FHIR_BASE_URL,
-    hasToken: Boolean(FHIR_AUTH_TOKEN)
+app.all('/api/config', (req, res) => {
+  res.status(405).json({
+    error: 'La configuración FHIR solo se cambia con variables de entorno (FHIR_MODE, FHIR_BASE_URL, FHIR_AUTH_TOKEN).'
   });
 });
 
@@ -170,12 +255,17 @@ app.get('/api/ai/vault-status', (req, res) => {
 });
 
 app.post('/api/ai/consult', async (req, res) => {
-  const apiKey = String(req.headers['x-ai-key'] || '').trim();
-  const baseUrl = String(req.headers['x-ai-base-url'] || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-  const model = String(req.headers['x-ai-model'] || 'openai/gpt-4o').trim();
+  const apiKey = String(process.env.CLINICAL_AI_KEY || process.env.OPENROUTER_API_KEY || '').trim();
+  const model = String(process.env.CLINICAL_AI_MODEL || 'openai/gpt-4o').trim();
+  let baseUrl;
+  try {
+    baseUrl = resolveAiBaseUrl(process.env.CLINICAL_AI_BASE || 'https://openrouter.ai/api/v1');
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
 
   if (!apiKey) {
-    return res.status(400).json({ error: 'Falta la API key del modelo. Configúrala en Mi perfil.' });
+    return res.status(400).json({ error: 'Configura CLINICAL_AI_KEY en el entorno del servidor.' });
   }
 
   const diagnosis = req.body?.diagnosis;
@@ -264,6 +354,7 @@ app.post('/api/ai/consult', async (req, res) => {
 
     const llmResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
+      redirect: 'manual',
       headers: llmHeaders,
       body: JSON.stringify({
         model,
@@ -274,6 +365,10 @@ app.post('/api/ai/consult', async (req, res) => {
         ]
       })
     });
+
+    if (llmResponse.status >= 300 && llmResponse.status < 400) {
+      return res.status(502).json({ error: 'El modelo respondió con una redirección y no se siguió.' });
+    }
 
     const llmData = await llmResponse.json().catch(() => ({}));
     if (!llmResponse.ok) {
@@ -305,18 +400,62 @@ function parseFhirQuery(url) {
   return query;
 }
 
+function rejectNonCanonicalFhir(req, res) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok) {
+    res.status(400).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'invalid', diagnostics: 'URL de FHIR no válida' }]
+    });
+    return true;
+  }
+  if (parsed.nonCanonical) {
+    res.status(404).json({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'not-found', diagnostics: `${parsed.rawType} not found` }]
+    });
+    return true;
+  }
+  return false;
+}
+
+function canonicalFhirPath(req) {
+  const parsed = parseFhirTarget(req.path);
+  if (!parsed.ok || parsed.kind === 'base') return '';
+  if (parsed.kind === 'metadata') return 'metadata';
+  return [parsed.type, parsed.id, ...parsed.extra].filter(Boolean).join('/');
+}
+
+function sendLocalFhir(res, run) {
+  try {
+    return sendFhirResult(res, run());
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'FHIR store failure';
+    console.error('[FHIR] local store request failed:', detail);
+    if (res.headersSent) return undefined;
+    return res.status(500).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: 'No se pudo completar la operación FHIR local.'
+      }]
+    });
+  }
+}
+
 app.all('/fhir*', (req, res) => {
-  const fhirPath = req.path.replace(/^\/fhir\/?/, '');
-  const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
-  return sendFhirResult(res, result);
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  // req.method only. X-HTTP-Method-Override is not read.
+  return sendLocalFhir(res, () => localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body));
 });
 
 // FHIR Proxy Endpoint (local store or remote)
 app.all('/api/fhir/*', async (req, res) => {
-  const fhirPath = req.params[0] || '';
+  if (rejectNonCanonicalFhir(req, res)) return undefined;
+  const fhirPath = canonicalFhirPath(req);
   if (isLocalFhirMode()) {
-    const result = localFhir.handleFhirRequest(req.method, fhirPath, parseFhirQuery(req.url), req.body);
-    return sendFhirResult(res, result);
+    return sendLocalFhir(res, () => localFhir.handleFhirRequest(req.method, req.path, parseFhirQuery(req.url), req.body));
   }
 
   if (!FHIR_BASE_URL || !FHIR_AUTH_TOKEN) {
@@ -403,14 +542,47 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`🚀 IntegraMed FHIR Proxy Server running on http://localhost:${PORT}`);
-});
-
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`[FHIR Proxy] Port ${PORT} is already in use. Stop the old Node process and run npm run dev again.`);
+function assertProxySecrets() {
+  if (!isAcceptableSecret(process.env.SESSION_SECRET)) {
+    console.error('[FHIR Proxy] SESSION_SECRET must be set to a unique value of at least 32 characters. Generate one with: openssl rand -base64 48');
     process.exit(1);
   }
-  throw err;
-});
+  if (!isAcceptableSecret(process.env.FHIR_PROXY_SECRET)) {
+    console.error('[FHIR Proxy] FHIR_PROXY_SECRET must be set to a unique value of at least 32 characters. Generate one with: openssl rand -base64 48');
+    process.exit(1);
+  }
+}
+
+export { app };
+
+if (process.env.FHIR_PROXY_NO_LISTEN !== '1') {
+  if (PORT == null) {
+    console.error('[FHIR Proxy] FHIR_PROXY_PORT must be an integer from 1 to 65535.');
+    process.exit(1);
+  }
+  assertProxySecrets();
+  if (process.env.PORT) {
+    console.log(`[FHIR Proxy] PORT=${process.env.PORT} is ignored. Loopback proxy listens on ${PORT}. Next.js serves HTTP on port 3000.`);
+  }
+  if (isLocalFhirMode()) {
+    try {
+      assertFhirRootWritable(defaultFhirStorageRoot(DATA_ROOT));
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+    const ids = localFhir.store.listType('Practitioner').map((resource) => resource?.id).filter(Boolean);
+    logAccountsMissingFromStore(readAccountEntries(defaultAuthStorageRoot(PROJECT_ROOT)), ids);
+  }
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`IntegraMed FHIR Proxy listening on http://${HOST}:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[FHIR Proxy] Port ${PORT} is already in use. Stop the old Node process and run npm run dev again.`);
+      process.exit(1);
+    }
+    throw err;
+  });
+}

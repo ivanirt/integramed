@@ -291,7 +291,7 @@ const MODALITY_ALIASES = {
   acupuncture: ['acupuncture', 'acupuntura', 'mtc', 'tcm'],
   stem_cells: ['stem_cells', 'celulas_madre', 'regen_med'],
   homeopathy: ['homeopathy', 'homeopatia', 'boericke', 'homoeopathic', 'materia_medica'],
-  iridology: ['iridology', 'iridologia'],
+  iridology: ['iridology', 'iridologia', 'iris'],
   biodescodification: ['biodescodification', 'biodescodificacion', 'biodecoding', 'biodecodificacion'],
   ayurveda: ['ayurveda'],
   functional: ['functional', 'medicina_funcional', 'peptides', 'herbalismo', 'herbal']
@@ -300,11 +300,14 @@ const MODALITY_ALIASES = {
 function expandModalityAliases(modalities) {
   return (modalities || []).flatMap((mod) => {
     if (mod && typeof mod === 'object') {
-      return Array.isArray(mod.aliases) ? mod.aliases : [mod.id];
+      const id = normalizeTag(mod.id);
+      const fromTable = MODALITY_ALIASES[id] || [];
+      const explicit = Array.isArray(mod.aliases) ? mod.aliases : [];
+      return [id, ...fromTable, ...explicit];
     }
     const key = normalizeTag(mod);
     return MODALITY_ALIASES[key] || [key];
-  }).map((alias) => normalizeTag(alias));
+  }).map((alias) => normalizeTag(alias)).filter(Boolean);
 }
 
 function modalityMatches(tags, modalities) {

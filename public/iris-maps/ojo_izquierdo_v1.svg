@@ -1,0 +1,1194 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" version="1.1" id="svg_iris_oi_v1"
+   sodipodi:docname="ojo_izquierdo_v1.svg" inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+  <title>Mapa de iris - OJO IZQUIERDO (v1)</title>
+  <sodipodi:namedview id="namedview_oi_v1" pagecolor="#ffffff" bordercolor="#000000" borderopacity="0.25" inkscape:showpageshadow="2" inkscape:pageopacity="0.0" inkscape:pagecheckerboard="0" inkscape:deskcolor="#d1d1d1" inkscape:zoom="0.7" inkscape:cx="600" inkscape:cy="600" inkscape:current-layer="svg_iris_oi_v1" />
+  <defs id="defs_oi_v1">
+    <style id="style_oi_v1">
+      .ring { fill: none; stroke: #222; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .ring-dash { fill: none; stroke: #666; stroke-width: 1.5; stroke-dasharray: 8 6; stroke-linecap: butt; }
+      .pupil { fill: #000; stroke: #000; stroke-width: 1; }
+      .pupil-letter { font-family: Georgia, 'Times New Roman', serif; font-size: 90px; font-weight: 700; fill: #fff; text-anchor: middle; dominant-baseline: central; }
+      .sna-wave { fill: none; stroke: #111; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+      .trazo { fill: none; stroke: #111; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+      .zona { fill: #000; fill-opacity: 0; stroke: #777; stroke-width: 0.8; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+      .zona-inferida { fill: #000; fill-opacity: 0; stroke: #777; stroke-width: 0.8; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+      .minor-tick { fill: none; stroke: #666; stroke-width: 1.25; stroke-linecap: butt; vector-effect: non-scaling-stroke; }
+      .hour-tick { fill: none; stroke: #222; stroke-width: 2.3; stroke-linecap: butt; vector-effect: non-scaling-stroke; }
+      .hour-number { font-family: Arial, Helvetica, sans-serif; font-size: 28px; font-weight: 600; text-anchor: middle; dominant-baseline: central; fill: #444; }
+      .cardinal-number { font-family: Arial, Helvetica, sans-serif; font-size: 34px; font-weight: 800; text-anchor: middle; dominant-baseline: central; fill: #111; }
+      .lbl-organ { font-family: Arial, Helvetica, sans-serif; font-weight: 600; fill: #111; text-anchor: middle; dominant-baseline: central; }
+      .lbl-arc { font-family: Arial, Helvetica, sans-serif; font-weight: 700; fill: #333; text-anchor: middle; }
+      .lbl-outer { font-family: Arial, Helvetica, sans-serif; font-weight: 700; fill: #555; text-anchor: middle; }
+      .lbl-unverified { font-family: Arial, Helvetica, sans-serif; font-weight: 600; font-style: italic; fill: #777; text-anchor: middle; dominant-baseline: central; }
+      .lbl-title { font-family: Arial, Helvetica, sans-serif; font-weight: 800; font-size: 24px; fill: #111; }
+      .lbl-legend { font-family: Arial, Helvetica, sans-serif; font-weight: 600; font-size: 15px; fill: #333; }
+      .region { fill: #000; fill-opacity: 0; stroke: none; }
+      .region:hover { fill-opacity: 0.10; }
+      .frontera { fill: none; stroke: #111; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+      .frontera-inferida { fill: none; stroke: #666; stroke-width: 1.5; stroke-dasharray: 6 4; stroke-linecap: butt; stroke-linejoin: round; }
+      .lbl-outer.espejo { font-style: italic; fill: #777; }
+    </style>
+
+    <path id="arc_66_colon_transverso" d="M 479.573 467.432 A 179.1 179.1 0 0 1 650.125 428.057" fill="none" />
+    <path id="arc_67_colon_descendente" d="M 714.016 461.88 A 179.1 179.1 0 0 1 775.529 635.587" fill="none" />
+    <path id="arc_68_sigmoides" d="M 559.446 784.495 A 188.9 188.9 0 0 0 665.836 777.056" fill="none" />
+    <path id="arc_69_intestino_delgado" d="M 453.971 689.166 A 171.1 171.1 0 0 1 457.171 505.792" fill="none" />
+    <path id="arc_70_placas_de_peyer" d="M 405.314 588.938 A 195 195 0 0 1 443.751 483.332" fill="none" />
+    <path id="arc_71_estomago" d="M 549.567 489.187 A 121.75 121.75 0 0 1 650.433 489.187" fill="none" />
+    <path id="arc_72_piloro" d="M 468.453 570.565 A 134.8 134.8 0 0 0 470.827 638.54" fill="none" />
+    <path id="arc_73_sistema_nervioso_autonomo" d="M 388.11 532.441 A 222.4 222.4 0 0 0 456.108 769.578" fill="none" />
+    <path id="arc_74_sistema_nervioso_autonomo" d="M 593.258 380.453 A 219.65 219.65 0 0 1 767.666 458.105" fill="none" />
+    <path id="arc_75_mes" d="M 564.195 818.992 A 221.9 221.9 0 0 0 608.076 821.753" fill="none" />
+    <path id="arc_76_mes" d="M 450.158 449.888 A 212.1 212.1 0 0 1 484.322 422.222" fill="none" />
+    <path id="arc_77_cerebro_psicologico" d="M 330.241 117.958 A 552.39 552.39 0 0 1 575.252 48.165" fill="none" />
+    <path id="arc_78_cerebro_motriz" d="M 348.574 79.671 A 577.89 577.89 0 0 1 529.474 26.43" fill="none" />
+    <path id="arc_79_cerebro_fisiologico" d="M 618.169 50.911 A 549.39 549.39 0 0 1 863.871 118.127" fill="none" />
+    <path id="arc_80_cerebelo_sensorial" d="M 621.579 30.018 A 570.39 570.39 0 0 1 855.681 90.126" fill="none" />
+    <path id="arc_81_cara" d="M 199.672 232.563 A 543.39 543.39 0 0 1 238.188 194.58" fill="none" />
+    <path id="arc_82_garganta" d="M 69.47 497.241 A 540.39 540.39 0 0 1 100.521 393.742" fill="none" />
+    <path id="arc_83_espalda_alta" d="M 54.652 672.228 A 550.11 550.11 0 0 0 99.244 827.737" fill="none" />
+    <path id="arc_84_espalda_baja" d="M 156.97 928.63 A 551.61 551.61 0 0 0 271.37 1043.03" fill="none" />
+    <path id="arc_85_pelvis" d="M 418.728 1127.323 A 557.61 557.61 0 0 0 497.148 1148.042" fill="none" />
+    <path id="arc_86_abdomen_inferior" d="M 637.319 1154.856 A 556.11 556.11 0 0 0 845.109 1099.179" fill="none" />
+    <path id="arc_87_abdomen_superior" d="M 898.462 1063.89 A 551.61 551.61 0 0 0 1053.192 914.469" fill="none" />
+    <path id="arc_88_torax" d="M 1120.38 778.399 A 550.11 550.11 0 0 0 1138.333 713.219" fill="none" />
+    <path id="arc_89_pulmon" d="M 1109.789 425.308 A 538.89 538.89 0 0 1 1130.232 503.787" fill="none" />
+    <path id="arc_90_cuello" d="M 957.357 190.648 A 543.39 543.39 0 0 1 1014.301 248.394" fill="none" />
+    <path id="arc_91_sistema_circulatorio_y_linfatico" d="M 164.396 476.107 A 452.88 452.88 0 0 1 470.037 166.168" fill="none" />
+    <path id="arc_92_sistema_circulatorio_y_linfatico" d="M 471.469 1043.886 A 462.12 462.12 0 0 0 897.963 953.232" fill="none" />
+    <path id="arc_93_piel" d="M 923.561 242.689 A 482.04 482.04 0 0 1 960.68 280.199" fill="none" />
+    <path id="arc_94_piel" d="M 683.159 1083.338 A 490.44 490.44 0 0 0 735.495 1071.352" fill="none" />
+    <path id="arc_95_piel" d="M 237.097 282.725 A 482.04 482.04 0 0 1 273.953 244.957" fill="none" />
+  </defs>
+  <rect width="1200" height="1200" fill="#ffffff" id="fondo" />
+  <g
+     inkscape:groupmode="layer"
+     inkscape:label="120 marcas exteriores"
+     id="g186">
+    <line
+       x1="600"
+       y1="100"
+       x2="600"
+       y2="81"
+       class="hour-tick"
+       id="line67" />
+    <line
+       x1="626.168"
+       y1="100.685"
+       x2="626.796"
+       y2="88.702"
+       class="minor-tick"
+       id="line68" />
+    <line
+       x1="652.264"
+       y1="102.739"
+       x2="653.519"
+       y2="90.805"
+       class="minor-tick"
+       id="line69" />
+    <line
+       x1="678.217"
+       y1="106.156"
+       x2="680.094"
+       y2="94.304"
+       class="minor-tick"
+       id="line70" />
+    <line
+       x1="703.956"
+       y1="110.926"
+       x2="706.451"
+       y2="99.188"
+       class="minor-tick"
+       id="line71" />
+    <line
+       x1="729.41"
+       y1="117.037"
+       x2="732.515"
+       y2="105.446"
+       class="minor-tick"
+       id="line72" />
+    <line
+       x1="754.508"
+       y1="124.472"
+       x2="758.217"
+       y2="113.059"
+       class="minor-tick"
+       id="line73" />
+    <line
+       x1="779.184"
+       y1="133.21"
+       x2="783.484"
+       y2="122.007"
+       class="minor-tick"
+       id="line74" />
+    <line
+       x1="803.368"
+       y1="143.227"
+       x2="808.249"
+       y2="132.265"
+       class="minor-tick"
+       id="line75" />
+    <line
+       x1="826.995"
+       y1="154.497"
+       x2="832.443"
+       y2="143.805"
+       class="minor-tick"
+       id="line76" />
+    <line
+       x1="850"
+       y1="166.987"
+       x2="859.5"
+       y2="150.533"
+       class="hour-tick"
+       id="line77" />
+    <line
+       x1="872.32"
+       y1="180.665"
+       x2="878.855"
+       y2="170.601"
+       class="minor-tick"
+       id="line78" />
+    <line
+       x1="893.893"
+       y1="195.492"
+       x2="900.946"
+       y2="185.783"
+       class="minor-tick"
+       id="line79" />
+    <line
+       x1="914.66"
+       y1="211.427"
+       x2="922.212"
+       y2="202.101"
+       class="minor-tick"
+       id="line80" />
+    <line
+       x1="934.565"
+       y1="228.428"
+       x2="942.595"
+       y2="219.51"
+       class="minor-tick"
+       id="line81" />
+    <line
+       x1="953.553"
+       y1="246.447"
+       x2="962.039"
+       y2="237.961"
+       class="minor-tick"
+       id="line82" />
+    <line
+       x1="971.572"
+       y1="265.435"
+       x2="980.49"
+       y2="257.405"
+       class="minor-tick"
+       id="line83" />
+    <line
+       x1="988.573"
+       y1="285.34"
+       x2="997.899"
+       y2="277.788"
+       class="minor-tick"
+       id="line84" />
+    <line
+       x1="1004.508"
+       y1="306.107"
+       x2="1014.217"
+       y2="299.054"
+       class="minor-tick"
+       id="line85" />
+    <line
+       x1="1019.335"
+       y1="327.68"
+       x2="1029.399"
+       y2="321.145"
+       class="minor-tick"
+       id="line86" />
+    <line
+       x1="1033.013"
+       y1="350"
+       x2="1049.467"
+       y2="340.5"
+       class="hour-tick"
+       id="line87" />
+    <line
+       x1="1045.503"
+       y1="373.005"
+       x2="1056.195"
+       y2="367.557"
+       class="minor-tick"
+       id="line88" />
+    <line
+       x1="1056.773"
+       y1="396.632"
+       x2="1067.735"
+       y2="391.751"
+       class="minor-tick"
+       id="line89" />
+    <line
+       x1="1066.79"
+       y1="420.816"
+       x2="1077.993"
+       y2="416.516"
+       class="minor-tick"
+       id="line90" />
+    <line
+       x1="1075.528"
+       y1="445.492"
+       x2="1086.941"
+       y2="441.783"
+       class="minor-tick"
+       id="line91" />
+    <line
+       x1="1082.963"
+       y1="470.59"
+       x2="1094.554"
+       y2="467.485"
+       class="minor-tick"
+       id="line92" />
+    <line
+       x1="1089.074"
+       y1="496.044"
+       x2="1100.812"
+       y2="493.549"
+       class="minor-tick"
+       id="line93" />
+    <line
+       x1="1093.844"
+       y1="521.783"
+       x2="1105.696"
+       y2="519.906"
+       class="minor-tick"
+       id="line94" />
+    <line
+       x1="1097.261"
+       y1="547.736"
+       x2="1109.195"
+       y2="546.481"
+       class="minor-tick"
+       id="line95" />
+    <line
+       x1="1099.315"
+       y1="573.832"
+       x2="1111.298"
+       y2="573.204"
+       class="minor-tick"
+       id="line96" />
+    <line
+       x1="1100"
+       y1="600"
+       x2="1119"
+       y2="600"
+       class="hour-tick"
+       id="line97" />
+    <line
+       x1="1099.315"
+       y1="626.168"
+       x2="1111.298"
+       y2="626.796"
+       class="minor-tick"
+       id="line98" />
+    <line
+       x1="1097.261"
+       y1="652.264"
+       x2="1109.195"
+       y2="653.519"
+       class="minor-tick"
+       id="line99" />
+    <line
+       x1="1093.844"
+       y1="678.217"
+       x2="1105.696"
+       y2="680.094"
+       class="minor-tick"
+       id="line100" />
+    <line
+       x1="1089.074"
+       y1="703.956"
+       x2="1100.812"
+       y2="706.451"
+       class="minor-tick"
+       id="line101" />
+    <line
+       x1="1082.963"
+       y1="729.41"
+       x2="1094.554"
+       y2="732.515"
+       class="minor-tick"
+       id="line102" />
+    <line
+       x1="1075.528"
+       y1="754.508"
+       x2="1086.941"
+       y2="758.217"
+       class="minor-tick"
+       id="line103" />
+    <line
+       x1="1066.79"
+       y1="779.184"
+       x2="1077.993"
+       y2="783.484"
+       class="minor-tick"
+       id="line104" />
+    <line
+       x1="1056.773"
+       y1="803.368"
+       x2="1067.735"
+       y2="808.249"
+       class="minor-tick"
+       id="line105" />
+    <line
+       x1="1045.503"
+       y1="826.995"
+       x2="1056.195"
+       y2="832.443"
+       class="minor-tick"
+       id="line106" />
+    <line
+       x1="1033.013"
+       y1="850"
+       x2="1049.467"
+       y2="859.5"
+       class="hour-tick"
+       id="line107" />
+    <line
+       x1="1019.335"
+       y1="872.32"
+       x2="1029.399"
+       y2="878.855"
+       class="minor-tick"
+       id="line108" />
+    <line
+       x1="1004.508"
+       y1="893.893"
+       x2="1014.217"
+       y2="900.946"
+       class="minor-tick"
+       id="line109" />
+    <line
+       x1="988.573"
+       y1="914.66"
+       x2="997.899"
+       y2="922.212"
+       class="minor-tick"
+       id="line110" />
+    <line
+       x1="971.572"
+       y1="934.565"
+       x2="980.49"
+       y2="942.595"
+       class="minor-tick"
+       id="line111" />
+    <line
+       x1="953.553"
+       y1="953.553"
+       x2="962.039"
+       y2="962.039"
+       class="minor-tick"
+       id="line112" />
+    <line
+       x1="934.565"
+       y1="971.572"
+       x2="942.595"
+       y2="980.49"
+       class="minor-tick"
+       id="line113" />
+    <line
+       x1="914.66"
+       y1="988.573"
+       x2="922.212"
+       y2="997.899"
+       class="minor-tick"
+       id="line114" />
+    <line
+       x1="893.893"
+       y1="1004.508"
+       x2="900.946"
+       y2="1014.217"
+       class="minor-tick"
+       id="line115" />
+    <line
+       x1="872.32"
+       y1="1019.335"
+       x2="878.855"
+       y2="1029.399"
+       class="minor-tick"
+       id="line116" />
+    <line
+       x1="850"
+       y1="1033.013"
+       x2="859.5"
+       y2="1049.467"
+       class="hour-tick"
+       id="line117" />
+    <line
+       x1="826.995"
+       y1="1045.503"
+       x2="832.443"
+       y2="1056.195"
+       class="minor-tick"
+       id="line118" />
+    <line
+       x1="803.368"
+       y1="1056.773"
+       x2="808.249"
+       y2="1067.735"
+       class="minor-tick"
+       id="line119" />
+    <line
+       x1="779.184"
+       y1="1066.79"
+       x2="783.484"
+       y2="1077.993"
+       class="minor-tick"
+       id="line120" />
+    <line
+       x1="754.508"
+       y1="1075.528"
+       x2="758.217"
+       y2="1086.941"
+       class="minor-tick"
+       id="line121" />
+    <line
+       x1="729.41"
+       y1="1082.963"
+       x2="732.515"
+       y2="1094.554"
+       class="minor-tick"
+       id="line122" />
+    <line
+       x1="703.956"
+       y1="1089.074"
+       x2="706.451"
+       y2="1100.812"
+       class="minor-tick"
+       id="line123" />
+    <line
+       x1="678.217"
+       y1="1093.844"
+       x2="680.094"
+       y2="1105.696"
+       class="minor-tick"
+       id="line124" />
+    <line
+       x1="652.264"
+       y1="1097.261"
+       x2="653.519"
+       y2="1109.195"
+       class="minor-tick"
+       id="line125" />
+    <line
+       x1="626.168"
+       y1="1099.315"
+       x2="626.796"
+       y2="1111.298"
+       class="minor-tick"
+       id="line126" />
+    <line
+       x1="600"
+       y1="1100"
+       x2="600"
+       y2="1119"
+       class="hour-tick"
+       id="line127" />
+    <line
+       x1="573.832"
+       y1="1099.315"
+       x2="573.204"
+       y2="1111.298"
+       class="minor-tick"
+       id="line128" />
+    <line
+       x1="547.736"
+       y1="1097.261"
+       x2="546.481"
+       y2="1109.195"
+       class="minor-tick"
+       id="line129" />
+    <line
+       x1="521.783"
+       y1="1093.844"
+       x2="519.906"
+       y2="1105.696"
+       class="minor-tick"
+       id="line130" />
+    <line
+       x1="496.044"
+       y1="1089.074"
+       x2="493.549"
+       y2="1100.812"
+       class="minor-tick"
+       id="line131" />
+    <line
+       x1="470.59"
+       y1="1082.963"
+       x2="467.485"
+       y2="1094.554"
+       class="minor-tick"
+       id="line132" />
+    <line
+       x1="445.492"
+       y1="1075.528"
+       x2="441.783"
+       y2="1086.941"
+       class="minor-tick"
+       id="line133" />
+    <line
+       x1="420.816"
+       y1="1066.79"
+       x2="416.516"
+       y2="1077.993"
+       class="minor-tick"
+       id="line134" />
+    <line
+       x1="396.632"
+       y1="1056.773"
+       x2="391.751"
+       y2="1067.735"
+       class="minor-tick"
+       id="line135" />
+    <line
+       x1="373.005"
+       y1="1045.503"
+       x2="367.557"
+       y2="1056.195"
+       class="minor-tick"
+       id="line136" />
+    <line
+       x1="350"
+       y1="1033.013"
+       x2="340.5"
+       y2="1049.467"
+       class="hour-tick"
+       id="line137" />
+    <line
+       x1="327.68"
+       y1="1019.335"
+       x2="321.145"
+       y2="1029.399"
+       class="minor-tick"
+       id="line138" />
+    <line
+       x1="306.107"
+       y1="1004.508"
+       x2="299.054"
+       y2="1014.217"
+       class="minor-tick"
+       id="line139" />
+    <line
+       x1="285.34"
+       y1="988.573"
+       x2="277.788"
+       y2="997.899"
+       class="minor-tick"
+       id="line140" />
+    <line
+       x1="265.435"
+       y1="971.572"
+       x2="257.405"
+       y2="980.49"
+       class="minor-tick"
+       id="line141" />
+    <line
+       x1="246.447"
+       y1="953.553"
+       x2="237.961"
+       y2="962.039"
+       class="minor-tick"
+       id="line142" />
+    <line
+       x1="228.428"
+       y1="934.565"
+       x2="219.51"
+       y2="942.595"
+       class="minor-tick"
+       id="line143" />
+    <line
+       x1="211.427"
+       y1="914.66"
+       x2="202.101"
+       y2="922.212"
+       class="minor-tick"
+       id="line144" />
+    <line
+       x1="195.492"
+       y1="893.893"
+       x2="185.783"
+       y2="900.946"
+       class="minor-tick"
+       id="line145" />
+    <line
+       x1="180.665"
+       y1="872.32"
+       x2="170.601"
+       y2="878.855"
+       class="minor-tick"
+       id="line146" />
+    <line
+       x1="166.987"
+       y1="850"
+       x2="150.533"
+       y2="859.5"
+       class="hour-tick"
+       id="line147" />
+    <line
+       x1="154.497"
+       y1="826.995"
+       x2="143.805"
+       y2="832.443"
+       class="minor-tick"
+       id="line148" />
+    <line
+       x1="143.227"
+       y1="803.368"
+       x2="132.265"
+       y2="808.249"
+       class="minor-tick"
+       id="line149" />
+    <line
+       x1="133.21"
+       y1="779.184"
+       x2="122.007"
+       y2="783.484"
+       class="minor-tick"
+       id="line150" />
+    <line
+       x1="124.472"
+       y1="754.508"
+       x2="113.059"
+       y2="758.217"
+       class="minor-tick"
+       id="line151" />
+    <line
+       x1="117.037"
+       y1="729.41"
+       x2="105.446"
+       y2="732.515"
+       class="minor-tick"
+       id="line152" />
+    <line
+       x1="110.926"
+       y1="703.956"
+       x2="99.188"
+       y2="706.451"
+       class="minor-tick"
+       id="line153" />
+    <line
+       x1="106.156"
+       y1="678.217"
+       x2="94.304"
+       y2="680.094"
+       class="minor-tick"
+       id="line154" />
+    <line
+       x1="102.739"
+       y1="652.264"
+       x2="90.805"
+       y2="653.519"
+       class="minor-tick"
+       id="line155" />
+    <line
+       x1="100.685"
+       y1="626.168"
+       x2="88.702"
+       y2="626.796"
+       class="minor-tick"
+       id="line156" />
+    <line
+       x1="100"
+       y1="600"
+       x2="81"
+       y2="600"
+       class="hour-tick"
+       id="line157" />
+    <line
+       x1="100.685"
+       y1="573.832"
+       x2="88.702"
+       y2="573.204"
+       class="minor-tick"
+       id="line158" />
+    <line
+       x1="102.739"
+       y1="547.736"
+       x2="90.805"
+       y2="546.481"
+       class="minor-tick"
+       id="line159" />
+    <line
+       x1="106.156"
+       y1="521.783"
+       x2="94.304"
+       y2="519.906"
+       class="minor-tick"
+       id="line160" />
+    <line
+       x1="110.926"
+       y1="496.044"
+       x2="99.188"
+       y2="493.549"
+       class="minor-tick"
+       id="line161" />
+    <line
+       x1="117.037"
+       y1="470.59"
+       x2="105.446"
+       y2="467.485"
+       class="minor-tick"
+       id="line162" />
+    <line
+       x1="124.472"
+       y1="445.492"
+       x2="113.059"
+       y2="441.783"
+       class="minor-tick"
+       id="line163" />
+    <line
+       x1="133.21"
+       y1="420.816"
+       x2="122.007"
+       y2="416.516"
+       class="minor-tick"
+       id="line164" />
+    <line
+       x1="143.227"
+       y1="396.632"
+       x2="132.265"
+       y2="391.751"
+       class="minor-tick"
+       id="line165" />
+    <line
+       x1="154.497"
+       y1="373.005"
+       x2="143.805"
+       y2="367.557"
+       class="minor-tick"
+       id="line166" />
+    <line
+       x1="166.987"
+       y1="350"
+       x2="150.533"
+       y2="340.5"
+       class="hour-tick"
+       id="line167" />
+    <line
+       x1="180.665"
+       y1="327.68"
+       x2="170.601"
+       y2="321.145"
+       class="minor-tick"
+       id="line168" />
+    <line
+       x1="195.492"
+       y1="306.107"
+       x2="185.783"
+       y2="299.054"
+       class="minor-tick"
+       id="line169" />
+    <line
+       x1="211.427"
+       y1="285.34"
+       x2="202.101"
+       y2="277.788"
+       class="minor-tick"
+       id="line170" />
+    <line
+       x1="228.428"
+       y1="265.435"
+       x2="219.51"
+       y2="257.405"
+       class="minor-tick"
+       id="line171" />
+    <line
+       x1="246.447"
+       y1="246.447"
+       x2="237.961"
+       y2="237.961"
+       class="minor-tick"
+       id="line172" />
+    <line
+       x1="265.435"
+       y1="228.428"
+       x2="257.405"
+       y2="219.51"
+       class="minor-tick"
+       id="line173" />
+    <line
+       x1="285.34"
+       y1="211.427"
+       x2="277.788"
+       y2="202.101"
+       class="minor-tick"
+       id="line174" />
+    <line
+       x1="306.107"
+       y1="195.492"
+       x2="299.054"
+       y2="185.783"
+       class="minor-tick"
+       id="line175" />
+    <line
+       x1="327.68"
+       y1="180.665"
+       x2="321.145"
+       y2="170.601"
+       class="minor-tick"
+       id="line176" />
+    <line
+       x1="350"
+       y1="166.987"
+       x2="340.5"
+       y2="150.533"
+       class="hour-tick"
+       id="line177" />
+    <line
+       x1="373.005"
+       y1="154.497"
+       x2="367.557"
+       y2="143.805"
+       class="minor-tick"
+       id="line178" />
+    <line
+       x1="396.632"
+       y1="143.227"
+       x2="391.751"
+       y2="132.265"
+       class="minor-tick"
+       id="line179" />
+    <line
+       x1="420.816"
+       y1="133.21"
+       x2="416.516"
+       y2="122.007"
+       class="minor-tick"
+       id="line180" />
+    <line
+       x1="445.492"
+       y1="124.472"
+       x2="441.783"
+       y2="113.059"
+       class="minor-tick"
+       id="line181" />
+    <line
+       x1="470.59"
+       y1="117.037"
+       x2="467.485"
+       y2="105.446"
+       class="minor-tick"
+       id="line182" />
+    <line
+       x1="496.044"
+       y1="110.926"
+       x2="493.549"
+       y2="99.188"
+       class="minor-tick"
+       id="line183" />
+    <line
+       x1="521.783"
+       y1="106.156"
+       x2="519.906"
+       y2="94.304"
+       class="minor-tick"
+       id="line184" />
+    <line
+       x1="547.736"
+       y1="102.739"
+       x2="546.481"
+       y2="90.805"
+       class="minor-tick"
+       id="line185" />
+    <line
+       x1="573.832"
+       y1="100.685"
+       x2="573.204"
+       y2="88.702"
+       class="minor-tick"
+       id="line186" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Aros del grafico (radios medidos)" id="g_aros">
+    <path d="M 600 440.6 A 159.4 159.4 0 1 1 600 759.4 A 159.4 159.4 0 1 1 600 440.6 Z" class="ring" inkscape:label="Borde externo zona estomago (r=159.4)" id="aro_159_4" />
+    <path d="M 600 429.3 A 170.7 170.7 0 1 1 600 770.7 A 170.7 170.7 0 1 1 600 429.3 Z" class="ring" inkscape:label="Aro pupilar (r=170.7)" id="aro_170_7" />
+    <path d="M 600 372.2 A 227.8 227.8 0 1 1 600 827.8 A 227.8 227.8 0 1 1 600 372.2 Z" class="ring" inkscape:label="Limite zona intestinal / organos internos (r=227.8)" id="aro_227_8" />
+    <path d="M 600 298 A 302 302 0 1 1 600 902 A 302 302 0 1 1 600 298 Z" class="ring" inkscape:label="Circulo liso inicio zona de organos (r=302)" id="aro_302" />
+    <path d="M 600 220.3 A 379.7 379.7 0 1 1 600 979.7 A 379.7 379.7 0 1 1 600 220.3 Z" class="ring-dash" inkscape:label="Division interna de organos (r=379.7, discontinua en el grafico)" id="aro_379_7" />
+    <path d="M 600 155.6 A 444.4 444.4 0 1 1 600 1044.4 A 444.4 444.4 0 1 1 600 155.6 Z" class="ring" inkscape:label="Limite zona de organos / circulatorio-linfatico (r=444.4)" id="aro_444_4" />
+    <path d="M 600 126.6 A 473.4 473.4 0 1 1 600 1073.4 A 473.4 473.4 0 1 1 600 126.6 Z" class="ring" inkscape:label="Limite circulatorio-linfatico / PIEL (r=473.4)" id="aro_473_4" />
+    <path d="M 600 100 A 500 500 0 1 1 600 1100 A 500 500 0 1 1 600 100 Z" class="ring" inkscape:label="Borde exterior (r=500)" id="aro_500" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Pupila (disco r=100, letra I)" id="g_pupila">
+    <circle cx="600" cy="600" r="100" class="pupil" id="pupila" />
+    <text x="600" y="604" class="pupil-letter" id="pupila_I">I</text>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="SNA - Sistema Nervioso Autonomo (borde ondulado)" id="g_sna">
+    <path d="M 705.941 408.877 C 709.176 409.029, 712.019 411.209, 714.688 412.845 C 735.768 425.763, 724.303 438.974, 740.326 454.689 C 743.233 457.54, 747.05 458.531, 749.797 461.529 C 752.981 465.003, 753.045 469.908, 755.858 473.789 C 759.228 478.438, 764.529 481.171, 767.337 486.065 C 770.113 490.905, 771.112 496.612, 774.086 501.507 C 776.81 505.989, 783.027 505.833, 785.027 510.754 C 786.971 515.537, 784.507 522.99, 787.351 529.952 C 789.195 534.466, 794.4 536.487, 795.79 541.074 C 797.563 546.928, 793.293 554.01, 795.239 561.165 C 796.65 566.356, 802.652 568.844, 803.325 574.134 C 804.074 580.014, 798.893 584.686, 800.533 592.997 C 801.466 597.72, 806.605 601.553, 806.337 606.304 C 805.902 614.011, 796.473 620.593, 795.808 630.138 C 795.195 638.936, 800.975 651.904, 800.357 655.564 C 799.63 659.867, 788.705 665.581, 785.649 670.336 C 778.595 681.312, 784.061 688.447, 780.767 696.116 C 778.031 702.485, 771.748 700.032, 769.416 712.134 C 768.538 716.694, 766.957 739.715, 764.055 740.116 C 757.819 740.978, 739.743 731.042, 735.494 734.317 C 732.853 736.351, 733.391 741.86, 731.32 744.572 C 726.884 750.381, 716.119 753.498, 713.691 760.869 C 712.199 765.398, 715.823 775.935, 711.925 779.117 C 706.931 783.193, 696.198 777.735, 690.193 778.939 C 680.354 780.912, 680.208 788.281, 674.38 791.267 C 669.429 793.802, 662.147 789.411, 656.568 790.971 C 650.922 792.549, 647.193 799.797, 641.691 800.439 C 636.627 801.03, 632.316 796.096, 626.869 797.432 C 622.249 798.565, 618.048 803.877, 613.357 803.794 C 606.632 803.675, 601.393 797.605, 593.088 797.929 C 587.515 798.147, 583.911 804.821, 578.53 804.272 C 573.596 803.769, 570.567 797.666, 566.432 795.354 C 562.203 792.989, 557.186 791.608, 552.453 790.701 C 546.277 789.518, 532.753 797.083, 530.553 796.112 C 526.854 794.479, 527.635 783.545, 521.643 780.208 C 515.929 777.026, 508.181 775.384, 503.405 770.731 C 501.397 768.776, 500.102 761.904, 498.211 761.327 C 495.257 760.424, 491.249 761.621, 488.134 761.255 C 485.077 760.895, 482.368 759.385, 479.477 758.495 C 465.854 754.304, 470.82 758.013, 459.92 747.614 C 453.57 741.555, 448.964 734.426, 443.135 728.164 C 438.213 722.875, 432.329 717.723, 428.573 711.326 C 427.191 708.972, 426.931 706.174, 425.505 703.813 C 423.969 701.269, 421.048 700.475, 419.452 698.03 C 405.298 676.347, 402.712 657.179, 397.11 633.043 C 394.262 620.777, 389.553 593.557, 395.961 582.149 C 401.188 572.842, 398.662 560.977, 400.661 550.299 C 401.357 546.579, 403.988 543.953, 404.802 540.322 C 405.614 536.697, 404.296 533.414, 404.868 529.94 C 406.641 519.17, 416.808 502.816, 422.566 493.387 C 425.11 489.222, 427.271 484.945, 429.674 480.737 C 432.037 476.6, 435.75 473.105, 438.742 469.416 C 447.434 458.7, 473.602 432.485, 484.953 426.184 C 489.793 423.497, 494.93 426.204, 500.038 423.318 C 502.692 421.818, 506.344 420.702, 508.625 418.716 C 513.86 414.161, 517.234 404.589, 526.331 405.554 C 529.167 405.855, 531.484 408.224, 534.228 408.985 C 542.479 411.273, 544.236 403.214, 550.422 401.153 C 551.016 400.955, 570.179 397.767, 570.68 397.787 C 574.307 397.93, 576.82 399.914, 580.685 399.407 C 584.206 398.945, 586.528 396.345, 590.213 396.256 C 593.851 396.169, 596.393 398.865, 600 398.982 C 603.992 399.111, 606.893 397.074, 610.646 396.867 C 616.602 396.538, 622.014 400.08, 628.137 399.795 C 631.098 399.658, 633.374 397.563, 636.462 398.363 C 641.655 399.709, 644.773 405.576, 652.623 406.983 C 656.761 407.724, 660.181 404.158, 664.32 404.943 C 670.259 406.071, 672.799 412.334, 679.256 413.284 C 688.811 414.691, 696.8 408.45, 705.941 408.877 Z" class="sna-wave" id="sna_wave" inkscape:label="Borde ondulado SNA (una curva Bezier cerrada)" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Regiones (particion plana: un poligono cerrado por organo)" id="g_regiones">
+      <g inkscape:label="PILORO" id="reg_01_piloro" data-organ="PILORO" data-region="1" data-kind="organ" data-angle-start="247.1" data-angle-end="282.6" data-r-min="119" data-r-max="146"><title>PILORO (8.24-9.42 h)</title><path d="M 462 574 L 462 649 L 484 649 L 484 574 L 462 574 Z" class="region" fill-rule="evenodd" id="reg_01_piloro_p" /></g>
+      <g inkscape:label="ESTOMAGO" id="reg_02_estomago" data-organ="ESTOMAGO" data-region="2" data-kind="organ" data-angle-start="293.0" data-angle-end="292.0" data-r-min="159" data-r-max="159"><title>ESTOMAGO (9.77-9.73 h)</title><path d="M 600 759.4 A 159.4 159.4 0 0 0 600 440.6 A 159.4 159.4 0 0 0 600 759.4 Z M 462 574 L 484 574 L 484 649 L 462 649 L 462 574 Z M 600 500 A 100 100 0 0 1 600 700 A 100 100 0 0 1 600 500 Z" class="region" fill-rule="evenodd" id="reg_02_estomago_p" /></g>
+      <g inkscape:label="BORDE PUPILAR (anillo del estomago)" id="reg_03_borde_pupilar_anillo_del_estomago" data-organ="BORDE PUPILAR (anillo del estomago)" data-region="3" data-kind="ring" data-angle-start="0.0" data-angle-end="360.0" data-r-min="171" data-r-max="171"><title>BORDE PUPILAR (anillo del estomago) (anillo)</title><path d="M 682.757 450.702 A 170.7 170.7 0 0 0 600 429.3 A 170.7 170.7 0 0 0 467.341 492.575 A 170.7 170.7 0 0 0 482.498 723.821 A 170.7 170.7 0 0 0 742.344 694.216 A 170.7 170.7 0 0 0 682.757 450.702 Z M 600 440.6 A 159.4 159.4 0 0 1 600 759.4 A 159.4 159.4 0 0 1 600 440.6 Z" class="region" fill-rule="evenodd" id="reg_03_borde_pupilar_anillo_del_estomago_p" /></g>
+      <g inkscape:label="COLON DESCENDENTE" id="reg_04_colon_descendente" data-organ="COLON DESCENDENTE" data-region="4" data-kind="organ" data-angle-start="29.0" data-angle-end="123.5" data-r-min="171" data-r-max="220"><title>COLON DESCENDENTE (0.97-4.12 h)</title><path d="M 769.416 712.134 C 771.748 700.032, 778.031 702.485, 780.767 696.116 C 784.061 688.447, 778.595 681.312, 785.649 670.336 C 788.705 665.581, 799.63 659.867, 800.357 655.564 C 800.975 651.904, 795.195 638.936, 795.808 630.138 C 796.473 620.593, 805.902 614.011, 806.337 606.304 C 806.605 601.553, 801.466 597.72, 800.533 592.997 C 798.893 584.686, 804.074 580.014, 803.325 574.134 C 802.652 568.844, 796.65 566.356, 795.239 561.165 C 793.293 554.01, 797.563 546.928, 795.79 541.074 C 794.4 536.487, 789.195 534.466, 787.351 529.952 C 784.507 522.99, 786.971 515.537, 785.027 510.754 C 783.027 505.833, 776.81 505.989, 774.086 501.507 C 771.112 496.612, 770.113 490.905, 767.337 486.065 C 764.529 481.171, 759.228 478.438, 755.858 473.789 C 753.045 469.908, 752.981 465.003, 749.797 461.529 C 747.05 458.531, 743.233 457.54, 740.326 454.689 C 724.303 438.974, 735.768 425.763, 714.688 412.845 C 712.019 411.209, 709.176 409.029, 705.941 408.877 L 682.757 450.702 A 170.7 170.7 0 0 1 742.344 694.216 L 769.416 712.134 Z" class="region" fill-rule="evenodd" id="reg_04_colon_descendente_p" /></g>
+      <g inkscape:label="SIGMOIDES" id="reg_05_sigmoides" data-organ="SIGMOIDES" data-region="5" data-kind="organ" data-angle-start="123.5" data-angle-end="223.5" data-r-min="171" data-r-max="216"><title>SIGMOIDES (4.12-7.45 h)</title><path d="M 656.568 790.971 C 662.147 789.411, 669.429 793.802, 674.38 791.267 C 680.208 788.281, 680.354 780.912, 690.193 778.939 C 696.198 777.735, 706.931 783.193, 711.925 779.117 C 715.823 775.935, 712.199 765.398, 713.691 760.869 C 716.119 753.498, 726.884 750.381, 731.32 744.572 C 733.391 741.86, 732.853 736.351, 735.494 734.317 C 739.743 731.042, 757.819 740.978, 764.055 740.116 C 766.957 739.715, 768.538 716.694, 769.416 712.134 L 742.344 694.216 A 170.7 170.7 0 0 1 482.498 723.821 L 459.92 747.614 C 470.82 758.013, 465.854 754.304, 479.477 758.495 C 482.368 759.385, 485.077 760.895, 488.134 761.255 C 491.249 761.621, 495.257 760.424, 498.211 761.327 C 500.102 761.904, 501.397 768.776, 503.405 770.731 C 508.181 775.384, 515.929 777.026, 521.643 780.208 C 527.635 783.545, 526.854 794.479, 530.553 796.112 C 532.753 797.083, 546.277 789.518, 552.453 790.701 C 557.186 791.608, 562.203 792.989, 566.432 795.354 C 570.567 797.666, 573.596 803.769, 578.53 804.272 C 583.911 804.821, 587.515 798.147, 593.088 797.929 C 601.393 797.605, 606.632 803.675, 613.357 803.794 C 618.048 803.877, 622.249 798.565, 626.869 797.432 C 632.316 796.096, 636.627 801.03, 641.691 800.439 C 647.193 799.797, 650.922 792.549, 656.568 790.971 Z" class="region" fill-rule="evenodd" id="reg_05_sigmoides_p" /></g>
+      <g inkscape:label="INTESTINO DELGADO" id="reg_06_intestino_delgado" data-organ="INTESTINO DELGADO" data-region="6" data-kind="organ" data-angle-start="223.5" data-angle-end="309.0" data-r-min="171" data-r-max="208"><title>INTESTINO DELGADO (7.45-10.30 h)</title><path d="M 395.961 582.149 C 389.553 593.557, 394.262 620.777, 397.11 633.043 C 402.712 657.179, 405.298 676.347, 419.452 698.03 C 421.048 700.475, 423.969 701.269, 425.505 703.813 C 426.931 706.174, 427.191 708.972, 428.573 711.326 C 432.329 717.723, 438.213 722.875, 443.135 728.164 C 448.964 734.426, 453.57 741.555, 459.92 747.614 L 482.498 723.821 A 170.7 170.7 0 0 1 467.341 492.575 L 438.742 469.416 C 435.75 473.105, 432.037 476.6, 429.674 480.737 L 445.999 492.168 A 188 188 0 0 0 412.715 583.615 L 395.961 582.149 Z" class="region" fill-rule="evenodd" id="reg_06_intestino_delgado_p" /></g>
+      <g inkscape:label="PLACAS DE PEYER" id="reg_07_placas_de_peyer" data-organ="PLACAS DE PEYER" data-region="7" data-kind="organ" data-angle-start="275.0" data-angle-end="305.0" data-r-min="188" data-r-max="208"><title>PLACAS DE PEYER (9.17-10.17 h)</title><path d="M 422.566 493.387 C 416.808 502.816, 406.641 519.17, 404.868 529.94 C 404.296 533.414, 405.614 536.697, 404.802 540.322 C 403.988 543.953, 401.357 546.579, 400.661 550.299 C 398.662 560.977, 401.188 572.842, 395.961 582.149 L 412.715 583.615 A 188 188 0 0 1 445.999 492.168 L 429.674 480.737 C 427.271 484.945, 425.11 489.222, 422.566 493.387 Z" class="region" fill-rule="evenodd" id="reg_07_placas_de_peyer_p" /></g>
+      <g inkscape:label="COLON TRANSVERSO" id="reg_08_colon_transverso" data-organ="COLON TRANSVERSO" data-region="8" data-kind="organ" data-angle-start="309.0" data-angle-end="29.0" data-r-min="171" data-r-max="219"><title>COLON TRANSVERSO (10.30-0.97 h)</title><path d="M 534.228 408.985 C 531.484 408.224, 529.167 405.855, 526.331 405.554 C 517.234 404.589, 513.86 414.161, 508.625 418.716 C 506.344 420.702, 502.692 421.818, 500.038 423.318 C 494.93 426.204, 489.793 423.497, 484.953 426.184 C 473.602 432.485, 447.434 458.7, 438.742 469.416 L 467.341 492.575 A 170.7 170.7 0 0 1 600 429.3 A 170.7 170.7 0 0 1 682.757 450.702 L 705.941 408.877 C 696.8 408.45, 688.811 414.691, 679.256 413.284 C 672.799 412.334, 670.259 406.071, 664.32 404.943 C 660.181 404.158, 656.761 407.724, 652.623 406.983 C 644.773 405.576, 641.655 399.709, 636.462 398.363 C 633.374 397.563, 631.098 399.658, 628.137 399.795 C 622.014 400.08, 616.602 396.538, 610.646 396.867 C 606.893 397.074, 603.992 399.111, 600 398.982 C 596.393 398.865, 593.851 396.169, 590.213 396.256 C 586.528 396.345, 584.206 398.945, 580.685 399.407 C 576.82 399.914, 574.307 397.93, 570.68 397.787 C 570.179 397.767, 551.016 400.955, 550.422 401.153 C 544.236 403.214, 542.479 411.273, 534.228 408.985 Z" class="region" fill-rule="evenodd" id="reg_08_colon_transverso_p" /></g>
+      <g inkscape:label="MES" id="reg_09_mes" data-organ="MES" data-region="9" data-kind="band" data-angle-start="163.5" data-angle-end="203.5" data-r-min="196" data-r-max="228"><title>MES (5.45-6.78 h)</title><path d="M 656.568 790.971 C 650.922 792.549, 647.193 799.797, 641.691 800.439 C 636.627 801.03, 632.316 796.096, 626.869 797.432 C 622.249 798.565, 618.048 803.877, 613.357 803.794 C 606.632 803.675, 601.393 797.605, 593.088 797.929 C 587.515 798.147, 583.911 804.821, 578.53 804.272 C 573.596 803.769, 570.567 797.666, 566.432 795.354 C 562.203 792.989, 557.186 791.608, 552.453 790.701 C 546.277 789.518, 532.753 797.083, 530.553 796.112 C 526.854 794.479, 527.635 783.545, 521.643 780.208 L 509.165 808.906 A 227.8 227.8 0 0 0 516.881 812.095 A 227.8 227.8 0 0 0 537.756 819.131 A 227.8 227.8 0 0 0 566.373 825.304 A 227.8 227.8 0 0 0 619.854 826.933 A 227.8 227.8 0 0 0 643.466 823.615 A 227.8 227.8 0 0 0 664.699 818.419 L 656.568 790.971 Z" class="region" fill-rule="evenodd" id="reg_09_mes_p" /></g>
+      <g inkscape:label="SISTEMA NERVIOSO AUTONOMO" id="reg_10_sistema_nervioso_autonomo" data-organ="SISTEMA NERVIOSO AUTONOMO" data-region="10" data-kind="band" data-angle-start="203.5" data-angle-end="301.0" data-r-min="191" data-r-max="228"><title>SISTEMA NERVIOSO AUTONOMO (6.78-10.03 h)</title><path d="M 521.643 780.208 C 515.929 777.026, 508.181 775.384, 503.405 770.731 C 501.397 768.776, 500.102 761.904, 498.211 761.327 C 495.257 760.424, 491.249 761.621, 488.134 761.255 C 485.077 760.895, 482.368 759.385, 479.477 758.495 C 465.854 754.304, 470.82 758.013, 459.92 747.614 C 453.57 741.555, 448.964 734.426, 443.135 728.164 C 438.213 722.875, 432.329 717.723, 428.573 711.326 C 427.191 708.972, 426.931 706.174, 425.505 703.813 C 423.969 701.269, 421.048 700.475, 419.452 698.03 C 405.298 676.347, 402.712 657.179, 397.11 633.043 C 394.262 620.777, 389.553 593.557, 395.961 582.149 C 401.188 572.842, 398.662 560.977, 400.661 550.299 C 401.357 546.579, 403.988 543.953, 404.802 540.322 C 405.614 536.697, 404.296 533.414, 404.868 529.94 C 406.641 519.17, 416.808 502.816, 422.566 493.387 L 404.737 482.674 A 227.8 227.8 0 0 0 380.807 537.974 A 227.8 227.8 0 0 0 382.266 666.969 A 227.8 227.8 0 0 0 392.711 694.467 A 227.8 227.8 0 0 0 431.935 753.775 A 227.8 227.8 0 0 0 455.101 775.776 A 227.8 227.8 0 0 0 487.047 797.825 A 227.8 227.8 0 0 0 503.728 806.457 A 227.8 227.8 0 0 0 509.165 808.906 L 521.643 780.208 Z" class="region" fill-rule="evenodd" id="reg_10_sistema_nervioso_autonomo_p" /></g>
+      <g inkscape:label="MES" id="reg_11_mes" data-organ="MES" data-region="11" data-kind="band" data-angle-start="301.0" data-angle-end="341.0" data-r-min="202" data-r-max="228"><title>MES (10.03-11.37 h)</title><path d="M 422.566 493.387 C 425.11 489.222, 427.271 484.945, 429.674 480.737 C 432.037 476.6, 435.75 473.105, 438.742 469.416 C 447.434 458.7, 473.602 432.485, 484.953 426.184 C 489.793 423.497, 494.93 426.204, 500.038 423.318 C 502.692 421.818, 506.344 420.702, 508.625 418.716 C 513.86 414.161, 517.234 404.589, 526.331 405.554 C 529.167 405.855, 531.484 408.224, 534.228 408.985 L 525.836 384.611 A 227.8 227.8 0 0 0 525.069 384.877 A 227.8 227.8 0 0 0 501.418 394.636 A 227.8 227.8 0 0 0 479.285 406.815 A 227.8 227.8 0 0 0 462.906 418.07 A 227.8 227.8 0 0 0 443.193 434.76 A 227.8 227.8 0 0 0 425.495 453.573 A 227.8 227.8 0 0 0 406.815 479.284 A 227.8 227.8 0 0 0 404.737 482.674 L 422.566 493.387 Z" class="region" fill-rule="evenodd" id="reg_11_mes_p" /></g>
+      <g inkscape:label="SISTEMA NERVIOSO AUTONOMO" id="reg_12_sistema_nervioso_autonomo" data-organ="SISTEMA NERVIOSO AUTONOMO" data-region="12" data-kind="band" data-angle-start="341.0" data-angle-end="163.5" data-r-min="191" data-r-max="228"><title>SISTEMA NERVIOSO AUTONOMO (11.37-5.45 h)</title><path d="M 705.941 408.877 C 709.176 409.029, 712.019 411.209, 714.688 412.845 C 735.768 425.763, 724.303 438.974, 740.326 454.689 C 743.233 457.54, 747.05 458.531, 749.797 461.529 C 752.981 465.003, 753.045 469.908, 755.858 473.789 C 759.228 478.438, 764.529 481.171, 767.337 486.065 C 770.113 490.905, 771.112 496.612, 774.086 501.507 C 776.81 505.989, 783.027 505.833, 785.027 510.754 C 786.971 515.537, 784.507 522.99, 787.351 529.952 C 789.195 534.466, 794.4 536.487, 795.79 541.074 C 797.563 546.928, 793.293 554.01, 795.239 561.165 C 796.65 566.356, 802.652 568.844, 803.325 574.134 C 804.074 580.014, 798.893 584.686, 800.533 592.997 C 801.466 597.72, 806.605 601.553, 806.337 606.304 C 805.902 614.011, 796.473 620.593, 795.808 630.138 C 795.195 638.936, 800.975 651.904, 800.357 655.564 C 799.63 659.867, 788.705 665.581, 785.649 670.336 C 778.595 681.312, 784.061 688.447, 780.767 696.116 C 778.031 702.485, 771.748 700.032, 769.416 712.134 C 768.538 716.694, 766.957 739.715, 764.055 740.116 C 757.819 740.978, 739.743 731.042, 735.494 734.317 C 732.853 736.351, 733.391 741.86, 731.32 744.572 C 726.884 750.381, 716.119 753.498, 713.691 760.869 C 712.199 765.398, 715.823 775.935, 711.925 779.117 C 706.931 783.193, 696.198 777.735, 690.193 778.939 C 680.354 780.912, 680.208 788.281, 674.38 791.267 C 669.429 793.802, 662.147 789.411, 656.568 790.971 L 664.699 818.419 A 227.8 227.8 0 0 0 685.335 811.212 A 227.8 227.8 0 0 0 715.617 796.28 A 227.8 227.8 0 0 0 735.021 783.473 A 227.8 227.8 0 0 0 770.046 751.583 A 227.8 227.8 0 0 0 789.604 726.266 A 227.8 227.8 0 0 0 799.238 710.44 A 227.8 227.8 0 0 0 820.038 658.959 A 227.8 227.8 0 0 0 819.726 539.89 A 227.8 227.8 0 0 0 804.745 500.139 A 227.8 227.8 0 0 0 786.603 469.34 A 227.8 227.8 0 0 0 766.603 444.641 A 227.8 227.8 0 0 0 744.899 424.224 A 227.8 227.8 0 0 0 722.397 407.876 A 227.8 227.8 0 0 0 701.644 396.134 A 227.8 227.8 0 0 0 674.164 384.611 A 227.8 227.8 0 0 0 643.466 376.386 A 227.8 227.8 0 0 0 611.922 372.512 A 227.8 227.8 0 0 0 600 372.2 A 227.8 227.8 0 0 0 597.318 372.216 A 227.8 227.8 0 0 0 525.836 384.611 L 534.228 408.985 C 542.479 411.273, 544.236 403.214, 550.422 401.153 C 551.016 400.955, 570.179 397.767, 570.68 397.787 C 574.307 397.93, 576.82 399.914, 580.685 399.407 C 584.206 398.945, 586.528 396.345, 590.213 396.256 C 593.851 396.169, 596.393 398.865, 600 398.982 C 603.992 399.111, 606.893 397.074, 610.646 396.867 C 616.602 396.538, 622.014 400.08, 628.137 399.795 C 631.098 399.658, 633.374 397.563, 636.462 398.363 C 641.655 399.709, 644.773 405.576, 652.623 406.983 C 656.761 407.724, 660.181 404.158, 664.32 404.943 C 670.259 406.071, 672.799 412.334, 679.256 413.284 C 688.811 414.691, 696.8 408.45, 705.941 408.877 Z" class="region" fill-rule="evenodd" id="reg_12_sistema_nervioso_autonomo_p" /></g>
+      <g inkscape:label="SENSITIVIDAD" id="reg_13_sensitividad" data-organ="SENSITIVIDAD" data-region="13" data-kind="organ" data-angle-start="3.0" data-angle-end="11.0" data-r-min="228" data-r-max="444"><title>SENSITIVIDAD (0.10-0.37 h)</title><path d="M 657.625 303.549 L 684.795 163.764 A 444.4 444.4 0 0 0 623.258 156.209 L 611.922 372.512 A 227.8 227.8 0 0 1 643.466 376.386 L 657.625 303.549 Z" class="region" fill-rule="evenodd" id="reg_13_sensitividad_p" /></g>
+      <g inkscape:label="ALUCINACION" id="reg_14_alucinacion" data-organ="ALUCINACION" data-region="14" data-kind="organ" data-angle-start="11.0" data-angle-end="14.0" data-r-min="302" data-r-max="444"><title>ALUCINACION (0.37-0.47 h)</title><path d="M 684.795 163.764 L 657.625 303.549 A 302 302 0 0 1 673.06 306.97 L 707.51 168.801 A 444.4 444.4 0 0 0 684.795 163.764 Z" class="region" fill-rule="evenodd" id="reg_14_alucinacion_p" /></g>
+      <g inkscape:label="OBSESION" id="reg_15_obsesion" data-organ="OBSESION" data-region="15" data-kind="organ" data-angle-start="11.0" data-angle-end="19.0" data-r-min="228" data-r-max="444"><title>OBSESION (0.37-0.63 h)</title><path d="M 711.605 275.876 L 744.682 179.811 A 444.4 444.4 0 0 0 722.146 172.716 L 684.992 306.888 C 680.177 309.213, 678.421 308.319, 673.06 306.97 A 302 302 0 0 0 657.625 303.549 L 643.466 376.386 A 227.8 227.8 0 0 1 674.164 384.611 L 711.605 275.876 Z" class="region" fill-rule="evenodd" id="reg_15_obsesion_p" /></g>
+      <g inkscape:label="MENTALIDAD INNATA" id="reg_16_mentalidad_innata" data-organ="MENTALIDAD INNATA" data-region="16" data-kind="organ" data-angle-start="14.0" data-angle-end="16.2" data-r-min="302" data-r-max="444"><title>MENTALIDAD INNATA (0.47-0.54 h)</title><path d="M 673.06 306.97 C 678.421 308.319, 680.177 309.213, 684.992 306.888 L 722.146 172.716 A 444.4 444.4 0 0 0 707.51 168.801 L 673.06 306.97 Z" class="region" fill-rule="evenodd" id="reg_16_mentalidad_innata_p" /></g>
+      <g inkscape:label="IMPULSO SEXUAL" id="reg_17_impulso_sexual" data-organ="IMPULSO SEXUAL" data-region="17" data-kind="organ" data-angle-start="19.0" data-angle-end="26.5" data-r-min="228" data-r-max="343"><title>IMPULSO SEXUAL (0.63-0.88 h)</title><path d="M 701.644 396.134 L 752.957 293.216 A 342.8 342.8 0 0 0 711.605 275.876 L 674.164 384.611 A 227.8 227.8 0 0 1 701.644 396.134 Z" class="region" fill-rule="evenodd" id="reg_17_impulso_sexual_p" /></g>
+      <g inkscape:label="PERVERSION" id="reg_18_perversion" data-organ="PERVERSION" data-region="18" data-kind="organ" data-angle-start="19.0" data-angle-end="26.5" data-r-min="343" data-r-max="444"><title>PERVERSION (0.63-0.88 h)</title><path d="M 752.957 293.216 L 798.29 202.291 A 444.4 444.4 0 0 0 744.682 179.811 L 711.605 275.876 A 342.8 342.8 0 0 1 752.957 293.216 Z" class="region" fill-rule="evenodd" id="reg_18_perversion_p" /></g>
+      <g inkscape:label="MEDULA" id="reg_19_medula" data-organ="MEDULA" data-region="19" data-kind="organ" data-angle-start="26.5" data-angle-end="32.5" data-r-min="228" data-r-max="444"><title>MEDULA (0.88-1.08 h)</title><path d="M 722.397 407.876 L 838.776 225.196 A 444.4 444.4 0 0 0 798.29 202.291 L 752.957 293.216 L 701.644 396.134 A 227.8 227.8 0 0 1 722.397 407.876 Z" class="region" fill-rule="evenodd" id="reg_19_medula_p" /></g>
+      <g inkscape:label="MASTOIDES" id="reg_20_mastoides" data-organ="MASTOIDES" data-region="20" data-kind="organ" data-angle-start="32.5" data-angle-end="39.5" data-r-min="228" data-r-max="444"><title>MASTOIDES (1.08-1.32 h)</title><path d="M 744.899 424.224 L 882.674 257.09 A 444.4 444.4 0 0 0 838.776 225.196 L 722.397 407.876 A 227.8 227.8 0 0 1 744.899 424.224 Z" class="region" fill-rule="evenodd" id="reg_20_mastoides_p" /></g>
+      <g inkscape:label="OIDO" id="reg_21_oido" data-organ="OIDO" data-region="21" data-kind="organ" data-angle-start="39.5" data-angle-end="47.0" data-r-min="228" data-r-max="444"><title>OIDO (1.32-1.57 h)</title><path d="M 766.603 444.641 L 925.014 296.92 A 444.4 444.4 0 0 0 882.674 257.09 L 744.899 424.224 A 227.8 227.8 0 0 1 766.603 444.641 Z" class="region" fill-rule="evenodd" id="reg_21_oido_p" /></g>
+      <g inkscape:label="CUELLO" id="reg_22_cuello" data-organ="CUELLO" data-region="22" data-kind="organ" data-angle-start="47.0" data-angle-end="55.0" data-r-min="228" data-r-max="444"><title>CUELLO (1.57-1.83 h)</title><path d="M 786.603 469.34 L 964.031 345.102 A 444.4 444.4 0 0 0 925.014 296.92 L 766.603 444.641 A 227.8 227.8 0 0 1 786.603 469.34 Z" class="region" fill-rule="evenodd" id="reg_22_cuello_p" /></g>
+      <g inkscape:label="HOMBRO" id="reg_23_hombro" data-organ="HOMBRO" data-region="23" data-kind="organ" data-angle-start="55.0" data-angle-end="64.0" data-r-min="228" data-r-max="444"><title>HOMBRO (1.83-2.13 h)</title><path d="M 941.273 433.551 L 999.424 405.188 A 444.4 444.4 0 0 0 964.031 345.102 L 786.603 469.34 A 227.8 227.8 0 0 1 804.745 500.139 L 871.436 467.612 L 941.273 433.551 Z" class="region" fill-rule="evenodd" id="reg_23_hombro_p" /></g>
+      <g inkscape:label="AORTA (AO)" id="reg_24_aorta_ao" data-organ="AORTA (AO)" data-region="24" data-kind="organ" data-angle-start="64.0" data-angle-end="74.7" data-r-min="228" data-r-max="302"><title>AORTA (AO) (2.13-2.49 h)</title><path d="M 871.436 467.612 L 804.745 500.139 A 227.8 227.8 0 0 1 819.726 539.89 L 857.055 529.678 L 891.296 520.31 A 302 302 0 0 0 871.436 467.612 Z" class="region" fill-rule="evenodd" id="reg_24_aorta_ao_p" /></g>
+      <g inkscape:label="PULMON SUP." id="reg_25_pulmon_sup" data-organ="PULMON SUP." data-region="25" data-kind="organ" data-angle-start="64.0" data-angle-end="73.0" data-r-min="380" data-r-max="444"><title>PULMON SUP. (2.13-2.43 h)</title><path d="M 999.424 405.188 L 941.273 433.551 A 379.7 379.7 0 0 1 963.109 488.986 L 1024.982 470.07 A 444.4 444.4 0 0 0 999.424 405.188 Z" class="region" fill-rule="evenodd" id="reg_25_pulmon_sup_p" /></g>
+      <g inkscape:label="PULMON" id="reg_26_pulmon" data-organ="PULMON" data-region="26" data-kind="organ" data-angle-start="64.0" data-angle-end="91.0" data-r-min="302" data-r-max="380"><title>PULMON (2.13-3.03 h)</title><path d="M 901.954 605.27 L 979.643 606.626 A 379.7 379.7 0 0 0 976.004 547.156 A 379.7 379.7 0 0 0 963.109 488.986 A 379.7 379.7 0 0 0 941.273 433.551 L 871.436 467.612 A 302 302 0 0 1 891.296 520.31 A 302 302 0 0 1 901.954 605.27 Z" class="region" fill-rule="evenodd" id="reg_26_pulmon_p" /></g>
+      <g inkscape:label="PULMON MEDIO" id="reg_27_pulmon_medio" data-organ="PULMON MEDIO" data-region="27" data-kind="organ" data-angle-start="73.0" data-angle-end="82.0" data-r-min="380" data-r-max="444"><title>PULMON MEDIO (2.43-2.73 h)</title><path d="M 976.004 547.156 L 1040.075 538.151 A 444.4 444.4 0 0 0 1024.982 470.07 L 963.109 488.986 A 379.7 379.7 0 0 1 976.004 547.156 Z" class="region" fill-rule="evenodd" id="reg_27_pulmon_medio_p" /></g>
+      <g inkscape:label="BRONQUIOLOS" id="reg_28_bronquiolos" data-organ="BRONQUIOLOS" data-region="28" data-kind="organ" data-angle-start="74.7" data-angle-end="105.0" data-r-min="266" data-r-max="302"><title>BRONQUIOLOS (2.49-3.50 h)</title><path d="M 891.296 520.31 L 857.055 529.678 A 266.5 266.5 0 0 1 857.419 668.975 L 891.71 678.163 A 302 302 0 0 0 899.679 637.375 A 302 302 0 0 0 901.954 605.27 A 302 302 0 0 0 891.296 520.31 Z" class="region" fill-rule="evenodd" id="reg_28_bronquiolos_p" /></g>
+      <g inkscape:label="CORAZON" id="reg_29_corazon" data-organ="CORAZON" data-region="29" data-kind="organ" data-angle-start="74.7" data-angle-end="105.0" data-r-min="228" data-r-max="267"><title>CORAZON (2.49-3.50 h)</title><path d="M 857.055 529.678 L 819.726 539.89 A 227.8 227.8 0 0 1 820.038 658.959 L 857.419 668.975 A 266.5 266.5 0 0 0 857.055 529.678 Z" class="region" fill-rule="evenodd" id="reg_29_corazon_p" /></g>
+      <g inkscape:label="PULMON INF." id="reg_30_pulmon_inf" data-organ="PULMON INF." data-region="30" data-kind="organ" data-angle-start="82.0" data-angle-end="91.0" data-r-min="380" data-r-max="444"><title>PULMON INF. (2.73-3.03 h)</title><path d="M 979.643 606.626 L 1044.332 607.756 A 444.4 444.4 0 0 0 1040.075 538.151 L 976.004 547.156 A 379.7 379.7 0 0 1 979.643 606.626 Z" class="region" fill-rule="evenodd" id="reg_30_pulmon_inf_p" /></g>
+      <g inkscape:label="PLEURA" id="reg_31_pleura" data-organ="PLEURA" data-region="31" data-kind="organ" data-angle-start="91.0" data-angle-end="97.1" data-r-min="302" data-r-max="444"><title>PLEURA (3.03-3.24 h)</title><path d="M 1044.332 607.756 L 979.643 606.626 L 901.954 605.27 A 302 302 0 0 1 899.679 637.375 L 1040.983 654.999 A 444.4 444.4 0 0 0 1044.332 607.756 Z" class="region" fill-rule="evenodd" id="reg_31_pleura_p" /></g>
+      <g inkscape:label="TORAX" id="reg_32_torax" data-organ="TORAX" data-region="32" data-kind="organ" data-angle-start="97.1" data-angle-end="108.0" data-r-min="302" data-r-max="444"><title>TORAX (3.24-3.60 h)</title><path d="M 887.221 693.317 L 897.007 696.505 L 897.208 685.668 L 908.229 684.421 L 922.8 691.995 L 922.713 696.733 L 936.261 707.896 L 958.648 703.151 C 960.149 708.229, 960.439 709.956, 959.754 715.362 L 1023.207 735.597 A 444.4 444.4 0 0 0 1040.983 654.999 L 899.679 637.375 A 302 302 0 0 1 891.71 678.163 A 302 302 0 0 1 887.221 693.317 Z" class="region" fill-rule="evenodd" id="reg_32_torax_p" /></g>
+      <g inkscape:label="PL. SOL." id="reg_33_pl_sol" data-organ="PL. SOL." data-region="33" data-kind="organ" data-angle-start="105.0" data-angle-end="119.0" data-r-min="228" data-r-max="302"><title>PL. SOL. (3.50-3.97 h)</title><path d="M 799.238 710.44 L 864.135 746.412 A 302 302 0 0 0 887.221 693.317 A 302 302 0 0 0 891.71 678.163 L 857.419 668.975 L 820.038 658.959 A 227.8 227.8 0 0 1 799.238 710.44 Z" class="region" fill-rule="evenodd" id="reg_33_pl_sol_p" /></g>
+      <g inkscape:label="COSTILLAS" id="reg_34_costillas" data-organ="COSTILLAS" data-region="34" data-kind="organ" data-angle-start="105.3" data-angle-end="119.0" data-r-min="302" data-r-max="444"><title>COSTILLAS (3.51-3.97 h)</title><path d="M 1023.207 735.597 L 959.754 715.362 C 960.439 709.956, 960.149 708.229, 958.648 703.151 L 936.261 707.896 L 922.713 696.733 L 922.8 691.995 L 908.229 684.421 L 897.208 685.668 L 897.007 696.505 L 887.221 693.317 A 302 302 0 0 1 864.135 746.412 L 988.681 815.449 A 444.4 444.4 0 0 0 1023.207 735.597 Z" class="region" fill-rule="evenodd" id="reg_34_costillas_p" /></g>
+      <g inkscape:label="BRAZO MANO" id="reg_35_brazo_mano" data-organ="BRAZO MANO" data-region="35" data-kind="organ" data-angle-start="119.0" data-angle-end="126.5" data-r-min="228" data-r-max="444"><title>BRAZO MANO (3.97-4.22 h)</title><path d="M 988.681 815.449 L 864.135 746.412 L 799.238 710.44 A 227.8 227.8 0 0 1 789.604 726.266 C 813.519 737.399, 835.231 753.749, 842.776 779.622 L 845.509 776.236 C 851.413 777.871, 858.478 777.64, 863.926 780.234 C 894.44 794.772, 938.21 839.488, 968.308 848.677 A 444.4 444.4 0 0 0 988.681 815.449 Z" class="region" fill-rule="evenodd" id="reg_35_brazo_mano_p" /></g>
+      <g inkscape:label="VESIC." id="reg_36_vesic" data-organ="VESIC." data-region="36" data-kind="organ" data-angle-start="123.2" data-angle-end="132.5" data-r-min="228" data-r-max="302"><title>VESIC. (4.11-4.42 h)</title><path d="M 842.776 779.622 C 835.231 753.749, 813.519 737.399, 789.604 726.266 A 227.8 227.8 0 0 1 770.046 751.583 L 795.898 779.693 C 809.397 783.582, 821.752 786.672, 836.01 788.423 A 302 302 0 0 0 842.776 779.622 Z" class="region" fill-rule="evenodd" id="reg_36_vesic_p" /></g>
+      <g inkscape:label="BAZO" id="reg_37_bazo" data-organ="BAZO" data-region="37" data-kind="organ" data-angle-start="124.0" data-angle-end="132.0" data-r-min="302" data-r-max="444"><title>BAZO (4.13-4.40 h)</title><path d="M 968.308 848.677 C 938.21 839.488, 894.44 794.772, 863.926 780.234 C 858.478 777.64, 851.413 777.871, 845.509 776.236 L 842.776 779.622 A 302 302 0 0 1 836.01 788.423 C 831.157 799.146, 844.818 813.411, 849.866 821.981 C 855.249 831.024, 922.332 891.872, 932.175 895.213 A 444.4 444.4 0 0 0 968.308 848.677 Z" class="region" fill-rule="evenodd" id="reg_37_bazo_p" /></g>
+      <g inkscape:label="DIAFRAGMA" id="reg_38_diafragma" data-organ="DIAFRAGMA" data-region="38" data-kind="organ" data-angle-start="128.6" data-angle-end="143.7" data-r-min="228" data-r-max="444"><title>DIAFRAGMA (4.29-4.79 h)</title><path d="M 932.175 895.213 C 922.332 891.872, 855.249 831.024, 849.866 821.981 C 844.818 813.411, 831.157 799.146, 836.01 788.423 C 821.752 786.672, 809.397 783.582, 795.898 779.693 L 770.046 751.583 A 227.8 227.8 0 0 1 735.021 783.473 L 779 843.234 L 803.468 823.622 L 901.723 926.273 A 444.4 444.4 0 0 0 932.175 895.213 Z" class="region" fill-rule="evenodd" id="reg_38_diafragma_p" /></g>
+      <g inkscape:label="ABD. SUPERIOR" id="reg_39_abd_superior" data-organ="ABD. SUPERIOR" data-region="39" data-kind="organ" data-angle-start="137.2" data-angle-end="143.7" data-r-min="302" data-r-max="444"><title>ABD. SUPERIOR (4.57-4.79 h)</title><path d="M 779 843.234 L 863.403 957.925 A 444.4 444.4 0 0 0 901.723 926.273 L 803.468 823.622 L 779 843.234 Z" class="region" fill-rule="evenodd" id="reg_39_abd_superior_p" /></g>
+      <g inkscape:label="OVARIO TESTICULO" id="reg_40_ovario_testiculo" data-organ="OVARIO TESTICULO" data-region="40" data-kind="organ" data-angle-start="143.6" data-angle-end="149.5" data-r-min="228" data-r-max="444"><title>OVARIO TESTICULO (4.79-4.98 h)</title><path d="M 863.403 957.925 L 779 843.234 L 735.021 783.473 A 227.8 227.8 0 0 1 715.617 796.28 L 743.735 844.013 L 825.55 982.908 A 444.4 444.4 0 0 0 863.403 957.925 Z" class="region" fill-rule="evenodd" id="reg_40_ovario_testiculo_p" /></g>
+      <g inkscape:label="PELVIS" id="reg_41_pelvis" data-organ="PELVIS" data-region="41" data-kind="organ" data-angle-start="149.5" data-angle-end="158.0" data-r-min="228" data-r-max="444"><title>PELVIS (4.98-5.27 h)</title><path d="M 825.55 982.908 L 743.735 844.013 L 715.617 796.28 A 227.8 227.8 0 0 1 685.335 811.212 L 733.023 929.243 L 766.475 1012.041 A 444.4 444.4 0 0 0 825.55 982.908 Z" class="region" fill-rule="evenodd" id="reg_41_pelvis_p" /></g>
+      <g inkscape:label="PARED ABDOMINAL" id="reg_42_pared_abdominal" data-organ="PARED ABDOMINAL" data-region="42" data-kind="organ" data-angle-start="158.0" data-angle-end="169.0" data-r-min="355" data-r-max="444"><title>PARED ABDOMINAL (5.27-5.63 h)</title><path d="M 766.475 1012.041 L 733.023 929.243 A 355.1 355.1 0 0 1 667.756 948.576 L 684.796 1036.235 A 444.4 444.4 0 0 0 766.475 1012.041 Z" class="region" fill-rule="evenodd" id="reg_42_pared_abdominal_p" /></g>
+      <g inkscape:label="PERITONEO" id="reg_43_peritoneo" data-organ="PERITONEO" data-region="43" data-kind="organ" data-angle-start="158.0" data-angle-end="169.0" data-r-min="228" data-r-max="355"><title>PERITONEO (5.27-5.63 h)</title><path d="M 733.023 929.243 L 685.335 811.212 A 227.8 227.8 0 0 1 664.699 818.419 A 227.8 227.8 0 0 1 643.466 823.615 L 652.664 870.933 L 667.756 948.576 A 355.1 355.1 0 0 0 733.023 929.243 Z" class="region" fill-rule="evenodd" id="reg_43_peritoneo_p" /></g>
+      <g inkscape:label="INGLE" id="reg_44_ingle" data-organ="INGLE" data-region="44" data-kind="organ" data-angle-start="169.0" data-angle-end="175.0" data-r-min="228" data-r-max="444"><title>INGLE (5.63-5.83 h)</title><path d="M 684.796 1036.235 L 667.756 948.576 L 652.664 870.933 L 643.466 823.615 A 227.8 227.8 0 0 1 619.854 826.933 L 633.093 978.255 L 638.732 1042.708 A 444.4 444.4 0 0 0 684.796 1036.235 Z" class="region" fill-rule="evenodd" id="reg_44_ingle_p" /></g>
+      <g inkscape:label="PIE" id="reg_45_pie" data-organ="PIE" data-region="45" data-kind="organ" data-angle-start="175.0" data-angle-end="185.5" data-r-min="380" data-r-max="444"><title>PIE (5.83-6.18 h)</title><path d="M 638.732 1042.708 L 633.093 978.255 A 379.7 379.7 0 0 1 563.607 977.952 L 557.406 1042.354 A 444.4 444.4 0 0 0 638.732 1042.708 Z" class="region" fill-rule="evenodd" id="reg_45_pie_p" /></g>
+      <g inkscape:label="ROD." id="reg_46_rod" data-organ="ROD." data-region="46" data-kind="organ" data-angle-start="175.0" data-angle-end="188.8" data-r-min="228" data-r-max="380"><title>ROD. (5.83-6.29 h)</title><path d="M 633.093 978.255 L 619.854 826.933 A 227.8 227.8 0 0 1 566.373 825.304 L 566.295 833.044 L 573.875 843.45 C 574.408 856.432, 576.658 882.803, 562.786 891.356 L 564.053 899.698 L 553.754 898.438 L 553.62 909.232 L 561.225 915.242 C 569.855 942.749, 566.658 946.355, 563.607 977.952 A 379.7 379.7 0 0 0 633.093 978.255 Z" class="region" fill-rule="evenodd" id="reg_46_rod_p" /></g>
+      <g inkscape:label="RIÑON" id="reg_47_rinon" data-organ="RIÑON" data-region="47" data-kind="organ" data-angle-start="185.4" data-angle-end="197.8" data-r-min="302" data-r-max="444"><title>RIÑON (6.18-6.59 h)</title><path d="M 557.406 1042.354 L 563.607 977.952 C 566.658 946.355, 569.855 942.749, 561.225 915.242 L 553.62 909.232 L 553.754 898.438 A 302 302 0 0 1 522.481 891.882 C 520.168 895.65, 520.205 899.693, 518.097 903.379 C 513.388 911.618, 503.392 916.036, 499.158 925.046 C 491.994 940.286, 488.346 958.38, 483.06 974.41 C 477.641 990.845, 468.044 1007.373, 464.301 1023.175 A 444.4 444.4 0 0 0 557.406 1042.354 Z" class="region" fill-rule="evenodd" id="reg_47_rinon_p" /></g>
+      <g inkscape:label="ADREN." id="reg_48_adren" data-organ="ADREN." data-region="48" data-kind="organ" data-angle-start="185.6" data-angle-end="196.9" data-r-min="228" data-r-max="302"><title>ADREN. (6.19-6.56 h)</title><path d="M 553.754 898.438 L 564.053 899.698 L 562.786 891.356 C 576.658 882.803, 574.408 856.432, 573.875 843.45 L 566.295 833.044 L 566.373 825.304 A 227.8 227.8 0 0 1 537.756 819.131 L 537.903 840.133 C 524.504 853.683, 516.621 871.801, 512.474 889.244 L 522.481 891.882 A 302 302 0 0 0 553.754 898.438 Z" class="region" fill-rule="evenodd" id="reg_48_adren_p" /></g>
+      <g inkscape:label="ESCROTO PERINEO" id="reg_49_escroto_perineo" data-organ="ESCROTO PERINEO" data-region="49" data-kind="organ" data-angle-start="194.5" data-angle-end="201.4" data-r-min="228" data-r-max="444"><title>ESCROTO PERINEO (6.48-6.71 h)</title><path d="M 522.481 891.882 L 512.474 889.244 C 516.621 871.801, 524.504 853.683, 537.903 840.133 L 537.756 819.131 A 227.8 227.8 0 0 1 516.881 812.095 L 437.849 1013.761 A 444.4 444.4 0 0 0 464.301 1023.175 C 468.044 1007.373, 477.641 990.845, 483.06 974.41 C 488.346 958.38, 491.994 940.286, 499.158 925.046 C 503.392 916.036, 513.388 911.618, 518.097 903.379 C 520.205 899.693, 520.168 895.65, 522.481 891.882 Z" class="region" fill-rule="evenodd" id="reg_49_escroto_perineo_p" /></g>
+      <g inkscape:label="RECTO" id="reg_50_recto" data-organ="RECTO" data-region="50" data-kind="organ" data-angle-start="201.4" data-angle-end="205.0" data-r-min="228" data-r-max="444"><title>RECTO (6.71-6.83 h)</title><path d="M 503.728 806.457 L 464.17 891.287 L 412.188 1002.763 A 444.4 444.4 0 0 0 437.849 1013.761 L 516.881 812.095 A 227.8 227.8 0 0 1 509.165 808.906 A 227.8 227.8 0 0 1 503.728 806.457 Z" class="region" fill-rule="evenodd" id="reg_50_recto_p" /></g>
+      <g inkscape:label="UT. PRO." id="reg_51_ut_pro" data-organ="UT. PRO." data-region="51" data-kind="organ" data-angle-start="205.0" data-angle-end="212.6" data-r-min="228" data-r-max="321"><title>UT. PRO. (6.83-7.09 h)</title><path d="M 487.047 797.825 C 468.902 810.69, 462.172 820.45, 448.462 837.104 L 448.582 846.38 L 442.979 852.936 L 442.006 879.885 A 321.4 321.4 0 0 0 464.17 891.287 L 503.728 806.457 A 227.8 227.8 0 0 1 487.047 797.825 Z" class="region" fill-rule="evenodd" id="reg_51_ut_pro_p" /></g>
+      <g inkscape:label="VAGINA" id="reg_52_vagina" data-organ="VAGINA" data-region="52" data-kind="organ" data-angle-start="205.0" data-angle-end="211.5" data-r-min="321" data-r-max="444"><title>VAGINA (6.83-7.05 h)</title><path d="M 464.17 891.287 A 321.4 321.4 0 0 1 442.006 879.885 L 426.152 886.707 C 417.961 898.893, 409.825 911.523, 401.607 923.747 L 367.802 978.913 A 444.4 444.4 0 0 0 412.188 1002.763 L 464.17 891.287 Z" class="region" fill-rule="evenodd" id="reg_52_vagina_p" /></g>
+      <g inkscape:label="VEJIGA" id="reg_53_vejiga" data-organ="VEJIGA" data-region="53" data-kind="organ" data-angle-start="209.4" data-angle-end="219.5" data-r-min="228" data-r-max="444"><title>VEJIGA (6.98-7.32 h)</title><path d="M 442.006 879.885 L 442.979 852.936 L 448.582 846.38 L 448.462 837.104 C 462.172 820.45, 468.902 810.69, 487.047 797.825 A 227.8 227.8 0 0 1 455.101 775.776 L 358.481 892.986 L 317.326 942.91 A 444.4 444.4 0 0 0 367.802 978.913 L 401.607 923.747 C 409.825 911.523, 417.961 898.893, 426.152 886.707 L 442.006 879.885 Z" class="region" fill-rule="evenodd" id="reg_53_vejiga_p" /></g>
+      <g inkscape:label="ESPALDA BAJA" id="reg_54_espalda_baja" data-organ="ESPALDA BAJA" data-region="54" data-kind="organ" data-angle-start="219.5" data-angle-end="236.7" data-r-min="228" data-r-max="444"><title>ESPALDA BAJA (7.32-7.89 h)</title><path d="M 358.481 892.986 L 455.101 775.776 A 227.8 227.8 0 0 1 431.935 753.775 C 412.358 763.023, 391.376 797.533, 377.583 804.046 L 346.859 767.466 C 339.291 776.113, 316.71 788.245, 305.611 793.072 L 305.527 799.024 L 293.466 806.587 C 292.04 811.782, 291.797 812.691, 288.944 816.746 L 268.066 818.415 C 257.774 831.329, 246.171 840.011, 232.371 849.681 A 444.4 444.4 0 0 0 317.326 942.91 L 358.481 892.986 Z" class="region" fill-rule="evenodd" id="reg_54_espalda_baja_p" /></g>
+      <g inkscape:label="ESPALDA MEDIA" id="reg_55_espalda_media" data-organ="ESPALDA MEDIA" data-region="55" data-kind="organ" data-angle-start="227.3" data-angle-end="245.5" data-r-min="228" data-r-max="444"><title>ESPALDA MEDIA (7.58-8.18 h)</title><path d="M 232.371 849.681 C 246.171 840.011, 257.774 831.329, 268.066 818.415 L 288.944 816.746 C 291.797 812.691, 292.04 811.782, 293.466 806.587 L 305.527 799.024 L 305.611 793.072 C 316.71 788.245, 339.291 776.113, 346.859 767.466 L 377.583 804.046 C 391.376 797.533, 412.358 763.023, 431.935 753.775 A 227.8 227.8 0 0 1 392.711 694.467 L 195.613 784.29 A 444.4 444.4 0 0 0 232.371 849.681 Z" class="region" fill-rule="evenodd" id="reg_55_espalda_media_p" /></g>
+      <g inkscape:label="ESPALDA ALTA" id="reg_56_espalda_alta" data-organ="ESPALDA ALTA" data-region="56" data-kind="organ" data-angle-start="245.5" data-angle-end="254.0" data-r-min="228" data-r-max="444"><title>ESPALDA ALTA (8.18-8.47 h)</title><path d="M 382.266 666.969 C 377.027 667.779, 373.185 669.192, 368.645 671.028 C 368.353 671.145, 353.959 670.653, 351.753 671.138 C 337.096 674.45, 325.231 683.111, 309.699 683.242 L 172.815 722.493 A 444.4 444.4 0 0 0 195.613 784.29 L 392.711 694.467 A 227.8 227.8 0 0 1 382.266 666.969 Z" class="region" fill-rule="evenodd" id="reg_56_espalda_alta_p" /></g>
+      <g inkscape:label="BRONQUIOS" id="reg_57_bronquios" data-organ="BRONQUIOS" data-region="57" data-kind="organ" data-angle-start="252.9" data-angle-end="285.8" data-r-min="228" data-r-max="302"><title>BRONQUIOS (8.43-9.53 h)</title><path d="M 309.699 683.242 C 325.231 683.111, 337.096 674.45, 351.753 671.138 C 353.959 670.653, 368.353 671.145, 368.645 671.028 C 373.185 669.192, 377.027 667.779, 382.266 666.969 A 227.8 227.8 0 0 1 380.807 537.974 L 309.411 517.771 A 302 302 0 0 0 305.741 532.065 A 302 302 0 0 0 299.756 567.48 A 302 302 0 0 0 298.011 597.365 A 302 302 0 0 0 300.603 639.56 A 302 302 0 0 0 309.699 683.242 Z" class="region" fill-rule="evenodd" id="reg_57_bronquios_p" /></g>
+      <g inkscape:label="OMOPLATO" id="reg_58_omoplato" data-organ="OMOPLATO" data-region="58" data-kind="organ" data-angle-start="254.0" data-angle-end="262.5" data-r-min="302" data-r-max="444"><title>OMOPLATO (8.47-8.75 h)</title><path d="M 172.815 722.493 L 309.699 683.242 A 302 302 0 0 1 300.603 639.56 L 159.429 658.214 A 444.4 444.4 0 0 0 172.815 722.493 Z" class="region" fill-rule="evenodd" id="reg_58_omoplato_p" /></g>
+      <g inkscape:label="ESOFAGO" id="reg_59_esofago" data-organ="ESOFAGO" data-region="59" data-kind="organ" data-angle-start="262.5" data-angle-end="270.5" data-r-min="302" data-r-max="444"><title>ESOFAGO (8.75-9.02 h)</title><path d="M 298.011 597.365 L 155.617 596.122 A 444.4 444.4 0 0 0 159.429 658.214 L 300.603 639.56 A 302 302 0 0 1 298.011 597.365 Z" class="region" fill-rule="evenodd" id="reg_59_esofago_p" /></g>
+      <g inkscape:label="TRAQUEA" id="reg_60_traquea" data-organ="TRAQUEA" data-region="60" data-kind="organ" data-angle-start="270.5" data-angle-end="276.2" data-r-min="302" data-r-max="444"><title>TRAQUEA (9.02-9.21 h)</title><path d="M 155.617 596.122 L 298.011 597.365 A 302 302 0 0 1 299.756 567.48 L 158.184 552.145 A 444.4 444.4 0 0 0 155.617 596.122 Z" class="region" fill-rule="evenodd" id="reg_60_traquea_p" /></g>
+      <g inkscape:label="CUERDAS VOCALES" id="reg_61_cuerdas_vocales" data-organ="CUERDAS VOCALES" data-region="61" data-kind="organ" data-angle-start="276.2" data-angle-end="283.0" data-r-min="302" data-r-max="444"><title>CUERDAS VOCALES (9.21-9.43 h)</title><path d="M 305.741 532.065 L 166.99 500.032 A 444.4 444.4 0 0 0 158.184 552.145 L 299.756 567.48 A 302 302 0 0 1 305.741 532.065 Z" class="region" fill-rule="evenodd" id="reg_61_cuerdas_vocales_p" /></g>
+      <g inkscape:label="TIROIDES" id="reg_62_tiroides" data-organ="TIROIDES" data-region="62" data-kind="organ" data-angle-start="283.0" data-angle-end="290.0" data-r-min="302" data-r-max="444"><title>TIROIDES (9.43-9.67 h)</title><path d="M 316.213 496.71 L 182.401 448.006 A 444.4 444.4 0 0 0 166.99 500.032 L 305.741 532.065 A 302 302 0 0 1 309.411 517.771 A 302 302 0 0 1 316.213 496.71 Z" class="region" fill-rule="evenodd" id="reg_62_tiroides_p" /></g>
+      <g inkscape:label="P.T." id="reg_63_p_t" data-organ="P.T." data-region="63" data-kind="organ" data-angle-start="285.8" data-angle-end="302.0" data-r-min="228" data-r-max="302"><title>P.T. (9.53-10.07 h)</title><path d="M 406.815 479.284 L 343.889 439.964 A 302 302 0 0 0 331.843 461.092 A 302 302 0 0 0 325.444 474.209 A 302 302 0 0 0 316.213 496.71 A 302 302 0 0 0 309.411 517.771 L 380.807 537.974 A 227.8 227.8 0 0 1 404.737 482.674 A 227.8 227.8 0 0 1 406.815 479.284 Z" class="region" fill-rule="evenodd" id="reg_63_p_t_p" /></g>
+      <g inkscape:label="FARINGE" id="reg_64_faringe" data-organ="FARINGE" data-region="64" data-kind="organ" data-angle-start="290.0" data-angle-end="294.6" data-r-min="302" data-r-max="444"><title>FARINGE (9.67-9.82 h)</title><path d="M 182.401 448.006 L 316.213 496.71 A 302 302 0 0 1 325.444 474.209 L 195.985 414.896 A 444.4 444.4 0 0 0 182.401 448.006 Z" class="region" fill-rule="evenodd" id="reg_64_faringe_p" /></g>
+      <g inkscape:label="LARINGE" id="reg_65_laringe" data-organ="LARINGE" data-region="65" data-kind="organ" data-angle-start="294.6" data-angle-end="297.4" data-r-min="302" data-r-max="444"><title>LARINGE (9.82-9.91 h)</title><path d="M 331.843 461.092 L 205.4 395.593 A 444.4 444.4 0 0 0 195.985 414.896 L 325.444 474.209 A 302 302 0 0 1 331.843 461.092 Z" class="region" fill-rule="evenodd" id="reg_65_laringe_p" /></g>
+      <g inkscape:label="AMIGDALAS" id="reg_66_amigdalas" data-organ="AMIGDALAS" data-region="66" data-kind="organ" data-angle-start="297.4" data-angle-end="302.0" data-r-min="302" data-r-max="444"><title>AMIGDALAS (9.91-10.07 h)</title><path d="M 343.889 439.964 L 298.858 411.826 L 223.128 364.503 A 444.4 444.4 0 0 0 205.4 395.593 L 331.843 461.092 A 302 302 0 0 1 343.889 439.964 Z" class="region" fill-rule="evenodd" id="reg_66_amigdalas_p" /></g>
+      <g inkscape:label="LENGUA BOCA" id="reg_67_lengua_boca" data-organ="LENGUA BOCA" data-region="67" data-kind="organ" data-angle-start="302.0" data-angle-end="310.0" data-r-min="355" data-r-max="444"><title>LENGUA BOCA (10.07-10.33 h)</title><path d="M 327.978 371.746 L 259.57 314.345 A 444.4 444.4 0 0 0 223.128 364.503 L 298.858 411.826 A 355.1 355.1 0 0 1 327.978 371.746 Z" class="region" fill-rule="evenodd" id="reg_67_lengua_boca_p" /></g>
+      <g inkscape:label="MANDIBULA INFERIOR" id="reg_68_mandibula_inferior" data-organ="MANDIBULA INFERIOR" data-region="68" data-kind="organ" data-angle-start="302.0" data-angle-end="310.0" data-r-min="228" data-r-max="355"><title>MANDIBULA INFERIOR (10.07-10.33 h)</title><path d="M 425.495 453.573 L 327.978 371.746 A 355.1 355.1 0 0 0 298.858 411.826 L 343.889 439.964 L 406.815 479.284 A 227.8 227.8 0 0 1 425.495 453.573 Z" class="region" fill-rule="evenodd" id="reg_68_mandibula_inferior_p" /></g>
+      <g inkscape:label="NARIZ" id="reg_69_nariz" data-organ="NARIZ" data-region="69" data-kind="organ" data-angle-start="310.0" data-angle-end="316.5" data-r-min="228" data-r-max="444"><title>NARIZ (10.33-10.55 h)</title><path d="M 443.193 434.76 L 294.095 277.644 A 444.4 444.4 0 0 0 259.57 314.345 L 327.978 371.746 L 425.495 453.573 A 227.8 227.8 0 0 1 443.193 434.76 Z" class="region" fill-rule="evenodd" id="reg_69_nariz_p" /></g>
+      <g inkscape:label="MANDIBULA SUPERIOR" id="reg_70_mandibula_superior" data-organ="MANDIBULA SUPERIOR" data-region="70" data-kind="organ" data-angle-start="316.5" data-angle-end="323.0" data-r-min="228" data-r-max="444"><title>MANDIBULA SUPERIOR (10.55-10.77 h)</title><path d="M 462.906 418.07 L 332.554 245.086 A 444.4 444.4 0 0 0 294.095 277.644 L 443.193 434.76 A 227.8 227.8 0 0 1 462.906 418.07 Z" class="region" fill-rule="evenodd" id="reg_70_mandibula_superior_p" /></g>
+      <g inkscape:label="OJO" id="reg_71_ojo" data-organ="OJO" data-region="71" data-kind="organ" data-angle-start="323.0" data-angle-end="328.0" data-r-min="228" data-r-max="444"><title>OJO (10.77-10.93 h)</title><path d="M 479.285 406.815 L 364.504 223.128 A 444.4 444.4 0 0 0 332.554 245.086 L 462.906 418.07 A 227.8 227.8 0 0 1 479.285 406.815 Z" class="region" fill-rule="evenodd" id="reg_71_ojo_p" /></g>
+      <g inkscape:label="FRENTE SIEN" id="reg_72_frente_sien" data-organ="FRENTE SIEN" data-region="72" data-kind="organ" data-angle-start="328.0" data-angle-end="334.5" data-r-min="228" data-r-max="444"><title>FRENTE SIEN (10.93-11.15 h)</title><path d="M 501.418 394.636 C 496.919 379.352, 490.12 379.262, 484.101 369.032 C 476.979 356.928, 468.391 343.537, 463.005 331 L 456.723 333.998 C 453.115 285.189, 409.765 249.677, 400.492 202.901 A 444.4 444.4 0 0 0 364.504 223.128 L 479.285 406.815 A 227.8 227.8 0 0 1 501.418 394.636 Z" class="region" fill-rule="evenodd" id="reg_72_frente_sien_p" /></g>
+      <g inkscape:label="DESARROLLO MENTAL" id="reg_73_desarrollo_mental" data-organ="DESARROLLO MENTAL" data-region="73" data-kind="organ" data-angle-start="331.7" data-angle-end="341.3" data-r-min="228" data-r-max="444"><title>DESARROLLO MENTAL (11.06-11.38 h)</title><path d="M 525.069 384.877 C 521.609 377.818, 520.863 370.664, 519.723 362.851 L 505.649 357.023 C 503.609 344.116, 492.831 328.793, 494.048 317.196 L 444.088 183.848 A 444.4 444.4 0 0 0 400.492 202.901 C 409.765 249.677, 453.115 285.189, 456.723 333.998 L 463.005 331 C 468.391 343.537, 476.979 356.928, 484.101 369.032 C 490.12 379.262, 496.919 379.352, 501.418 394.636 A 227.8 227.8 0 0 1 525.069 384.877 Z" class="region" fill-rule="evenodd" id="reg_73_desarrollo_mental_p" /></g>
+      <g inkscape:label="G. PIT." id="reg_74_g_pit" data-organ="G. PIT." data-region="74" data-kind="organ" data-angle-start="338.8" data-angle-end="0.2" data-r-min="228" data-r-max="302"><title>G. PIT. (11.29-0.01 h)</title><path d="M 597.318 372.216 L 600.766 356.093 L 589.507 343.464 L 586.827 298.288 A 302 302 0 0 0 560.581 300.583 A 302 302 0 0 0 532.065 305.741 A 302 302 0 0 0 494.048 317.196 C 492.831 328.793, 503.609 344.116, 505.649 357.023 L 519.723 362.851 C 520.863 370.664, 521.609 377.818, 525.069 384.877 A 227.8 227.8 0 0 1 525.836 384.611 A 227.8 227.8 0 0 1 597.318 372.216 Z" class="region" fill-rule="evenodd" id="reg_74_g_pit_p" /></g>
+      <g inkscape:label="CENTRO DE LA PALABRA" id="reg_75_centro_de_la_palabra" data-organ="CENTRO DE LA PALABRA" data-region="75" data-kind="organ" data-angle-start="339.5" data-angle-end="347.0" data-r-min="302" data-r-max="444"><title>CENTRO DE LA PALABRA (11.32-11.57 h)</title><path d="M 532.065 305.741 L 500.032 166.99 A 444.4 444.4 0 0 0 444.088 183.848 L 494.048 317.196 A 302 302 0 0 1 532.065 305.741 Z" class="region" fill-rule="evenodd" id="reg_75_centro_de_la_palabra_p" /></g>
+      <g inkscape:label="EGO, PRESION ART." id="reg_76_ego_presion_art" data-organ="EGO, PRESION ART." data-region="76" data-kind="organ" data-angle-start="347.0" data-angle-end="352.5" data-r-min="302" data-r-max="444"><title>EGO, PRESION ART. (11.57-11.75 h)</title><path d="M 560.581 300.583 L 541.994 159.402 A 444.4 444.4 0 0 0 500.032 166.99 L 532.065 305.741 A 302 302 0 0 1 560.581 300.583 Z" class="region" fill-rule="evenodd" id="reg_76_ego_presion_art_p" /></g>
+      <g inkscape:label="AREA 5 SENTIDOS" id="reg_77_area_5_sentidos" data-organ="AREA 5 SENTIDOS" data-region="77" data-kind="organ" data-angle-start="352.5" data-angle-end="357.5" data-r-min="302" data-r-max="444"><title>AREA 5 SENTIDOS (11.75-11.92 h)</title><path d="M 586.827 298.288 L 580.616 156.023 A 444.4 444.4 0 0 0 541.994 159.402 L 560.581 300.583 A 302 302 0 0 1 586.827 298.288 Z" class="region" fill-rule="evenodd" id="reg_77_area_5_sentidos_p" /></g>
+      <g inkscape:label="CENTRO VITAL" id="reg_78_centro_vital" data-organ="CENTRO VITAL" data-region="78" data-kind="organ" data-angle-start="357.5" data-angle-end="3.0" data-r-min="228" data-r-max="444"><title>CENTRO VITAL (11.92-0.10 h)</title><path d="M 611.922 372.512 L 623.258 156.209 A 444.4 444.4 0 0 0 600 155.6 A 444.4 444.4 0 0 0 580.616 156.023 L 586.827 298.288 L 589.507 343.464 L 600.766 356.093 L 597.318 372.216 A 227.8 227.8 0 0 1 600 372.2 A 227.8 227.8 0 0 1 611.922 372.512 Z" class="region" fill-rule="evenodd" id="reg_78_centro_vital_p" /></g>
+      <g inkscape:label="SISTEMA CIRCULATORIO Y LINFATICO" id="reg_79_sistema_circulatorio_y_linfatico" data-organ="SISTEMA CIRCULATORIO Y LINFATICO" data-region="79" data-kind="ring" data-angle-start="0.0" data-angle-end="360.0" data-r-min="473" data-r-max="473"><title>SISTEMA CIRCULATORIO Y LINFATICO (anillo)</title><path d="M 600 1073.4 A 473.4 473.4 0 0 0 600 126.6 A 473.4 473.4 0 0 0 600 1073.4 Z M 600 155.6 A 444.4 444.4 0 0 1 623.258 156.209 A 444.4 444.4 0 0 1 684.795 163.764 A 444.4 444.4 0 0 1 707.51 168.801 A 444.4 444.4 0 0 1 722.146 172.716 A 444.4 444.4 0 0 1 744.682 179.811 A 444.4 444.4 0 0 1 798.29 202.291 A 444.4 444.4 0 0 1 838.776 225.196 A 444.4 444.4 0 0 1 882.674 257.09 A 444.4 444.4 0 0 1 925.014 296.92 A 444.4 444.4 0 0 1 964.031 345.102 A 444.4 444.4 0 0 1 999.424 405.188 A 444.4 444.4 0 0 1 1024.982 470.07 A 444.4 444.4 0 0 1 1040.075 538.151 A 444.4 444.4 0 0 1 1044.332 607.756 A 444.4 444.4 0 0 1 1040.983 654.999 A 444.4 444.4 0 0 1 1023.207 735.597 A 444.4 444.4 0 0 1 988.681 815.449 A 444.4 444.4 0 0 1 968.308 848.677 A 444.4 444.4 0 0 1 932.175 895.213 A 444.4 444.4 0 0 1 901.723 926.273 A 444.4 444.4 0 0 1 863.403 957.925 A 444.4 444.4 0 0 1 825.55 982.908 A 444.4 444.4 0 0 1 766.475 1012.041 A 444.4 444.4 0 0 1 684.796 1036.235 A 444.4 444.4 0 0 1 638.732 1042.708 A 444.4 444.4 0 0 1 557.406 1042.354 A 444.4 444.4 0 0 1 464.301 1023.175 A 444.4 444.4 0 0 1 437.849 1013.761 A 444.4 444.4 0 0 1 412.188 1002.763 A 444.4 444.4 0 0 1 367.802 978.913 A 444.4 444.4 0 0 1 317.326 942.91 A 444.4 444.4 0 0 1 232.371 849.681 A 444.4 444.4 0 0 1 195.613 784.29 A 444.4 444.4 0 0 1 172.815 722.493 A 444.4 444.4 0 0 1 159.429 658.214 A 444.4 444.4 0 0 1 155.617 596.122 A 444.4 444.4 0 0 1 158.184 552.145 A 444.4 444.4 0 0 1 166.99 500.032 A 444.4 444.4 0 0 1 182.401 448.006 A 444.4 444.4 0 0 1 195.985 414.896 A 444.4 444.4 0 0 1 205.4 395.593 A 444.4 444.4 0 0 1 223.128 364.503 A 444.4 444.4 0 0 1 259.57 314.345 A 444.4 444.4 0 0 1 294.095 277.644 A 444.4 444.4 0 0 1 332.554 245.086 A 444.4 444.4 0 0 1 364.504 223.128 A 444.4 444.4 0 0 1 400.492 202.901 A 444.4 444.4 0 0 1 444.088 183.848 A 444.4 444.4 0 0 1 500.032 166.99 A 444.4 444.4 0 0 1 541.994 159.402 A 444.4 444.4 0 0 1 580.616 156.023 A 444.4 444.4 0 0 1 600 155.6 Z" class="region" fill-rule="evenodd" id="reg_79_sistema_circulatorio_y_linfatico_p" /></g>
+      <g inkscape:label="PIEL" id="reg_80_piel" data-organ="PIEL" data-region="80" data-kind="ring" data-angle-start="0.0" data-angle-end="360.0" data-r-min="500" data-r-max="500"><title>PIEL (anillo)</title><path d="M 600 1100 A 500 500 0 0 0 600 100 A 500 500 0 0 0 600 1100 Z M 600 126.6 A 473.4 473.4 0 0 1 600 1073.4 A 473.4 473.4 0 0 1 600 126.6 Z" class="region" fill-rule="evenodd" id="reg_80_piel_p" /></g>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Fronteras entre regiones (un solo trazo por arista compartida)" id="g_fronteras">
+    <path d="M 1044.332 607.756 L 979.643 606.626 M 1023.207 735.597 L 959.754 715.362 C 960.439 709.956, 960.149 708.229, 958.648 703.151 L 936.261 707.896 L 922.713 696.733 L 922.8 691.995 L 908.229 684.421 L 897.208 685.668 L 897.007 696.505 L 887.221 693.317 M 999.424 405.188 L 941.273 433.551 M 988.681 815.449 L 864.135 746.412 M 901.954 605.27 L 979.643 606.626 M 968.308 848.677 C 938.21 839.488, 894.44 794.772, 863.926 780.234 C 858.478 777.64, 851.413 777.871, 845.509 776.236 L 842.776 779.622 M 964.031 345.102 L 786.603 469.34 M 941.273 433.551 L 871.436 467.612 M 871.436 467.612 L 804.745 500.139 M 932.175 895.213 C 922.332 891.872, 855.249 831.024, 849.866 821.981 C 844.818 813.411, 831.157 799.146, 836.01 788.423 M 925.014 296.92 L 766.603 444.641 M 882.674 257.09 L 744.899 424.224 M 864.135 746.412 L 799.238 710.44 M 863.403 957.925 L 779 843.234 M 842.776 779.622 C 835.231 753.749, 813.519 737.399, 789.604 726.266 M 836.01 788.423 C 821.752 786.672, 809.397 783.582, 795.898 779.693 L 770.046 751.583 M 838.776 225.196 L 722.397 407.876 M 825.55 982.908 L 743.735 844.013 M 798.29 202.291 L 752.957 293.216 M 779 843.234 L 735.021 783.473 M 766.475 1012.041 L 733.023 929.243 M 752.957 293.216 L 701.644 396.134 M 743.735 844.013 L 715.617 796.28 M 744.682 179.811 L 711.605 275.876 M 733.023 929.243 L 685.335 811.212 M 711.605 275.876 L 674.164 384.611 M 684.796 1036.235 L 667.756 948.576 M 684.795 163.764 L 657.625 303.549 M 667.756 948.576 L 652.664 870.933 M 652.664 870.933 L 643.466 823.615 M 657.625 303.549 L 643.466 376.386 M 638.732 1042.708 L 633.093 978.255 M 633.093 978.255 L 619.854 826.933 M 623.258 156.209 L 611.922 372.512 M 597.318 372.216 L 600.766 356.093 L 589.507 343.464 L 586.827 298.288 M 586.827 298.288 L 580.616 156.023 M 566.373 825.304 L 566.295 833.044 L 573.875 843.45 C 574.408 856.432, 576.658 882.803, 562.786 891.356 L 564.053 899.698 L 553.754 898.438 M 563.607 977.952 L 557.406 1042.354 M 563.607 977.952 C 566.658 946.355, 569.855 942.749, 561.225 915.242 L 553.62 909.232 L 553.754 898.438 M 560.581 300.583 L 541.994 159.402 M 537.756 819.131 L 537.903 840.133 C 524.504 853.683, 516.621 871.801, 512.474 889.244 L 522.481 891.882 M 532.065 305.741 L 500.032 166.99 M 522.481 891.882 C 520.168 895.65, 520.205 899.693, 518.097 903.379 C 513.388 911.618, 503.392 916.036, 499.158 925.046 C 491.994 940.286, 488.346 958.38, 483.06 974.41 C 477.641 990.845, 468.044 1007.373, 464.301 1023.175 M 525.069 384.877 C 521.609 377.818, 520.863 370.664, 519.723 362.851 L 505.649 357.023 C 503.609 344.116, 492.831 328.793, 494.048 317.196 M 501.418 394.636 C 496.919 379.352, 490.12 379.262, 484.101 369.032 C 476.979 356.928, 468.391 343.537, 463.005 331 L 456.723 333.998 C 453.115 285.189, 409.765 249.677, 400.492 202.901 M 487.047 797.825 C 468.902 810.69, 462.172 820.45, 448.462 837.104 L 448.582 846.38 L 442.979 852.936 L 442.006 879.885 M 479.285 406.815 L 364.504 223.128 M 462.906 418.07 L 332.554 245.086 M 464.17 891.287 A 321.4 321.4 0 0 1 442.006 879.885 M 455.101 775.776 L 358.481 892.986 M 442.006 879.885 L 426.152 886.707 C 417.961 898.893, 409.825 911.523, 401.607 923.747 M 443.193 434.76 L 294.095 277.644 M 431.935 753.775 C 412.358 763.023, 391.376 797.533, 377.583 804.046 L 346.859 767.466 C 339.291 776.113, 316.71 788.245, 305.611 793.072 L 305.527 799.024 L 293.466 806.587 C 292.04 811.782, 291.797 812.691, 288.944 816.746 L 268.066 818.415 C 257.774 831.329, 246.171 840.011, 232.371 849.681 M 425.495 453.573 L 327.978 371.746 M 406.815 479.284 L 343.889 439.964 M 401.607 923.747 L 367.802 978.913 M 382.266 666.969 C 377.027 667.779, 373.185 669.192, 368.645 671.028 C 368.353 671.145, 353.959 670.653, 351.753 671.138 C 337.096 674.45, 325.231 683.111, 309.699 683.242 M 358.481 892.986 L 317.326 942.91 M 343.889 439.964 L 298.858 411.826 M 327.978 371.746 L 259.57 314.345 M 316.213 496.71 L 182.401 448.006 M 309.699 683.242 L 172.815 722.493 M 305.741 532.065 L 166.99 500.032 M 298.858 411.826 L 223.128 364.503 M 298.011 597.365 L 155.617 596.122 M 494.048 317.196 L 444.088 183.848 M 300.603 639.56 L 159.429 658.214 M 503.728 806.457 L 464.17 891.287 M 464.17 891.287 L 412.188 1002.763 M 516.881 812.095 L 437.849 1013.761 M 392.711 694.467 L 195.613 784.29 M 462 574 L 484 574 L 484 649 L 462 649 L 462 574" class="frontera" id="fronteras_solidas" inkscape:label="fronteras entre regiones: radiales, oblicuas, curvas y arcos intermedios (un trazo por arista)" />
+    <path d="M 1040.983 654.999 L 899.679 637.375 M 1040.075 538.151 L 976.004 547.156 M 1024.982 470.07 L 963.109 488.986 M 901.723 926.273 L 803.468 823.622 L 779 843.234 M 752.957 293.216 A 342.8 342.8 0 0 0 711.605 275.876 M 733.023 929.243 A 355.1 355.1 0 0 1 667.756 948.576 M 722.146 172.716 L 684.992 306.888 C 680.177 309.213, 678.421 308.319, 673.06 306.97 M 707.51 168.801 L 673.06 306.97 M 380.807 537.974 L 309.411 517.771 M 331.843 461.092 L 205.4 395.593 M 327.978 371.746 A 355.1 355.1 0 0 0 298.858 411.826 M 325.444 474.209 L 195.985 414.896 M 299.756 567.48 L 158.184 552.145 M 682.757 450.702 L 705.941 408.877 M 742.344 694.216 L 769.416 712.134 M 482.498 723.821 L 459.92 747.614 M 467.341 492.575 L 438.742 469.416 M 656.568 790.971 L 664.699 818.419 M 521.643 780.208 L 509.165 808.906 M 422.566 493.387 L 404.737 482.674 M 534.228 408.985 L 525.836 384.611 M 429.674 480.737 L 445.999 492.168 A 188 188 0 0 0 412.715 583.615 L 395.961 582.149 M 819.726 539.89 L 857.055 529.678 M 857.055 529.678 L 891.296 520.31 M 820.038 658.959 L 857.419 668.975 M 857.419 668.975 L 891.71 678.163 M 857.055 529.678 A 266.5 266.5 0 0 1 857.419 668.975" class="frontera-inferida" id="fronteras_inferidas" inkscape:label="fronteras inferidas (punteadas)" />
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Etiquetas ojo izquierdo" id="g_etiquetas_oi">
+   <g inkscape:groupmode="layer" inkscape:label="Etiquetas zona de organos" id="g_et_organos">
+    <text transform="translate(640.99 263.51) rotate(-83.1)" class="lbl-organ" style="font-size:14.3px" inkscape:label="SENSITIVIDAD [ocr-parcial]" data-conf="ocr-parcial" data-theta="6.9" id="lbl_o0">SENSITIVIDAD</text>
+    <text transform="translate(689.83 266.92) rotate(-74.9)" class="lbl-organ" style="font-size:12px" inkscape:label="MENTALIDAD INNATA [ocr-parcial]" data-conf="ocr-parcial" data-theta="15.1" id="lbl_o3">MENTALIDAD INNATA</text>
+    <text transform="translate(767.41 301.75) rotate(-60.7)" class="lbl-organ" style="font-size:14.3px" inkscape:label="MEDULA [ocr]" data-conf="ocr" data-theta="29.3" id="lbl_o6">MEDULA</text>
+    <text transform="translate(798.99 325.57) rotate(-54.1)" class="lbl-organ" style="font-size:14.3px" inkscape:label="MASTOIDES [ocr]" data-conf="ocr" data-theta="35.9" id="lbl_o7">MASTOIDES</text>
+    <text transform="translate(834.97 351.56) rotate(-46.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="OIDO [ocr]" data-conf="ocr" data-theta="43.4" id="lbl_o8">OIDO</text>
+    <text transform="translate(866.87 386.13) rotate(-38.7)" class="lbl-organ" style="font-size:14.3px" inkscape:label="CUELLO [ocr]" data-conf="ocr" data-theta="51.3" id="lbl_o9">CUELLO</text>
+    <text transform="translate(894.51 426.16) rotate(-30.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="HOMBRO [ocr]" data-conf="ocr" data-theta="59.4" id="lbl_o10">HOMBRO</text>
+    <text transform="translate(847.94 518.48) rotate(-18.2)" class="lbl-organ" style="font-size:13.5px" inkscape:label="AORTA (AO) [ocr]" data-conf="ocr" data-theta="71.8" id="lbl_o11">AORTA (AO)</text>
+    <text transform="translate(935.00 526.35) rotate(-12.4)" class="lbl-organ" style="font-size:13.5px" inkscape:label="PULMON [ocr]" data-conf="ocr" data-theta="77.6" id="lbl_o13">PULMON</text>
+    <text transform="translate(888.00 600.00) rotate(90.0)" class="lbl-organ" style="font-size:14.3px" inkscape:label="BRONQUIOLOS [ocr]" data-conf="ocr" data-theta="90.0" id="lbl_o15">BRONQUIOLOS</text>
+    <text transform="translate(843.91 576.94) rotate(84.6)" class="lbl-organ" style="font-size:13.5px" inkscape:label="CORAZON [ocr-parcial]" data-conf="ocr-parcial" data-theta="84.6" id="lbl_o16">CORAZON</text>
+    <text transform="translate(975.56 626.64) rotate(4.1)" class="lbl-organ" style="font-size:14.3px" inkscape:label="PLEURA [ocr]" data-conf="ocr" data-theta="94.1" id="lbl_o18">PLEURA</text>
+    <text transform="translate(976.22 668.89) rotate(10.4)" class="lbl-organ" style="font-size:14.3px" inkscape:label="TORAX [ocr]" data-conf="ocr" data-theta="100.4" id="lbl_o19">TORAX</text>
+    <text transform="translate(830.80 696.07) rotate(22.6)" class="lbl-organ" style="font-size:13.5px" inkscape:label="PL. SOL. [ocr]" data-conf="ocr" data-theta="112.6" id="lbl_o20">PL. SOL.</text>
+    <text transform="translate(904.77 745.00) rotate(25.4)" class="lbl-organ" style="font-size:14.3px" inkscape:label="COSTILLAS [ocr]" data-conf="ocr" data-theta="115.4" id="lbl_o21">COSTILLAS</text>
+    <text transform="translate(891.83 780.24) rotate(31.7)" class="lbl-organ" style="font-size:14.3px" inkscape:label="BRAZO MANO [ocr]" data-conf="ocr" data-theta="121.7" id="lbl_o22">BRAZO MANO</text>
+    <text transform="translate(882.52 823.12) rotate(38.3)" class="lbl-organ" style="font-size:15.6px" inkscape:label="BAZO [ocr]" data-conf="ocr" data-theta="128.3" id="lbl_o24">BAZO</text>
+    <text transform="translate(849.82 855.00) rotate(45.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="DIAFRAGMA [ocr]" data-conf="ocr" data-theta="135.6" id="lbl_o25">DIAFRAGMA</text>
+    <text transform="translate(845.59 881.38) rotate(48.9)" class="lbl-organ" style="font-size:13px" inkscape:label="ABD. SUPERIOR [ocr]" data-conf="ocr" data-theta="138.9" id="lbl_o26">ABD. SUPERIOR</text>
+    <text transform="translate(798.72 901.38) rotate(56.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="OVARIO TESTICULO [ocr]" data-conf="ocr" data-theta="146.6" id="lbl_o27">OVARIO TESTICULO</text>
+    <text transform="translate(771.11 942.10) rotate(63.4)" class="lbl-organ" style="font-size:14.3px" inkscape:label="PELVIS [ocr]" data-conf="ocr" data-theta="153.4" id="lbl_o28">PELVIS</text>
+    <text transform="translate(695.10 955.00) rotate(75.0)" class="lbl-organ" style="font-size:13px" inkscape:label="PARED ABDOMINAL [ocr]" data-conf="ocr" data-theta="165.0" id="lbl_o29">PARED ABDOMINAL</text>
+    <text transform="translate(707.30 926.30) rotate(71.8)" class="lbl-organ" style="font-size:14.3px" inkscape:label="PERITONEO [ocr]" data-conf="ocr" data-theta="161.8" id="lbl_o30">PERITONEO</text>
+    <text transform="translate(645.89 937.38) rotate(82.3)" class="lbl-organ" style="font-size:14.3px" inkscape:label="INGLE [ocr]" data-conf="ocr" data-theta="172.3" id="lbl_o31">INGLE</text>
+    <text transform="translate(597.38 1012.51) rotate(-89.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="PIE [ocr]" data-conf="ocr" data-theta="180.4" id="lbl_o32">PIE</text>
+    <text transform="translate(597.11 945.01) rotate(-89.5)" class="lbl-organ" style="font-size:14.3px" inkscape:label="ROD. [ocr]" data-conf="ocr" data-theta="180.5" id="lbl_o33">ROD.</text>
+    <text transform="translate(514.81 1011.27) rotate(-78.3)" class="lbl-organ" style="font-size:15.6px" inkscape:label="RIÑON [ocr]" data-conf="ocr" data-theta="191.7" id="lbl_o34">RIÑON</text>
+    <text transform="translate(544.61 862.73) rotate(-78.1)" class="lbl-organ" style="font-size:13px" inkscape:label="ADREN. [ocr]" data-conf="ocr" data-theta="191.9" id="lbl_o35">ADREN.</text>
+    <text transform="translate(471.76 966.19) rotate(-70.7)" class="lbl-organ" style="font-size:13px" inkscape:label="ESCROTO PERINEO [ocr-parcial]" data-conf="ocr-parcial" data-theta="199.3" id="lbl_o36">ESCROTO PERINEO</text>
+    <text transform="translate(465.20 917.57) rotate(-67.0)" class="lbl-organ" style="font-size:13.5px" inkscape:label="RECTO [ocr]" data-conf="ocr" data-theta="203.0" id="lbl_o37">RECTO</text>
+    <text transform="translate(466.60 851.85) rotate(-62.1)" class="lbl-organ" style="font-size:13px" inkscape:label="UT. PRO. [ocr]" data-conf="ocr" data-theta="207.9" id="lbl_o38">UT. PRO.</text>
+    <text transform="translate(408.06 970.24) rotate(-62.6)" class="lbl-organ" style="font-size:14.3px" inkscape:label="VAGINA [ocr]" data-conf="ocr" data-theta="207.4" id="lbl_o39">VAGINA</text>
+    <text transform="translate(400.31 879.50) rotate(-54.5)" class="lbl-organ" style="font-size:14.3px" inkscape:label="VEJIGA [ocr]" data-conf="ocr" data-theta="215.5" id="lbl_o40">VEJIGA</text>
+    <text transform="translate(297.96 766.73) rotate(-28.9)" class="lbl-organ" style="font-size:13px" inkscape:label="ESPALDA MEDIA [ocr-parcial]" data-conf="ocr-parcial" data-theta="241.1" id="lbl_o42">ESPALDA MEDIA</text>
+    <text transform="translate(338.42 564.28) rotate(7.8)" class="lbl-organ" style="font-size:14.3px" inkscape:label="BRONQUIOS [ocr]" data-conf="ocr" data-theta="277.8" id="lbl_o44">BRONQUIOS</text>
+    <text transform="translate(235.15 672.69) rotate(-11.3)" class="lbl-organ" style="font-size:14.3px" inkscape:label="OMOPLATO [ocr]" data-conf="ocr" data-theta="258.7" id="lbl_o45">OMOPLATO</text>
+    <text transform="translate(222.80 624.96) rotate(-3.8)" class="lbl-organ" style="font-size:14.3px" inkscape:label="ESOFAGO [ocr]" data-conf="ocr" data-theta="266.2" id="lbl_o46">ESOFAGO</text>
+    <text transform="translate(222.91 574.18) rotate(3.9)" class="lbl-organ" style="font-size:14.3px" inkscape:label="TRAQUEA [ocr]" data-conf="ocr" data-theta="273.9" id="lbl_o47">TRAQUEA</text>
+    <text transform="translate(244.42 543.56) rotate(9.0)" class="lbl-organ" style="font-size:13px" inkscape:label="CUERDAS VOCALES [ocr]" data-conf="ocr" data-theta="279.0" id="lbl_o48">CUERDAS VOCALES</text>
+    <text transform="translate(218.79 487.41) rotate(16.5)" class="lbl-organ" style="font-size:15.6px" inkscape:label="TIROIDES [ocr]" data-conf="ocr" data-theta="286.5" id="lbl_o49">TIROIDES</text>
+    <text transform="translate(377.05 507.24) rotate(22.6)" class="lbl-organ" style="font-size:13px" inkscape:label="P.T. [ocr]" data-conf="ocr" data-theta="292.6" id="lbl_o50">P.T.</text>
+    <text transform="translate(252.14 452.04) rotate(23.0)" class="lbl-organ" style="font-size:14.3px" inkscape:label="FARINGE [ocr]" data-conf="ocr" data-theta="293.0" id="lbl_o51">FARINGE</text>
+    <text transform="translate(261.37 435.50) rotate(25.9)" class="lbl-organ" style="font-size:14.3px" inkscape:label="LARINGE [ocr]" data-conf="ocr" data-theta="295.9" id="lbl_o52">LARINGE</text>
+    <text transform="translate(273.21 419.14) rotate(29.0)" class="lbl-organ" style="font-size:14.3px" inkscape:label="AMIGDALAS [ocr]" data-conf="ocr" data-theta="299.0" id="lbl_o53">AMIGDALAS</text>
+    <text transform="translate(306.56 378.70) rotate(37.0)" class="lbl-organ" style="font-size:14.3px" inkscape:label="LENGUA BOCA [ocr-parcial]" data-conf="ocr-parcial" data-theta="307.0" id="lbl_o54">LENGUA BOCA</text>
+    <text transform="translate(316.70 408.45) rotate(34.1)" class="lbl-organ" style="font-size:14px" inkscape:label="MANDIBULA INFERIOR [ocr-parcial]" data-conf="ocr-parcial" data-theta="304.1" id="lbl_o55">MANDIBULA INFERIOR</text>
+    <text transform="translate(354.80 368.10) rotate(43.4)" class="lbl-organ" style="font-size:14.3px" inkscape:label="NARIZ [ocr]" data-conf="ocr" data-theta="313.4" id="lbl_o56">NARIZ</text>
+    <text transform="translate(410.65 267.68) rotate(60.3)" class="lbl-organ" style="font-size:14.3px" inkscape:label="FRENTE SIEN [ocr]" data-conf="ocr" data-theta="330.3" id="lbl_o59">FRENTE SIEN</text>
+    <text transform="translate(453.09 271.36) rotate(65.9)" class="lbl-organ" style="font-size:14.3px" inkscape:label="DESARROLLO MENTAL [ocr-parcial]" data-conf="ocr-parcial" data-theta="335.9" id="lbl_o60">DESARROLLO MENTAL</text>
+    <text transform="translate(497.65 262.68) rotate(73.1)" class="lbl-organ" style="font-size:14.3px" inkscape:label="CENTRO DE LA PALABRA [ocr-parcial]" data-conf="ocr-parcial" data-theta="343.1" id="lbl_o62">CENTRO DE LA PALABRA</text>
+    <text transform="translate(570.15 262.28) rotate(84.9)" class="lbl-organ" style="font-size:14.3px" inkscape:label="AREA 5 SENTIDOS [ocr]" data-conf="ocr" data-theta="354.9" id="lbl_o64">AREA 5 SENTIDOS</text>
+    <text transform="translate(601.96 214.50) rotate(-89.7)" class="lbl-organ" style="font-size:15.6px" inkscape:label="CENTRO VITAL [ocr]" data-conf="ocr" data-theta="0.3" id="lbl_o65">CENTRO VITAL</text>
+   </g>
+   <g inkscape:groupmode="layer" inkscape:label="Etiquetas zona intestinal, estomago y SNA" id="g_et_intestinal">
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="COLON TRANSVERSO [ocr-parcial]" data-conf="ocr-parcial" data-theta="347.0" id="lbl_a66"><textPath href="#arc_66_colon_transverso" startOffset="50%">COLON TRANSVERSO</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="COLON DESCENDENTE [ocr]" data-conf="ocr" data-theta="70.5" id="lbl_a67"><textPath href="#arc_67_colon_descendente" startOffset="50%">COLON DESCENDENTE</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="SIGMOIDES [ocr]" data-conf="ocr" data-theta="176.0" id="lbl_a68"><textPath href="#arc_68_sigmoides" startOffset="50%">SIGMOIDES</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="INTESTINO DELGADO [ocr]" data-conf="ocr" data-theta="271.0" id="lbl_a69"><textPath href="#arc_69_intestino_delgado" startOffset="50%">INTESTINO DELGADO</textPath></text>
+    <text class="lbl-arc" style="font-size:10px;letter-spacing:0.6px" inkscape:label="PLACAS DE PEYER [aprox]" data-conf="aprox" data-theta="290.0" id="lbl_a70"><textPath href="#arc_70_placas_de_peyer" startOffset="50%">PLACAS DE PEYER</textPath></text>
+    <text class="lbl-arc" style="font-size:15px;letter-spacing:2.2px" inkscape:label="ESTOMAGO [ocr-parcial]" data-conf="ocr-parcial" data-theta="0.0" id="lbl_a71"><textPath href="#arc_71_estomago" startOffset="50%">ESTOMAGO</textPath></text>
+    <text class="lbl-arc" style="font-size:13px;letter-spacing:1.4px" inkscape:label="PILORO [aprox]" data-conf="aprox" data-theta="268.0" id="lbl_a72"><textPath href="#arc_72_piloro" startOffset="50%">PILORO</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:1.3px" inkscape:label="SISTEMA NERVIOSO AUTONOMO [ocr]" data-conf="ocr" data-theta="254.0" id="lbl_a73"><textPath href="#arc_73_sistema_nervioso_autonomo" startOffset="50%">SISTEMA NERVIOSO AUTONOMO</textPath></text>
+    <text class="lbl-arc" style="font-size:11px;letter-spacing:0.6px" inkscape:label="SISTEMA NERVIOSO AUTONOMO [ocr]" data-conf="ocr" data-theta="24.0" id="lbl_a74"><textPath href="#arc_74_sistema_nervioso_autonomo" startOffset="50%">SISTEMA NERVIOSO AUTONOMO</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="MES [ocr]" data-conf="ocr" data-theta="183.6" id="lbl_a75"><textPath href="#arc_75_mes" startOffset="50%">MES</textPath></text>
+    <text class="lbl-arc" style="font-size:14px;letter-spacing:2px" inkscape:label="MES [ocr]" data-conf="ocr" data-theta="321.0" id="lbl_a76"><textPath href="#arc_76_mes" startOffset="50%">MES</textPath></text>
+   </g>
+   <g inkscape:groupmode="layer" inkscape:label="Etiquetas anillo exterior (cerebro, piel, circulatorio)" id="g_et_exterior">
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CEREBRO PSICOLOGICO [ocr]" data-conf="ocr" data-theta="344.1" id="lbl_a77"><textPath href="#arc_77_cerebro_psicologico" startOffset="50%">CEREBRO PSICOLOGICO</textPath></text>
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CEREBRO MOTRIZ [ocr]" data-conf="ocr" data-theta="343.6" id="lbl_a78"><textPath href="#arc_78_cerebro_motriz" startOffset="50%">CEREBRO MOTRIZ</textPath></text>
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CEREBRO FISIOLOGICO [ocr]" data-conf="ocr" data-theta="15.3" id="lbl_a79"><textPath href="#arc_79_cerebro_fisiologico" startOffset="50%">CEREBRO FISIOLOGICO</textPath></text>
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CEREBELO SENSORIAL [ocr]" data-conf="ocr" data-theta="14.4" id="lbl_a80"><textPath href="#arc_80_cerebelo_sensorial" startOffset="50%">CEREBELO SENSORIAL</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CARA [por-confirmar]" data-conf="por-confirmar" data-theta="315.4" id="lbl_a81"><textPath href="#arc_81_cara" startOffset="50%">CARA</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="GARGANTA [por-confirmar]" data-conf="por-confirmar" data-theta="286.7" id="lbl_a82"><textPath href="#arc_82_garganta" startOffset="50%">GARGANTA</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="ESPALDA ALTA [por-confirmar]" data-conf="por-confirmar" data-theta="254.0" id="lbl_a83"><textPath href="#arc_83_espalda_alta" startOffset="50%">ESPALDA ALTA</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="ESPALDA BAJA [por-confirmar]" data-conf="por-confirmar" data-theta="225.0" id="lbl_a84"><textPath href="#arc_84_espalda_baja" startOffset="50%">ESPALDA BAJA</textPath></text>
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="PELVIS [ocr]" data-conf="ocr" data-theta="194.8" id="lbl_a85"><textPath href="#arc_85_pelvis" startOffset="50%">PELVIS</textPath></text>
+    <text class="lbl-outer" style="font-size:17px;letter-spacing:1.76px" inkscape:label="ABDOMEN INFERIOR [ocr]" data-conf="ocr" data-theta="165.0" id="lbl_a86"><textPath href="#arc_86_abdomen_inferior" startOffset="50%">ABDOMEN INFERIOR</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="ABDOMEN SUPERIOR [por-confirmar]" data-conf="por-confirmar" data-theta="136.0" id="lbl_a87"><textPath href="#arc_87_abdomen_superior" startOffset="50%">ABDOMEN SUPERIOR</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="TORAX [por-confirmar]" data-conf="por-confirmar" data-theta="105.4" id="lbl_a88"><textPath href="#arc_88_torax" startOffset="50%">TORAX</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="PULMON [por-confirmar]" data-conf="por-confirmar" data-theta="75.4" id="lbl_a89"><textPath href="#arc_89_pulmon" startOffset="50%">PULMON</textPath></text>
+    <text class="lbl-outer espejo" style="font-size:17px;letter-spacing:1.76px" inkscape:label="CUELLO [por-confirmar]" data-conf="por-confirmar" data-theta="45.4" id="lbl_a90"><textPath href="#arc_90_cuello" startOffset="50%">CUELLO</textPath></text>
+    <text class="lbl-outer" style="font-size:14px;letter-spacing:4.22px" inkscape:label="SISTEMA CIRCULATORIO Y LINFATICO [ocr]" data-conf="ocr" data-theta="314.6" id="lbl_a91"><textPath href="#arc_91_sistema_circulatorio_y_linfatico" startOffset="50%">SISTEMA CIRCULATORIO Y LINFATICO</textPath></text>
+    <text class="lbl-outer" style="font-size:14px;letter-spacing:4.22px" inkscape:label="SISTEMA CIRCULATORIO Y LINFATICO [ocr]" data-conf="ocr" data-theta="168.0" id="lbl_a92"><textPath href="#arc_92_sistema_circulatorio_y_linfatico" startOffset="50%">SISTEMA CIRCULATORIO Y LINFATICO</textPath></text>
+    <text class="lbl-outer" style="font-size:12px;letter-spacing:4.56px" inkscape:label="PIEL [ocr]" data-conf="ocr" data-theta="45.3" id="lbl_a93"><textPath href="#arc_93_piel" startOffset="50%">PIEL</textPath></text>
+    <text class="lbl-outer" style="font-size:12px;letter-spacing:4.56px" inkscape:label="PIEL [ocr]" data-conf="ocr" data-theta="167.1" id="lbl_a94"><textPath href="#arc_94_piel" startOffset="50%">PIEL</textPath></text>
+    <text class="lbl-outer" style="font-size:12px;letter-spacing:4.56px" inkscape:label="PIEL [ocr]" data-conf="ocr" data-theta="314.3" id="lbl_a95"><textPath href="#arc_95_piel" startOffset="50%">PIEL</textPath></text>
+   </g>
+   <g inkscape:groupmode="layer" inkscape:label="Etiquetas por confirmar (no leidas en el grafico izquierdo; tomadas del espejo)" id="g_et_confirmar">
+    <text transform="translate(679.31 256.53) rotate(-77.0)" class="lbl-unverified" style="font-size:12px" inkscape:label="ALUCINACION [por-confirmar]" data-conf="por-confirmar" data-theta="13.0" id="lbl_o1">ALUCINACION</text>
+    <text transform="translate(706.26 248.20) rotate(-73.2)" class="lbl-unverified" style="font-size:12px" inkscape:label="OBSESION [por-confirmar]" data-conf="por-confirmar" data-theta="16.8" id="lbl_o2">OBSESION</text>
+    <text transform="translate(723.29 289.04) rotate(-68.4)" class="lbl-unverified" style="font-size:13px" inkscape:label="IMPULSO SEXUAL [por-confirmar]" data-conf="por-confirmar" data-theta="21.6" id="lbl_o4">IMPULSO SEXUAL</text>
+    <text transform="translate(743.11 279.53) rotate(-65.9)" class="lbl-unverified" style="font-size:12px" inkscape:label="PERVERSION [por-confirmar]" data-conf="por-confirmar" data-theta="24.1" id="lbl_o5">PERVERSION</text>
+    <text transform="translate(998.08 444.07) rotate(-21.4)" class="lbl-unverified" style="font-size:13px" inkscape:label="PULMON SUP. [por-confirmar]" data-conf="por-confirmar" data-theta="68.6" id="lbl_o12">PULMON SUP.</text>
+    <text transform="translate(981.23 517.62) rotate(-12.2)" class="lbl-unverified" style="font-size:13px" inkscape:label="PULMON MEDIO [por-confirmar]" data-conf="por-confirmar" data-theta="77.8" id="lbl_o14">PULMON MEDIO</text>
+    <text transform="translate(1026.83 575.42) rotate(-3.3)" class="lbl-unverified" style="font-size:13px" inkscape:label="PULMON INF. [por-confirmar]" data-conf="por-confirmar" data-theta="86.7" id="lbl_o17">PULMON INF.</text>
+    <text transform="translate(803.33 758.81) rotate(38.0)" class="lbl-unverified" style="font-size:13px" inkscape:label="VESIC. [por-confirmar]" data-conf="por-confirmar" data-theta="128.0" id="lbl_o23">VESIC.</text>
+    <text transform="translate(317.60 854.27) rotate(-42.0)" class="lbl-unverified" style="font-size:13px" inkscape:label="ESPALDA BAJA [por-confirmar]" data-conf="por-confirmar" data-theta="228.0" id="lbl_o41">ESPALDA BAJA</text>
+    <text transform="translate(249.49 727.57) rotate(-20.0)" class="lbl-unverified" style="font-size:13px" inkscape:label="ESPALDA ALTA [por-confirmar]" data-conf="por-confirmar" data-theta="250.0" id="lbl_o43">ESPALDA ALTA</text>
+    <text transform="translate(385.63 345.18) rotate(49.9)" class="lbl-unverified" style="font-size:14px" inkscape:label="MANDIBULA SUPERIOR [por-confirmar]" data-conf="por-confirmar" data-theta="319.9" id="lbl_o57">MANDIBULA SUPERIOR</text>
+    <text transform="translate(402.71 315.11) rotate(55.3)" class="lbl-unverified" style="font-size:14.3px" inkscape:label="OJO [por-confirmar]" data-conf="por-confirmar" data-theta="325.3" id="lbl_o58">OJO</text>
+    <text transform="translate(553.93 362.96) rotate(79.0)" class="lbl-unverified" style="font-size:13px" inkscape:label="G. PIT. [por-confirmar]" data-conf="por-confirmar" data-theta="349.0" id="lbl_o61">G. PIT.</text>
+    <text transform="translate(530.68 222.33) rotate(79.6)" class="lbl-unverified" style="font-size:14.3px" inkscape:label="EGO, PRESION ART. [por-confirmar]" data-conf="por-confirmar" data-theta="349.6" id="lbl_o63">EGO, PRESION ART.</text>
+   </g>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="Titulo y leyenda" id="g_leyenda">
+    <text x="1160" y="1128" class="lbl-title" id="titulo" text-anchor="end">OJO IZQUIERDO</text>
+    <text x="1160" y="1156" class="lbl-legend" id="ley_gpit" text-anchor="end">G. Pit.  -  Pituitaria</text>
+    <text x="1160" y="1176" class="lbl-legend" id="ley_n" text-anchor="end">N  -  Ombligo</text>
+    <text x="1160" y="1196" class="lbl-legend" id="ley_ao" text-anchor="end">AO  -  Aorta</text>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     inkscape:label="Numeros de las horas"
+     id="g197">
+    <text
+       x="867.5"
+       y="136.676"
+       class="hour-number"
+       id="text186">1</text>
+    <text
+       x="1063.324"
+       y="332.5"
+       class="hour-number"
+       id="text187">2</text>
+    <text
+       x="1135"
+       y="600"
+       class="cardinal-number"
+       id="text188">3</text>
+    <text
+       x="1063.324"
+       y="867.5"
+       class="hour-number"
+       id="text189">4</text>
+    <text
+       x="867.5"
+       y="1063.324"
+       class="hour-number"
+       id="text190">5</text>
+    <text
+       x="600"
+       y="1135"
+       class="cardinal-number"
+       id="text191">6</text>
+    <text
+       x="332.5"
+       y="1063.324"
+       class="hour-number"
+       id="text192">7</text>
+    <text
+       x="136.676"
+       y="867.5"
+       class="hour-number"
+       id="text193">8</text>
+    <text
+       x="65"
+       y="600"
+       class="cardinal-number"
+       id="text194">9</text>
+    <text
+       x="136.676"
+       y="332.5"
+       class="hour-number"
+       id="text195">10</text>
+    <text
+       x="332.5"
+       y="136.676"
+       class="hour-number"
+       id="text196">11</text>
+    <text
+       x="600"
+       y="65"
+       class="cardinal-number"
+       id="text197">12</text>
+  </g>
+  <metadata id="metadata_oi_v1">ojo_izquierdo_v1: construido con el mismo metodo y estilo que iris_map_v7 (ojo derecho). Prior: v7 reflejado (angulo -> 360-angulo) con correccion angular medida en el grafico izquierdo; fronteras como trazos vectoriales limpios (ancho 1.5, aros 2.0, uniones redondeadas, radiales a 0.5 grados, arcos A en los radios medidos, onda SNA re-trazada como una curva Bezier cerrada). Particion plana: 80 regiones, una linea por frontera, sin huecos ni solapes. Solo negro y gris.</metadata>
+</svg>

@@ -1,5 +1,7 @@
 import { fhirRead, displayName } from "@/lib/fhir";
 import { PatientNav } from "@/components/ui";
+import { loadAccessModules } from "@/lib/clinic-config";
+import { canAccess, type RoleId } from "@/lib/roles";
 import { requireScreen } from "@/lib/require";
 
 export default async function PatientLayout({
@@ -9,7 +11,9 @@ export default async function PatientLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  await requireScreen("patients");
+  const user = await requireScreen("patients");
+  const modules = await loadAccessModules().catch(() => ({}) as Record<string, boolean>);
+  const showIris = canAccess(user.role as RoleId, "iris", modules);
   const { id } = await params;
   const patient = await fhirRead("Patient", id);
   return (
@@ -19,7 +23,7 @@ export default async function PatientLayout({
       <p className="mt-1 text-sm text-[#6D5E52]">
         {String(patient.gender || "")} {patient.birthDate ? `· ${patient.birthDate}` : ""} · {id}
       </p>
-      <PatientNav id={id} />
+      <PatientNav id={id} showIris={showIris} />
       <div className="mt-8">{children}</div>
     </div>
   );

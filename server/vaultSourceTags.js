@@ -36,6 +36,7 @@ const DOMAIN_FROM_TAG = {
   regen_med: 'stem_cells',
   iridology: 'iridology',
   iridologia: 'iridology',
+  iris: 'iridology',
   functional: 'functional',
   medicina_funcional: 'functional',
   peptides: 'peptides',

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "./session";
 import { canAccess, type RoleId } from "./roles";
-import { loadModules } from "./clinic-config";
+import { loadAccessModules } from "./clinic-config";
 
 export async function requireUser() {
   const user = await getSession();
@@ -11,7 +11,7 @@ export async function requireUser() {
 
 export async function requireScreen(screen: string) {
   const user = await requireUser();
-  const { modules } = await loadModules().catch(() => ({ modules: {} as Record<string, boolean> }));
+  const modules = await loadAccessModules().catch(() => ({}) as Record<string, boolean>);
   if (!canAccess(user.role as RoleId, screen, modules)) {
     redirect(`/?aviso=${encodeURIComponent("Esa pantalla no está disponible para tu rol o está apagada en módulos.")}`);
   }

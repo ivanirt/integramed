@@ -1,0 +1,15 @@
+{
+  "version": "2026-10-04",
+  "eyes": {
+    "right": {
+      "file": "ojo_derecho_v7.svg",
+      "displayName": "Ojo derecho",
+      "version": "v7"
+    },
+    "left": {
+      "file": "ojo_izquierdo_v1.svg",
+      "displayName": "Ojo izquierdo",
+      "version": "v1"
+    }
+  }
+}

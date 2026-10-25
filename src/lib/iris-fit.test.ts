@@ -81,3 +81,23 @@ test("suggestIrisFit finds a synthetic pupil and iris and ignores a blank frame"
   blank.fill(180);
   assert.equal(suggestIrisFit(blank, width, height), null);
 });
+
+test("suggestIrisFit finds an off-center pupil and falls back when the sclera is missing", () => {
+  const width = 180;
+  const height = 180;
+  const gray = new Float32Array(width * height);
+  gray.fill(230);
+  const cx = 48;
+  const cy = 52;
+  const rp = 14;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (Math.hypot(x - cx, y - cy) < rp) gray[y * width + x] = 8;
+    }
+  }
+  const fit = suggestIrisFit(gray, width, height);
+  assert.ok(fit);
+  assert.ok(Math.abs(fit.cx - cx) < 10, `cx ${fit?.cx}`);
+  assert.ok(Math.abs(fit.cy - cy) < 10, `cy ${fit?.cy}`);
+  assert.ok(fit.ri > fit.rp * 1.5);
+});

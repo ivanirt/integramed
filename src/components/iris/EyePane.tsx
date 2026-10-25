@@ -129,6 +129,7 @@ export function EyePane({
   const suggestToken = useRef(0);
   const photoToken = useRef(0);
   const [suggestRun, setSuggestRun] = useState(0);
+  const [suggesting, setSuggesting] = useState(false);
   const onSlotRef = useRef(onSlot);
   const onControllerRef = useRef(onController);
   const [dragOver, setDragOver] = useState(false);
@@ -239,6 +240,7 @@ export function EyePane({
     const photo = slot.photo;
     const token = ++suggestToken.current;
     let cancel = false;
+    setSuggesting(true);
     void (async () => {
       try {
         const image = await loadHtmlImage(photo.url);
@@ -250,7 +252,7 @@ export function EyePane({
           onSlotRef.current({
             forPhoto: photo.url,
             autoSuggest: false,
-            fitNote: "No se pudo estimar el iris en esta foto. Coloca el centro, la pupila y el borde a mano.",
+            fitNote: "No se vio un círculo oscuro de pupila. Centra el ojo en la foto o coloca el mapa a mano.",
           });
           return;
         }
@@ -265,13 +267,13 @@ export function EyePane({
               cy: guess.cy * scale,
               rp: guess.rp * scale,
               ri: guess.ri * scale,
-              rotation: 0,
+              rotation: fitRef.current?.rotation ?? 0,
             },
             photo.width,
             photo.height,
           ),
           fitNote:
-            "Sugerencia automática de centro y radios. No estima la rotación. Muchas fotos necesitan unos −30° y un ajuste manual.",
+            "Ajuste sugerido: centro, pupila y borde del iris. La rotación no se estima; corrígela con el asa de las 12 si hace falta.",
         });
       } catch {
         if (!cancel && token === suggestToken.current) {
@@ -281,10 +283,13 @@ export function EyePane({
             fitNote: "No se pudo leer la foto para sugerir el ajuste.",
           });
         }
+      } finally {
+        if (!cancel && token === suggestToken.current) setSuggesting(false);
       }
     })();
     return () => {
       cancel = true;
+      setSuggesting(false);
     };
   }, [slot.autoSuggest, slot.photo, loaded, suggestRun]);
 
@@ -406,6 +411,16 @@ export function EyePane({
       onSlot({ photoError: "No se pudo leer esa imagen.", autoSuggest: false });
     };
     image.src = url;
+  }
+
+  function requestSuggest() {
+    if (!slot.photo || !loaded || suggesting) return;
+    suggestToken.current += 1;
+    setSuggestRun((run) => run + 1);
+    onSlot({
+      autoSuggest: true,
+      fitNote: "Estimando centro y radios…",
+    });
   }
 
   function updateIris(nextRi: number) {
@@ -656,9 +671,9 @@ export function EyePane({
       </div>
 
       {slot.photoError ? <p className="mt-2 text-sm text-[#6D5E52]">{slot.photoError}</p> : null}
+      {slot.fitNote ? <p className="mt-2 text-sm text-[#6D5E52]">{slot.fitNote}</p> : null}
       {expanded ? null : (
         <>
-          {slot.fitNote ? <p className="mt-3 text-sm text-[#6D5E52]">{slot.fitNote}</p> : null}
           {loaded?.geom.usedFallback ? (
             <p className="mt-2 text-sm text-[#6D5E52]">
               Este SVG no declara bien pupila o radio exterior. El ajuste usa el viewBox como aproximación.
@@ -721,6 +736,9 @@ export function EyePane({
           <GhostButton type="button" onClick={() => onSlot({ overlayVisible: !slot.overlayVisible })} disabled={!loaded}>
             {slot.overlayVisible ? "Ocultar mapa" : "Mostrar mapa"}
           </GhostButton>
+          <GhostButton type="button" disabled={!slot.photo || !loaded || suggesting} onClick={requestSuggest}>
+            {suggesting ? "Estimando…" : "Sugerir ajuste"}
+          </GhostButton>
           {slot.photo && slot.fit ? (
             <label className="flex items-center gap-2">
               Rotación {Math.round(slot.fit.rotation)}°
@@ -775,22 +793,8 @@ export function EyePane({
         <GhostButton type="button" onClick={() => onSlot({ labelsVisible: !slot.labelsVisible })} disabled={!loaded}>
           {slot.labelsVisible ? "Ocultar etiquetas" : "Etiquetas del mapa"}
         </GhostButton>
-        <GhostButton
-          type="button"
-          disabled={!slot.photo || !loaded}
-          onClick={() => {
-            if (!slot.photo || !loaded) return;
-            suggestToken.current += 1;
-            setSuggestRun((run) => run + 1);
-            onSlot({
-              pupilTuned: false,
-              autoSuggest: true,
-              fitNote: null,
-              fit: defaultFit(slot.photo.width, slot.photo.height, loaded.geom),
-            });
-          }}
-        >
-          Sugerir ajuste
+        <GhostButton type="button" disabled={!slot.photo || !loaded || suggesting} onClick={requestSuggest}>
+          {suggesting ? "Estimando…" : "Sugerir ajuste"}
         </GhostButton>
         <GhostButton type="button" disabled={!slot.photo || !slot.fit || busyExport} onClick={() => onExport("active")}>
           {busyExport ? "Exportando…" : showingClean ? "Descargar solo iris" : slot.mask ? "Descargar original" : "Descargar PNG"}

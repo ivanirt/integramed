@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveIrisNoteAction } from "@/lib/actions";
 import { EyePane, emptySlot, slotView, type LoadedMap, type SlotState } from "@/components/iris/EyePane";
 import { exportIrisPairPng, exportIrisPng, type IrisOverlayController, type IrisPngSide } from "@/components/iris/mountIrisOverlay";
-import { cleanedPhotoBlob } from "@/components/iris/paintIrisClean";
+import { cleanedPhotoBlob, loadHtmlImage } from "@/components/iris/paintIrisClean";
 import { clampIrisMask, defaultIrisMask, maskLimit } from "@/lib/iris-mask";
 import { Button, GhostButton } from "@/components/ui";
 import {
@@ -20,7 +20,12 @@ import {
   type RegionInfoEntry,
 } from "@/lib/iris-map";
 import { defaultFit, resolveGeometry } from "@/lib/iris-fit";
-
+import {
+  findingsSentence,
+  rasterFromImage,
+  scoreAffectedOrgans,
+  type IrisFinding,
+} from "@/lib/iris-findings";
 type EyeScope = "both" | IrisEye;
 type OrganPick = { key: string; source: IrisEye | "list" };
 
@@ -80,6 +85,9 @@ export function EyeDiagnosis({
   const [exportError, setExportError] = useState<string | null>(null);
   const [busy, setBusy] = useState<IrisEye | "pair" | "pair-original" | null>(null);
   const [maximized, setMaximized] = useState<null | "both" | IrisEye>(null);
+  const [findings, setFindings] = useState<IrisFinding[]>([]);
+  const [findingStatus, setFindingStatus] = useState<string | null>(null);
+  const [findingBusy, setFindingBusy] = useState(false);
 
   const slotsRef = useRef(slots);
   const mapsRef = useRef(maps);
@@ -289,6 +297,52 @@ export function EyeDiagnosis({
     }));
   }
 
+  async function identifyAffected() {
+    setFindingBusy(true);
+    setFindingStatus(null);
+    try {
+      const rows: IrisFinding[] = [];
+      for (const eye of ["right", "left"] as const) {
+        const slot = slotsRef.current[eye];
+        const loaded = mapsRef.current[eye];
+        if (!slot.photo || !slot.fit || !loaded) continue;
+        const image = await loadHtmlImage(slot.photo.url);
+        const raster = rasterFromImage(image, slot.photo.width, slot.photo.height);
+        if (!raster) continue;
+        rows.push(
+          ...scoreAffectedOrgans(
+            raster.gray,
+            raster.width,
+            raster.height,
+            raster.scale,
+            slot.fit,
+            loaded.geom,
+            loaded.map.regions,
+            eye,
+          ),
+        );
+      }
+      rows.sort((a, b) => b.score - a.score);
+      const next = rows.slice(0, 8);
+      setFindings(next);
+      if (!next.length) {
+        setFindingStatus(
+          "No hay un contraste claro de pigmento, o falta alinear una foto con Sugerir ajuste. Esto no es un diagnóstico.",
+        );
+        return;
+      }
+      setFindingStatus("Pigmento más oscuro que el anillo a la misma distancia de la pupila. No es un hallazgo clínico.");
+      const top = next[0];
+      setPicked({ key: top.organKey, source: top.eye });
+      setDismissed(false);
+    } catch (err) {
+      setFindings([]);
+      setFindingStatus(err instanceof Error ? err.message : "No se pudo leer la foto.");
+    } finally {
+      setFindingBusy(false);
+    }
+  }
+
   async function sidePayload(
     eye: IrisEye,
     version: "active" | "original",
@@ -444,6 +498,7 @@ export function EyeDiagnosis({
         organ: selected?.organ,
         kind: selected?.kinds.map(kindLabel).join(", "),
         inferred: selected?.inferred,
+        findings: findingsSentence(findings),
         mapLabel: eyes
           .map((eye) => {
             const entry = maps[eye]?.entry;
@@ -500,6 +555,13 @@ export function EyeDiagnosis({
         <GhostButton type="button" onClick={() => openMaximized("both")}>
           Ampliar ambos ojos
         </GhostButton>
+        <Button
+          type="button"
+          disabled={findingBusy || !canClean}
+          onClick={() => void identifyAffected()}
+        >
+          {findingBusy ? "Identificando…" : "Identificar zonas marcadas"}
+        </Button>
         {exportError ? <p className="text-sm text-red-800">{exportError}</p> : null}
       </div>
 
@@ -529,6 +591,9 @@ export function EyeDiagnosis({
                   Ampliar ambos ojos
                 </GhostButton>
               ) : null}
+              <GhostButton type="button" disabled={findingBusy || !canClean} onClick={() => void identifyAffected()}>
+                {findingBusy ? "Identificando…" : "Identificar zonas marcadas"}
+              </GhostButton>
               <Button type="button" onClick={closeMaximized}>
                 Cerrar
               </Button>
@@ -611,6 +676,39 @@ export function EyeDiagnosis({
             <p className="mt-2 text-xs text-[#6D5E52]">
               La búsqueda resalta el mismo órgano en los dos ojos. Derecho o Izquierdo limita la lista y el resalte.
             </p>
+          </div>
+          <div className="border-b border-[#EADBCE] px-4 py-3" aria-live="polite">
+            <h3 className="font-serif text-lg">Órganos de las zonas más marcadas</h3>
+            <p className="mt-1 text-xs text-[#6D5E52]">
+              Compara el pigmento de cada sector con el resto del anillo, en esta foto. No sustituye un diagnóstico.
+            </p>
+            {findingStatus ? <p className="mt-2 text-xs text-[#6D5E52]">{findingStatus}</p> : null}
+            {findings.length ? (
+              <ol className="mt-3 space-y-1 text-sm">
+                {findings.map((row, index) => {
+                  const active = row.organKey === selection?.key;
+                  return (
+                    <li key={`${row.eye}-${row.organKey}`}>
+                      <button
+                        type="button"
+                        className={`block w-full px-2 py-1 text-left ${active ? "bg-[#241B16] text-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
+                        onClick={() => choose(row.eye, row.organKey)}
+                      >
+                        <span className="mr-2 text-xs opacity-70">{index + 1}.</span>
+                        {row.organ}
+                        <span className={`mt-0.5 block text-xs ${active ? "text-[#EADBCE]" : "text-[#6D5E52]"}`}>
+                          {row.eye === "right" ? "ojo derecho" : "ojo izquierdo"} del paciente
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="mt-2 text-sm text-[#6D5E52]">
+                Alinea una foto y pulsa Identificar zonas marcadas.
+              </p>
+            )}
           </div>
           <div className="px-4 py-3" aria-live="polite">
             {selected ? (

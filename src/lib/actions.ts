@@ -308,6 +308,7 @@ export async function saveIrisNoteAction(input: {
   kind?: string;
   inferred?: boolean;
   mapLabel?: string;
+  findings?: string;
 }) {
   await requireScreen("iris");
   const patientId = input.patientId.trim();
@@ -328,6 +329,7 @@ export async function saveIrisNoteAction(input: {
       ? `Región señalada en el mapa: ${organ}${input.kind ? ` (${input.kind})` : ""}${input.inferred ? ". La ubicación está marcada como inferida en el mapa." : "."}`
       : "Sin región seleccionada.",
     input.mapLabel ? `Mapa: ${input.mapLabel}.` : "",
+    input.findings?.trim() || "",
     "La fotografía se quedó en el navegador y no se adjuntó.",
   ]
     .filter(Boolean)

@@ -130,10 +130,46 @@ function meanCircle(
   return sum / n;
 }
 
+function pupilContrastScore(
+  gray: Float32Array,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  rp: number,
+  minSide: number,
+) {
+  const inside = meanCircle(gray, width, height, cx, cy, rp * 0.5);
+  const ring = meanCircle(gray, width, height, cx, cy, Math.min(rp * 1.35, minSide * 0.45));
+  if (inside >= ring - 6) return -1;
+  const off = Math.hypot(cx - width / 2, cy - height / 2) / minSide;
+  return ring - inside - inside * 0.45 - off * 12 - (rp / minSide) * 50;
+}
+
+function estimateIrisRadius(
+  gray: Float32Array,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  rp: number,
+  minSide: number,
+) {
+  const maxR = minSide * 0.48;
+  let best: { ri: number; score: number } | null = null;
+  for (let r = rp * 1.7; r <= maxR; r += Math.max(1.5, minSide / 80)) {
+    const inner = meanCircle(gray, width, height, cx, cy, Math.max(rp + 1, r - 2));
+    const outer = meanCircle(gray, width, height, cx, cy, r + 3);
+    const score = outer - inner;
+    if (!best || score > best.score) best = { ri: r, score };
+  }
+  if (best && best.score >= 4 && best.ri > rp * 1.35) return best.ri;
+  return Math.min(Math.max(rp * 3.05, rp * 1.85), minSide * 0.46);
+}
+
 /**
- * Rough in-browser pupil/iris estimate. It is a starting point: photos in the
- * earlier prototype usually still needed a manual correction, and rotation is
- * not estimated at all.
+ * In-browser pupil/iris estimate from a grayscale photo. Rotation is not
+ * estimated. Returns null only when there is no darker circular pupil.
  */
 export function suggestIrisFit(
   gray: Float32Array,
@@ -142,28 +178,25 @@ export function suggestIrisFit(
 ): Pick<IrisFit, "cx" | "cy" | "rp" | "ri"> | null {
   if (width < 16 || height < 16 || gray.length < width * height) return null;
   const minSide = Math.min(width, height);
-  const step = Math.max(2, Math.round(minSide / 48));
+  const step = Math.max(2, Math.round(minSide / 40));
   const pupilRadii: number[] = [];
-  for (let r = minSide * 0.05; r <= minSide * 0.22; r += Math.max(2, minSide * 0.025)) {
+  for (let r = minSide * 0.04; r <= minSide * 0.28; r += Math.max(2, minSide * 0.022)) {
     pupilRadii.push(r);
   }
   let bestPupil: { cx: number; cy: number; rp: number; score: number } | null = null;
-  const x0 = Math.round(width * 0.28);
-  const x1 = Math.round(width * 0.72);
-  const y0 = Math.round(height * 0.28);
-  const y1 = Math.round(height * 0.72);
+  const x0 = Math.round(width * 0.12);
+  const x1 = Math.round(width * 0.88);
+  const y0 = Math.round(height * 0.12);
+  const y1 = Math.round(height * 0.88);
   for (let cy = y0; cy <= y1; cy += step) {
     for (let cx = x0; cx <= x1; cx += step) {
       for (const rp of pupilRadii) {
-        const inside = meanCircle(gray, width, height, cx, cy, rp * 0.55);
-        const outside = meanCircle(gray, width, height, cx, cy, Math.min(rp * 1.35, minSide * 0.45));
-        const off = Math.hypot(cx - width / 2, cy - height / 2) / minSide;
-        const score = outside - inside - off * 25;
+        const score = pupilContrastScore(gray, width, height, cx, cy, rp, minSide);
         if (!bestPupil || score > bestPupil.score) bestPupil = { cx, cy, rp, score };
       }
     }
   }
-  if (!bestPupil || bestPupil.score < 12) return null;
+  if (!bestPupil || bestPupil.score < 6) return null;
 
   let cx = bestPupil.cx;
   let cy = bestPupil.cy;
@@ -174,27 +207,16 @@ export function suggestIrisFit(
     for (let x = cx - step; x <= cx + step; x += refine) {
       for (const radius of [rp * 0.8, rp, rp * 1.2]) {
         if (radius < 4) continue;
-        const inside = meanCircle(gray, width, height, x, y, radius * 0.55);
-        const outside = meanCircle(gray, width, height, x, y, radius * 1.35);
-        const score = outside - inside;
+        const score = pupilContrastScore(gray, width, height, x, y, radius, minSide);
         if (!refined || score > refined.score) refined = { cx: x, cy: y, rp: radius, score };
       }
     }
   }
-  if (refined) {
+  if (refined && refined.score > 0) {
     cx = refined.cx;
     cy = refined.cy;
     rp = refined.rp;
   }
 
-  const maxR = minSide * 0.48;
-  let bestIris: { ri: number; score: number } | null = null;
-  for (let r = rp * 1.8; r <= maxR; r += Math.max(1.5, minSide / 80)) {
-    const inner = meanCircle(gray, width, height, cx, cy, Math.max(rp + 1, r - 2));
-    const outer = meanCircle(gray, width, height, cx, cy, r + 3);
-    const score = outer - inner;
-    if (!bestIris || score > bestIris.score) bestIris = { ri: r, score };
-  }
-  if (!bestIris || bestIris.score < 8 || bestIris.ri <= rp * 1.3) return null;
-  return { cx, cy, rp, ri: bestIris.ri };
+  return { cx, cy, rp, ri: estimateIrisRadius(gray, width, height, cx, cy, rp, minSide) };
 }

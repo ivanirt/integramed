@@ -158,7 +158,24 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function applyAutoLinks(vaultPath, notes, selected) {
+function materializeNote(vaultPath, relative, fallbackRoots) {
+  const { abs } = resolveInsideVault(vaultPath, relative);
+  if (fs.existsSync(abs) && fs.statSync(abs).isFile()) return abs;
+  for (const root of fallbackRoots || []) {
+    try {
+      const source = resolveInsideVault(root, relative);
+      if (!fs.existsSync(source.abs) || !fs.statSync(source.abs).isFile()) continue;
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.copyFileSync(source.abs, abs);
+      return abs;
+    } catch {
+      // A bad fallback root must not hide a missing note.
+    }
+  }
+  return abs;
+}
+
+export function applyAutoLinks(vaultPath, notes, selected, fallbackRoots = []) {
   const byFile = new Map(notes.map((note) => [note.file, note]));
   const grouped = new Map();
   (selected || []).forEach((item) => {
@@ -170,7 +187,7 @@ export function applyAutoLinks(vaultPath, notes, selected) {
 
   const written = [];
   grouped.forEach((items, relative) => {
-    const { abs } = resolveInsideVault(vaultPath, relative);
+    const abs = materializeNote(vaultPath, relative, fallbackRoots);
     if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return;
     let raw = fs.readFileSync(abs, 'utf8');
     items.forEach((item) => {

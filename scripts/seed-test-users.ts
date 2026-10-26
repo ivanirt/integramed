@@ -14,7 +14,8 @@ function usage(): never {
 async function main() {
   const args = process.argv.slice(2).filter((arg) => arg !== "--");
   if (args.some((arg) => arg !== "--rotate")) usage();
-  const mode = String(process.env.FHIR_MODE || "local").toLowerCase();
+  const { resolvedFhirMode } = await import("../src/lib/fhir-mode.js");
+  const mode = resolvedFhirMode(process.env, "local");
   if (mode !== "local") {
     console.warn(
       `[seed:test-users] FHIR_MODE=${mode}. Este comando solo escribe el almacén local data/fhir.`,

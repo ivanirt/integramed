@@ -7,9 +7,12 @@ const PROXY_HEALTH_CACHE_MS = 3000;
 
 /** @type {{ at: number, ok: boolean } | null} */
 let proxyHealthCache = null;
+/** @type {Promise<boolean> | null} */
+let proxyHealthInflight = null;
 
 export function clearProxyHealthCache() {
   proxyHealthCache = null;
+  proxyHealthInflight = null;
 }
 
 function proxyHealthUrl() {
@@ -25,12 +28,7 @@ function proxyHealthUrl() {
   return `${url.origin}/healthz`;
 }
 
-/** @returns {Promise<boolean>} */
-export async function readProxyHealth() {
-  const now = Date.now();
-  if (proxyHealthCache && now - proxyHealthCache.at < PROXY_HEALTH_CACHE_MS) {
-    return proxyHealthCache.ok;
-  }
+async function probeProxyHealth() {
   const target = proxyHealthUrl();
   let ok = false;
   if (target) {
@@ -46,4 +44,19 @@ export async function readProxyHealth() {
   }
   proxyHealthCache = { at: Date.now(), ok };
   return ok;
+}
+
+/** @returns {Promise<boolean>} */
+export async function readProxyHealth() {
+  const now = Date.now();
+  if (proxyHealthCache && now - proxyHealthCache.at < PROXY_HEALTH_CACHE_MS) {
+    return proxyHealthCache.ok;
+  }
+  if (!proxyHealthInflight) {
+    const pending = probeProxyHealth().finally(() => {
+      if (proxyHealthInflight === pending) proxyHealthInflight = null;
+    });
+    proxyHealthInflight = pending;
+  }
+  return proxyHealthInflight;
 }

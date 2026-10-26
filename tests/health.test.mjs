@@ -205,3 +205,39 @@ test("Next /healthz reuses the proxy result for a few seconds", async () => {
     else process.env.FHIR_PROXY_URL = previous;
   }
 });
+
+test("concurrent /healthz calls share one in-flight proxy probe", async () => {
+  const { GET } = await import("../src/app/healthz/route.ts");
+  const { clearProxyHealthCache } = await import("../src/lib/proxy-health.js");
+  clearProxyHealthCache();
+  let hits = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const stub = await listen((req, res) => {
+    hits += 1;
+    gate.then(() => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  const previous = process.env.FHIR_PROXY_URL;
+  process.env.FHIR_PROXY_URL = `http://127.0.0.1:${stub.address().port}`;
+  try {
+    const pending = Promise.all([GET(), GET()]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(hits, 1);
+    release();
+    const [first, second] = await pending;
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(hits, 1);
+  } finally {
+    release();
+    clearProxyHealthCache();
+    await stop(stub);
+    if (previous === undefined) delete process.env.FHIR_PROXY_URL;
+    else process.env.FHIR_PROXY_URL = previous;
+  }
+});

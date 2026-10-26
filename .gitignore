@@ -43,6 +43,7 @@ cookies.txt
 data/fhir/
 data/auth/
 data/vault-source-settings.json
+data/vault/
 
 # Generated QA passwords. Never commit.
 .local/

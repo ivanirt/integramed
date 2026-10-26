@@ -47,7 +47,8 @@ async function main() {
     process.exit(1);
   }
 
-  const mode = String(process.env.FHIR_MODE || "local").toLowerCase();
+  const { resolvedFhirMode } = await import("../src/lib/fhir-mode.js");
+  const mode = resolvedFhirMode(process.env, "local");
   if (mode !== "local") {
     console.error(
       `[set-password] FHIR_MODE=${mode}. Este comando solo escribe el almacén local data/fhir. Con proxy remoto la app no verá el cambio.`,

@@ -7,7 +7,8 @@ import { isAcceptableSecret, proxySecretOk, requireClinicAccess } from './sessio
 import { findAuthStaff } from './staffLookup.js';
 import { isAuthLookupQuery } from '../src/lib/auth-query.js';
 import { resolveAiBaseUrl } from './aiAllowlist.js';
-import { loadVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
+import { loadLanguageVaultNotes, rankVaultNotes, excerptForPrompt, resolveVaultPath, normalizeVaultLanguage } from './clinicalVault.js';
+import { fhirModeIsLocal } from '../src/lib/fhir-mode.js';
 import { registerVaultRoutes } from './vaultRoutes.js';
 import { loadVaultSourceSettings, noteIsEnabled } from './vaultSettings.js';
 import { noteUsesSources } from './vaultSourceTags.js';
@@ -85,7 +86,7 @@ app.use(express.json({
 // Config
 let FHIR_BASE_URL = process.env.FHIR_BASE_URL || '';
 let FHIR_AUTH_TOKEN = process.env.FHIR_AUTH_TOKEN || '';
-let FHIR_MODE = String(process.env.FHIR_MODE || '').toLowerCase() === 'local' ? 'local' : 'proxy';
+let FHIR_MODE = fhirModeIsLocal() ? 'local' : 'proxy';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const DATA_ROOT = process.env.INTEGRAMED_DATA_ROOT
@@ -242,7 +243,7 @@ app.get('/api/ai/vault-status', (req, res) => {
   const language = normalizeVaultLanguage(req.query?.language);
   const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
   try {
-    const notes = loadVaultNotes(vaultPath);
+    const notes = loadLanguageVaultNotes(language, PROJECT_ROOT);
     res.json({
       exists: notes.length > 0,
       noteCount: notes.length,
@@ -275,7 +276,6 @@ app.post('/api/ai/consult', async (req, res) => {
   const freeTextDiagnosis = String(req.body?.diagnosisFreeText || '').trim();
   const diagnosisText = [codedDiagnosis, freeTextDiagnosis].filter((part) => String(part).trim()).join('\n');
   const language = normalizeVaultLanguage(req.body?.language || req.headers['x-ui-language']);
-  const vaultPath = resolveVaultPath(language, PROJECT_ROOT);
   const question = String(req.body?.question || '').trim();
   const modalities = req.body?.modalities || [];
 
@@ -285,7 +285,7 @@ app.post('/api/ai/consult', async (req, res) => {
 
   let notes = [];
   try {
-    notes = loadVaultNotes(vaultPath);
+    notes = loadLanguageVaultNotes(language, PROJECT_ROOT);
   } catch (err) {
     return res.status(500).json({ error: `No se pudo leer el vault: ${err.message}` });
   }

@@ -15,7 +15,7 @@ export default async function BovedaPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="font-serif text-4xl">Bóveda de contexto</h1>
       <p className="mt-2 text-sm text-[#6D5E52]">
-        Las notas siguen en disco (`vault-es/`), no en FHIR. El listado sale del servidor Express.
+        Las notas de la imagen siguen en `vault-es/`. Las importaciones se guardan en el volumen de la bóveda, no en FHIR. El listado sale del servidor Express.
       </p>
       {"error" in data && data.error ? <p className="mt-4 text-sm">{String(data.error)}</p> : null}
       <ul className="mt-8 divide-y divide-[#EADBCE] border border-[#EADBCE] bg-white">
